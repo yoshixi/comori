@@ -7,8 +7,8 @@ const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
 
-const DialogPortal = ({ className, ...props }: DialogPrimitive.DialogPortalProps): JSX.Element => (
-  <DialogPrimitive.Portal className={cn(className)} {...props} />
+const DialogPortal = (props: DialogPrimitive.DialogPortalProps): React.JSX.Element => (
+  <DialogPrimitive.Portal {...props} />
 )
 DialogPortal.displayName = DialogPrimitive.Portal.displayName
 
@@ -50,7 +50,7 @@ DialogContent.displayName = DialogPrimitive.Content.displayName
 const DialogHeader = ({
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>): JSX.Element => (
+}: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element => (
   <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
@@ -58,7 +58,7 @@ DialogHeader.displayName = 'DialogHeader'
 const DialogFooter = ({
   className,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>): JSX.Element => (
+}: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element => (
   <div
     className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)}
     {...props}

@@ -1,35 +1,464 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import React, { useEffect, useState } from 'react'
+import {
+  CalendarDays,
+  Clock4,
+  Pencil,
+  Trash2,
+  Plus
+} from 'lucide-react'
+
+import { Button } from './components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from './components/ui/dialog'
+import { Input } from './components/ui/input'
+import { Label } from './components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from './components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from './components/ui/table'
+import { Textarea } from './components/ui/textarea'
+
+type TaskStatus = 'To Do' | 'In Progress' | 'Done'
+
+interface Task {
+  id: string
+  title: string
+  description: string
+  status: TaskStatus
+  dueDate?: string
+  createdAt: string
+  updatedAt: string
+}
+
+const STATUS_OPTIONS: TaskStatus[] = ['To Do', 'In Progress', 'Done']
+
+const seedTasks: Task[] = [
+  {
+    id: createId(),
+    title: 'Draft research outline',
+    description:
+      'Translate the research brief in Spec.md into a clear outline with milestones and blockers.',
+    status: 'In Progress',
+    dueDate: upcomingDate(0),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: createId(),
+    title: 'Prototype focus timer',
+    description:
+      'Pair timer controls with the task list and wire up the highlighting interactions described in the spec.',
+    status: 'To Do',
+    dueDate: upcomingDate(1),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: createId(),
+    title: 'Polish task details',
+    description:
+      'Tighten up the copy, task metadata, and shadcn components for consistent styling.',
+    status: 'Done',
+    dueDate: upcomingDate(-1),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+]
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
+  const [tasks, setTasks] = useState<Task[]>(seedTasks)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all')
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [newTaskFields, setNewTaskFields] = useState({
+    title: '',
+    description: '',
+    dueDate: ''
+  })
+
+  const filteredTasks = tasks.filter((task) => {
+    if (statusFilter === 'all') return true
+    return task.status === statusFilter
+  })
+
+  function handleCreateTask(): void {
+    if (!newTaskFields.title.trim()) return
+
+    const now = new Date().toISOString()
+    const task: Task = {
+      id: createId(),
+      title: newTaskFields.title.trim(),
+      description: newTaskFields.description.trim(),
+      status: 'To Do',
+      dueDate: newTaskFields.dueDate || undefined,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    setTasks((prev) => [task, ...prev])
+    setNewTaskFields({ title: '', description: '', dueDate: '' })
+    setIsAddingTask(false)
+  }
+
+  function handleCancelAdd(): void {
+    setNewTaskFields({ title: '', description: '', dueDate: '' })
+    setIsAddingTask(false)
+  }
+
+  function handleDeleteTask(taskId: string): void {
+    setTasks((prev) => prev.filter((task) => task.id !== taskId))
+  }
+
+  function handleStatusChange(taskId: string, status: TaskStatus): void {
+    const now = new Date().toISOString()
+    setTasks((prev) =>
+      prev.map((task) => (task.id === taskId ? { ...task, status, updatedAt: now } : task))
+    )
+  }
+
+  function handleUpdateTask(updated: Task): void {
+    setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)))
+    setEditingTask(null)
+  }
 
   return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <Versions></Versions>
-    </>
+    <div className="min-h-screen p-8">
+      <main className="mx-auto max-w-6xl">
+        <header className="mb-8 text-center">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            <Clock4 className="h-4 w-4 text-primary" />
+            Task Management
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Task List
+          </h1>
+          <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground">
+            Manage your tasks in a simple table view
+          </p>
+        </header>
+
+        {/* Task Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Tasks</CardTitle>
+              <CardDescription>Manage your task list</CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+              <Select
+                value={statusFilter}
+                onValueChange={(value: 'all' | TaskStatus) => setStatusFilter(value)}
+              >
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem value={status} key={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!isAddingTask && (
+                <Button onClick={() => setIsAddingTask(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Task
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Due Date</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isAddingTask && (
+                  <TableRow className="border-primary/50 bg-primary/5">
+                    <TableCell>
+                      <Input
+                        placeholder="Enter task title"
+                        value={newTaskFields.title}
+                        onChange={(e) =>
+                          setNewTaskFields((prev) => ({ ...prev, title: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleCreateTask()
+                          } else if (e.key === 'Escape') {
+                            handleCancelAdd()
+                          }
+                        }}
+                        autoFocus
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="Enter description"
+                        value={newTaskFields.description}
+                        onChange={(e) =>
+                          setNewTaskFields((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleCreateTask()
+                          } else if (e.key === 'Escape') {
+                            handleCancelAdd()
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value="To Do"
+                        disabled
+                      >
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="date"
+                        value={newTaskFields.dueDate}
+                        onChange={(e) =>
+                          setNewTaskFields((prev) => ({ ...prev, dueDate: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleCreateTask()
+                          } else if (e.key === 'Escape') {
+                            handleCancelAdd()
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleCreateTask}
+                          disabled={!newTaskFields.title.trim()}
+                        >
+                          Save
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelAdd}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {filteredTasks.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      No tasks found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTasks.map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-medium">{task.title}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {task.description || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={task.status}
+                          onValueChange={(status: TaskStatus) =>
+                            handleStatusChange(task.id, status)
+                          }
+                        >
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {status}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4" />
+                          {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingTask(task)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteTask(task.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </main>
+
+      <EditTaskDialog
+        task={editingTask}
+        onOpenChange={(open) => !open && setEditingTask(null)}
+        onSubmit={handleUpdateTask}
+      />
+    </div>
   )
+}
+
+function EditTaskDialog({
+  task,
+  onOpenChange,
+  onSubmit
+}: {
+  task: Task | null
+  onOpenChange: (open: boolean) => void
+  onSubmit: (task: Task) => void
+}): React.JSX.Element | null {
+  const [localTask, setLocalTask] = useState<Task | null>(task)
+
+  useEffect(() => {
+    setLocalTask(task)
+  }, [task])
+
+  if (!task || !localTask) return null
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>): void {
+    event.preventDefault()
+    if (!localTask) return
+    onSubmit({ ...localTask, updatedAt: new Date().toISOString() })
+  }
+
+  return (
+    <Dialog open={!!task} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit task</DialogTitle>
+          <DialogDescription>Update the metadata and save.</DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="edit-title">Title</Label>
+            <Input
+              id="edit-title"
+              value={localTask.title}
+              onChange={(event) => setLocalTask({ ...localTask, title: event.target.value })}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-description">Description</Label>
+            <Textarea
+              id="edit-description"
+              value={localTask.description}
+              onChange={(event) => setLocalTask({ ...localTask, description: event.target.value })}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-due">Due date</Label>
+              <Input
+                id="edit-due"
+                type="date"
+                value={localTask.dueDate ?? ''}
+                onChange={(event) => setLocalTask({ ...localTask, dueDate: event.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={localTask.status}
+                onValueChange={(status: TaskStatus) => setLocalTask({ ...localTask, status })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit">Save changes</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function formatDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    weekday: 'short'
+  })
+}
+
+function upcomingDate(offset: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + offset)
+  return date.toISOString().slice(0, 10)
+}
+
+function createId(): string {
+  if (crypto?.randomUUID) return crypto.randomUUID()
+  return Math.random().toString(36).slice(2)
 }
 
 export default App

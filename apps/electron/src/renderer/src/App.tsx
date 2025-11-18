@@ -4,7 +4,10 @@ import {
   Clock4,
   Pencil,
   Trash2,
-  Plus
+  Plus,
+  Play,
+  Pause,
+  RotateCcw
 } from 'lucide-react'
 
 import { Button } from './components/ui/button'
@@ -46,6 +49,23 @@ interface Task {
   dueDate?: string
   createdAt: string
   updatedAt: string
+}
+
+interface TaskTimer {
+  id: string
+  taskId: string
+  startTime: string
+  endTime?: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface ActiveTimer {
+  taskId: string
+  timerId: string
+  startTime: number
+  elapsedTime: number
+  isRunning: boolean
 }
 
 const STATUS_OPTIONS: TaskStatus[] = ['To Do', 'In Progress', 'Done']
@@ -93,6 +113,21 @@ function App(): React.JSX.Element {
     description: '',
     dueDate: ''
   })
+  
+  // Timer state
+  const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
+  // @ts-ignore - taskTimers is used in setTaskTimers calls
+  const [taskTimers, setTaskTimers] = useState<TaskTimer[]>([])
+  const [currentTime, setCurrentTime] = useState(Date.now())
+
+  // Update current time every second for timer display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   const filteredTasks = tasks.filter((task) => {
     if (statusFilter === 'all') return true
@@ -125,6 +160,11 @@ function App(): React.JSX.Element {
 
   function handleDeleteTask(taskId: string): void {
     setTasks((prev) => prev.filter((task) => task.id !== taskId))
+    
+    // Stop timer if this task was being timed
+    if (activeTimer?.taskId === taskId) {
+      handleStopTimer()
+    }
   }
 
   function handleStatusChange(taskId: string, status: TaskStatus): void {
@@ -137,6 +177,101 @@ function App(): React.JSX.Element {
   function handleUpdateTask(updated: Task): void {
     setTasks((prev) => prev.map((task) => (task.id === updated.id ? updated : task)))
     setEditingTask(null)
+  }
+
+  // Timer functions
+  function handleStartTimer(taskId: string): void {
+    if (activeTimer) {
+      // Stop current timer first
+      handleStopTimer()
+    }
+
+    const now = new Date().toISOString()
+    const timerId = createId()
+    
+    // Create a new timer record
+    const newTimer: TaskTimer = {
+      id: timerId,
+      taskId,
+      startTime: now,
+      createdAt: now,
+      updatedAt: now
+    }
+
+    setTaskTimers(prev => [...prev, newTimer])
+    setActiveTimer({
+      taskId,
+      timerId,
+      startTime: Date.now(),
+      elapsedTime: 0,
+      isRunning: true
+    })
+
+    // Update task status to "In Progress" if not already done
+    handleStatusChange(taskId, 'In Progress')
+  }
+
+  function handlePauseTimer(): void {
+    if (!activeTimer) return
+
+    const elapsed = currentTime - activeTimer.startTime + activeTimer.elapsedTime
+    setActiveTimer(prev => prev ? { 
+      ...prev, 
+      elapsedTime: elapsed,
+      isRunning: false 
+    } : null)
+  }
+
+  function handleResumeTimer(): void {
+    if (!activeTimer) return
+
+    setActiveTimer(prev => prev ? {
+      ...prev,
+      startTime: Date.now() - prev.elapsedTime,
+      isRunning: true
+    } : null)
+  }
+
+  function handleStopTimer(): void {
+    if (!activeTimer) return
+
+    const now = new Date().toISOString()
+    
+    // Update the timer record with end time
+    setTaskTimers(prev => 
+      prev.map(timer => 
+        timer.id === activeTimer.timerId 
+          ? { ...timer, endTime: now, updatedAt: now }
+          : timer
+      )
+    )
+
+    setActiveTimer(null)
+  }
+
+  function handleResetTimer(): void {
+    if (!activeTimer) return
+
+    // Remove the current timer record
+    setTaskTimers(prev => prev.filter(timer => timer.id !== activeTimer.timerId))
+    setActiveTimer(null)
+  }
+
+  function getTimerDisplay(taskId: string): string {
+    if (activeTimer?.taskId === taskId) {
+      const elapsed = activeTimer.isRunning 
+        ? currentTime - activeTimer.startTime + activeTimer.elapsedTime
+        : activeTimer.elapsedTime
+      
+      const minutes = Math.floor(elapsed / 60000)
+      const seconds = Math.floor((elapsed % 60000) / 1000)
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    }
+    return '00:00'
+  }
+
+  function isTaskActive(taskId: string): boolean {
+    return activeTimer?.taskId === taskId && activeTimer.isRunning
   }
 
   return (
@@ -191,6 +326,7 @@ function App(): React.JSX.Element {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Timer</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
@@ -201,6 +337,9 @@ function App(): React.JSX.Element {
               <TableBody>
                 {isAddingTask && (
                   <TableRow className="border-primary/50 bg-primary/5">
+                    <TableCell>
+                      <span className="text-muted-foreground text-sm">00:00</span>
+                    </TableCell>
                     <TableCell>
                       <Input
                         placeholder="Enter task title"
@@ -282,13 +421,64 @@ function App(): React.JSX.Element {
                 )}
                 {filteredTasks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       No tasks found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredTasks.map((task) => (
-                    <TableRow key={task.id}>
+                    <TableRow 
+                      key={task.id}
+                      className={isTaskActive(task.id) ? 'border-primary/70 bg-primary/10' : ''}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Clock4 className="h-4 w-4" />
+                          <span className="font-mono text-sm min-w-[3rem]">
+                            {getTimerDisplay(task.id)}
+                          </span>
+                          {activeTimer?.taskId === task.id ? (
+                            <div className="flex gap-1">
+                              {activeTimer.isRunning ? (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={handlePauseTimer}
+                                  className="h-6 w-6"
+                                >
+                                  <Pause className="h-3 w-3" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={handleResumeTimer}
+                                  className="h-6 w-6"
+                                >
+                                  <Play className="h-3 w-3" />
+                                </Button>
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleResetTimer}
+                                className="h-6 w-6"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleStartTimer(task.id)}
+                              className="h-6 w-6"
+                            >
+                              <Play className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="font-medium">{task.title}</TableCell>
                       <TableCell className="max-w-xs truncate">
                         {task.description || '-'}

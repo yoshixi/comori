@@ -11,9 +11,11 @@
     "check-types": "tsc --noEmit",
     "drizzle:generate": "drizzle-kit generate --config ./drizzle.config.ts",
     "drizzle:push": "drizzle-kit push --config ./drizzle.config.ts",
-    "drizzle:pull": "drizzle-kit pull --config ./drizzle.config.ts"
+    "drizzle:pull": "drizzle-kit pull --config ./drizzle.config.ts",
+    "test": "vitest"
   },
   "dependencies": {
+    "@hono/zod-openapi": "^1.1.5",
     "@libsql/client": "^0.15.15",
     "@repo/ui": "workspace:*",
     "dotenv": "^17.2.3",
@@ -22,7 +24,8 @@
     "next": "16.0.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
@@ -31,7 +34,9 @@
     "@types/react": "19.2.6",
     "@types/react-dom": "19.2.3",
     "drizzle-kit": "^0.31.7",
+    "drizzle-seed": "^0.3.1",
     "eslint": "^9.34.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.0.13"
   }
 }

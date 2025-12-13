@@ -11,3 +11,14 @@ To build all apps and packages, run the following command:
 ```sh
 pnpm run dev
 ```
+
+# add new package to specific packages
+
+```js
+ pnpm --filter web add -D drizzle-seed
+```
+```
+
+
+
+```

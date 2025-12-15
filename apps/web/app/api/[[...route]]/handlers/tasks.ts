@@ -6,9 +6,8 @@ export const listTasksHandler = async (c: any) => {
   try {
     const db = getDb()
     const defaultUser = await ensureDefaultUser(db)
-    const { status } = c.req.valid('query')
     
-    const tasks = await getAllTasks(db, defaultUser.id.toString(), status)
+    const tasks = await getAllTasks(db, defaultUser.id.toString())
     
     return c.json({
       tasks: tasks,

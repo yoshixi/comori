@@ -9,12 +9,6 @@ export const UUIDSchema = z.string().uuid().openapi({
   example: '01234567-89ab-cdef-0123-456789abcdef',
 })
 
-// Enum for task status
-export const TaskStatusEnum = z.enum(['To Do', 'In Progress', 'Done']).openapi({
-  description: 'Status of a task',
-  example: 'To Do'
-})
-
 // Base task model
 export const TaskModel = z.object({
   id: UUIDSchema.openapi({
@@ -28,7 +22,6 @@ export const TaskModel = z.object({
     description: 'Detailed description of the task',
     example: 'Write comprehensive documentation for the API endpoints'
   }),
-  status: TaskStatusEnum,
   dueDate: z.string().datetime().optional().openapi({
     description: 'Due date for the task in ISO 8601 format',
     example: '2024-12-31T23:59:59.000Z'
@@ -69,7 +62,6 @@ export const UpdateTaskModel = z.object({
     description: 'Detailed description of the task',
     example: 'Write comprehensive documentation for the API endpoints'
   }),
-  status: TaskStatusEnum.optional(),
   dueDate: z.string().datetime().optional().nullable().openapi({
     description: 'Due date for the task in ISO 8601 format. Use null to remove due date',
     example: '2024-12-31T23:59:59.000Z'
@@ -92,12 +84,9 @@ export const TaskResponseModel = z.object({
   task: TaskModel
 }).openapi('TaskResponse')
 
-// Task query parameters
+// Task query parameters (removed status filter)
 export const TaskQueryParamsModel = z.object({
-  status: z.enum(['all', 'To Do', 'In Progress', 'Done']).optional().default('all').openapi({
-    description: 'Filter tasks by status',
-    example: 'To Do'
-  })
+  // No query parameters for now, but keeping the structure for future use
 }).openapi('TaskQueryParams')
 
 // Path parameter models
@@ -118,5 +107,4 @@ export type UpdateTask = z.infer<typeof UpdateTaskModel>
 export type TaskListResponse = z.infer<typeof TaskListResponseModel>
 export type TaskResponse = z.infer<typeof TaskResponseModel>
 export type TaskQueryParams = z.infer<typeof TaskQueryParamsModel>
-export type TaskStatus = z.infer<typeof TaskStatusEnum>
 export type TaskIdParam = z.infer<typeof TaskIdParamModel>

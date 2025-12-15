@@ -112,7 +112,6 @@ describe('Task Handlers (Simplified)', () => {
       expect(data.task.title).toBe(taskData.title);
       expect(data.task.description).toBe(taskData.description);
       expect(data.task.dueDate).toBe(taskData.dueDate);
-      expect(data.task.status).toBe('To Do');
       expect(data.task.id).toBeTruthy();
       expect(data.task.createdAt).toBeTruthy();
       expect(data.task.updatedAt).toBeTruthy();
@@ -138,7 +137,6 @@ describe('Task Handlers (Simplified)', () => {
       expect(data.task.title).toBe(taskData.title);
       expect(data.task.description).toBe('');
       expect(data.task.dueDate).toBeNull();
-      expect(data.task.status).toBe('To Do');
     });
 
     it('should reject empty title', async () => {
@@ -187,8 +185,7 @@ describe('Task Handlers (Simplified)', () => {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: 'Updated Lifecycle Task',
-          status: 'Done'
+          title: 'Updated Lifecycle Task'
         })
       });
       
@@ -196,7 +193,6 @@ describe('Task Handlers (Simplified)', () => {
       expect(updateRes.status).toBe(200);
       const updateData = await updateRes.json();
       expect(updateData.task.title).toBe('Updated Lifecycle Task');
-      expect(updateData.task.status).toBe('Done');
 
       // Delete task
       const deleteReq = new Request(`http://localhost/tasks/${taskId}`, {

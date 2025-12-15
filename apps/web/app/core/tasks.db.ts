@@ -3,15 +3,11 @@ import { tasksTable, taskTimersTable, usersTable, type InsertTask, type SelectTa
 import { createId, type DB } from './common.db'
 import { formatTimestamp, parseISOToUnixTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
 
-// Define TaskStatus type
-export type TaskStatus = 'To Do' | 'In Progress' | 'Done'
-
 // Define API types without zod dependencies
 export interface Task {
   id: string
   title: string
   description: string
-  status: TaskStatus
   dueDate: string | null
   createdAt: string
   updatedAt: string
@@ -26,24 +22,15 @@ export interface CreateTask {
 export interface UpdateTask {
   title?: string
   description?: string
-  status?: TaskStatus
   dueDate?: string | null
 }
 
 // Convert database task to API task
 export function convertDbTaskToApi(dbTask: SelectTask): Task {
-  let status: TaskStatus
-  if (dbTask.completedAt) {
-    status = 'Done'
-  } else {
-    status = 'To Do' // Default to "To Do", will be updated if there are active timers
-  }
-
   return {
     id: dbTask.id.toString(),
     title: dbTask.title,
     description: dbTask.description || '',
-    status,
     dueDate: dbTask.dueAt ? formatTimestamp(dbTask.dueAt) : null,
     createdAt: formatTimestamp(dbTask.createdAt),
     updatedAt: formatTimestamp(dbTask.updatedAt)
@@ -73,36 +60,14 @@ export async function ensureDefaultUser(db: DB): Promise<SelectUser> {
   return user
 }
 
-export async function getAllTasks(db: DB, userId: string, statusFilter?: string): Promise<Task[]> {
-  let dbTasks = await db
+export async function getAllTasks(db: DB, userId: string): Promise<Task[]> {
+  const dbTasks = await db
     .select()
     .from(tasksTable)
     .where(eq(tasksTable.userId, userId))
     .orderBy(desc(tasksTable.createdAt))
 
-  // Get active timers to determine "In Progress" status
-  const activeTimers = await db
-    .select()
-    .from(taskTimersTable)
-    .where(isNull(taskTimersTable.endTime))
-
-  const activeTaskIds = new Set(activeTimers.map(timer => timer.taskId.toString()))
-
-  let tasks: Task[] = dbTasks.map(dbTask => {
-    const task = convertDbTaskToApi(dbTask)
-    // Override status if there's an active timer
-    if (activeTaskIds.has(task.id)) {
-      task.status = 'In Progress'
-    }
-    return task
-  })
-
-  // Filter by status if specified
-  if (statusFilter && statusFilter !== 'all') {
-    tasks = tasks.filter(task => task.status === statusFilter)
-  }
-
-  return tasks
+  return dbTasks.map(convertDbTaskToApi)
 }
 
 export async function getTaskById(db: DB, userId: string, taskId: string): Promise<Task | null> {
@@ -115,18 +80,7 @@ export async function getTaskById(db: DB, userId: string, taskId: string): Promi
     return null
   }
 
-  // Check for active timer
-  const [activeTimer] = await db
-    .select()
-    .from(taskTimersTable)
-    .where(and(eq(taskTimersTable.taskId, taskId), isNull(taskTimersTable.endTime)))
-
-  const task = convertDbTaskToApi(dbTask)
-  if (activeTimer) {
-    task.status = 'In Progress'
-  }
-
-  return task
+  return convertDbTaskToApi(dbTask)
 }
 
 export async function createTask(db: DB, userId: string, data: CreateTask): Promise<Task> {
@@ -169,18 +123,6 @@ export async function updateTask(db: DB, userId: string, taskId: string, data: U
   if (data.description !== undefined) updateData.description = data.description.trim() || null
   if (data.dueDate !== undefined) updateData.dueAt = data.dueDate ? parseISOToUnixTimestamp(data.dueDate) : null
 
-  // Handle completion status
-  if (data.status === 'Done' && !existingTask.completedAt) {
-    updateData.completedAt = now
-    // End any active timers when marking as done
-    await db
-      .update(taskTimersTable)
-      .set({ endTime: now, updatedAt: now })
-      .where(and(eq(taskTimersTable.taskId, taskId), isNull(taskTimersTable.endTime)))
-  } else if (data.status !== 'Done' && existingTask.completedAt) {
-    updateData.completedAt = null
-  }
-
   const result = await db
     .update(tasksTable)
     .set(updateData)
@@ -192,18 +134,7 @@ export async function updateTask(db: DB, userId: string, taskId: string, data: U
     return null
   }
 
-  // Check for active timer to determine status
-  const [activeTimer] = await db
-    .select()
-    .from(taskTimersTable)
-    .where(and(eq(taskTimersTable.taskId, taskId), isNull(taskTimersTable.endTime)))
-
-  const task = convertDbTaskToApi(updatedDbTask)
-  if (activeTimer && task.status !== 'Done') {
-    task.status = 'In Progress'
-  }
-
-  return task
+  return convertDbTaskToApi(updatedDbTask)
 }
 
 export async function deleteTask(db: DB, userId: string, taskId: string): Promise<Task | null> {

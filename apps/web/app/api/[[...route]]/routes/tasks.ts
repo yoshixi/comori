@@ -9,15 +9,12 @@ import {
 } from '../../../core/tasks.core'
 import { ErrorResponseModel } from '../../../core/common.core'
 
-// GET /tasks - List all tasks with optional filtering
+// GET /tasks - List all tasks
 export const listTasksRoute = createRoute({
   method: 'get',
   path: '/tasks',
   summary: 'Get all tasks',
-  description: 'Retrieve all tasks with optional status filtering',
-  request: {
-    query: TaskQueryParamsModel
-  },
+  description: 'Retrieve all tasks',
   responses: {
     200: {
       content: {

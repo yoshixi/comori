@@ -1,4 +1,5 @@
-import { drizzle } from 'drizzle-orm/libsql';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import Database from 'better-sqlite3';
 import * as schema from '../schema/schema';
 import { getDb } from '../../core/common.db';
 
@@ -13,7 +14,14 @@ export type SqliteLibsqlTestContext = {
 };
 
 export const getTestDB = (location: ":memory:" | (string & {}) = ":memory:") => {
-  return drizzle(location, { schema, casing: "snake_case" });
+  if (location !== ":memory:") {
+    // Ensure directory exists if using file-based database
+    fs.mkdirSync(path.dirname(location), { recursive: true })
+  }
+  
+  const sqlite = new Database(location);
+  sqlite.pragma('foreign_keys = ON');
+  return drizzle(sqlite, { schema, casing: "snake_case" });
 };
 
 export type DB = ReturnType<typeof getDb>;

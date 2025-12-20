@@ -3,9 +3,10 @@
 {
   # https://devenv.sh/basics/
   env.GREET = "devenv";
+  dotenv.enable=true;
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git pkgs.pnpm ];
+  packages = [ pkgs.git pkgs.pnpm pkgs.turso-cli ];
 
   # https://devenv.sh/languages/
   # languages.rust.enable = true;
@@ -28,10 +29,11 @@
   '';
 
   # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
+  tasks = {
+     # devenv tasks run web:test
+    "web:test".exec = "pnpm --filter web run test:oneshot";
+     #"devenv:enterShell".after = [ "myproj:setup" ];
+  };
 
   # https://devenv.sh/tests/
   enterTest = ''

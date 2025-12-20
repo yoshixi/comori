@@ -10,7 +10,8 @@ export default defineConfig({
       target: 'node18',
       rollupOptions: {
         output: {
-          entryFileNames: '[name].js'
+          entryFileNames: '[name].mjs',
+          format: 'es' // 明示的に ESM 形式で出力するよう指定
         }
       }
     }
@@ -21,6 +22,7 @@ export default defineConfig({
       target: 'node18',
       rollupOptions: {
         output: {
+          // Preloadも合わせておくと安全です
           entryFileNames: '[name].mjs'
         }
       }

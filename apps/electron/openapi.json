@@ -3,32 +3,315 @@
   "info": {
     "version": "1.0.0",
     "title": "Shuchu API",
-    "description": "API for the Shuchu task management application"
+    "description": "API for the Shuchu task management application with OpenAPI documentation"
   },
-  "servers": [
-    {
-      "url": "/api",
-      "description": "API server"
-    }
-  ],
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Health status",
+            "example": "ok"
+          },
+          "message": {
+            "type": "string",
+            "description": "Health status message",
+            "example": "Shuchu API is running"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Current timestamp",
+            "example": "2024-01-01T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "timestamp"
+        ]
+      },
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the task",
+            "example": "01234567-89ab-cdef-0123-456789abcdef"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Title of the task",
+            "example": "Complete project documentation"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the task",
+            "example": "Write comprehensive documentation for the API endpoints"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Due date for the task in ISO 8601 format",
+            "example": "2024-12-31T23:59:59.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the task was created",
+            "example": "2024-01-01T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the task was last updated",
+            "example": "2024-01-01T15:30:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "TaskListResponse": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Task"
+            },
+            "description": "List of tasks"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of tasks",
+            "example": 5
+          }
+        },
+        "required": [
+          "tasks",
+          "total"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message describing what went wrong",
+            "example": "Task not found"
+          },
+          "code": {
+            "type": "string",
+            "description": "Optional error code",
+            "example": "TASK_NOT_FOUND"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "TaskResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/Task"
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "CreateTask": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Title of the task",
+            "example": "Complete project documentation"
+          },
+          "description": {
+            "type": "string",
+            "default": "",
+            "description": "Detailed description of the task",
+            "example": "Write comprehensive documentation for the API endpoints"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Due date for the task in ISO 8601 format",
+            "example": "2024-12-31T23:59:59.000Z"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "UpdateTask": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Title of the task",
+            "example": "Complete project documentation"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the task",
+            "example": "Write comprehensive documentation for the API endpoints"
+          },
+          "dueDate": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Due date for the task in ISO 8601 format. Use null to remove due date",
+            "example": "2024-12-31T23:59:59.000Z"
+          }
+        }
+      },
+      "TaskTimer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier for the timer",
+            "example": "01234567-89ab-cdef-0123-456789abcdef"
+          },
+          "taskId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the associated task",
+            "example": "01234567-89ab-cdef-0123-456789abcdef"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the timer was started",
+            "example": "2024-01-01T10:00:00.000Z"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the timer was ended (null for active timers)",
+            "example": "2024-01-01T10:25:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the timer was created",
+            "example": "2024-01-01T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the timer was last updated",
+            "example": "2024-01-01T10:25:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "taskId",
+          "startTime",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "TimerListResponse": {
+        "type": "object",
+        "properties": {
+          "timers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskTimer"
+            },
+            "description": "List of timers"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total number of timers",
+            "example": 5
+          }
+        },
+        "required": [
+          "timers",
+          "total"
+        ]
+      },
+      "TimerResponse": {
+        "type": "object",
+        "properties": {
+          "timer": {
+            "$ref": "#/components/schemas/TaskTimer"
+          }
+        },
+        "required": [
+          "timer"
+        ]
+      },
+      "CreateTimer": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the task to start timer for",
+            "example": "01234567-89ab-cdef-0123-456789abcdef"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the timer should start",
+            "example": "2024-01-01T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "taskId",
+          "startTime"
+        ]
+      },
+      "UpdateTimer": {
+        "type": "object",
+        "properties": {
+          "endTime": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Timestamp when the timer ended. Use null to remove end time",
+            "example": "2024-01-01T10:25:00.000Z"
+          }
+        }
+      }
+    },
+    "parameters": {}
+  },
   "paths": {
-    "/health": {
+    "/api/health": {
       "get": {
         "summary": "Health check",
-        "operationId": "getHealth",
+        "description": "Check if the API is running",
         "responses": {
           "200": {
-            "description": "Service is healthy",
+            "description": "API is healthy",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    }
-                  }
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -36,20 +319,27 @@
         }
       }
     },
-    "/tasks": {
+    "/api/tasks": {
       "get": {
-        "summary": "List all tasks",
-        "operationId": "listTasks",
+        "summary": "Get all tasks",
+        "description": "Retrieve all tasks",
         "responses": {
           "200": {
             "description": "Tasks retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Task"
-                  }
+                  "$ref": "#/components/schemas/TaskListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -57,10 +347,9 @@
         }
       },
       "post": {
-        "summary": "Create a new task",
-        "operationId": "createTask",
+        "summary": "Create a task",
+        "description": "Create a new task",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -75,7 +364,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Task"
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -83,18 +392,22 @@
         }
       }
     },
-    "/tasks/{id}": {
+    "/api/tasks/{id}": {
       "get": {
-        "summary": "Get a task by ID",
-        "operationId": "getTask",
+        "summary": "Get a task",
+        "description": "Retrieve a specific task by ID",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "format": "uuid",
+              "description": "Task ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Task ID",
+            "name": "id",
+            "in": "path"
           }
         ],
         "responses": {
@@ -103,7 +416,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Task"
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -112,19 +445,22 @@
       },
       "put": {
         "summary": "Update a task",
-        "operationId": "updateTask",
+        "description": "Update an existing task by ID",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "format": "uuid",
+              "description": "Task ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Task ID",
+            "name": "id",
+            "in": "path"
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
@@ -139,7 +475,37 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Task"
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -148,15 +514,19 @@
       },
       "delete": {
         "summary": "Delete a task",
-        "operationId": "deleteTask",
+        "description": "Delete a task by ID",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "format": "uuid",
+              "description": "Task ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Task ID",
+            "name": "id",
+            "in": "path"
           }
         ],
         "responses": {
@@ -165,99 +535,326 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    }
-                  }
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
           }
         }
       }
-    }
-  },
-  "components": {
-    "schemas": {
-      "Task": {
-        "type": "object",
-        "required": ["id", "title", "status", "createdAt", "updatedAt"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Unique identifier for the task"
+    },
+    "/api/timers": {
+      "get": {
+        "summary": "Get all timers",
+        "description": "Retrieve all timers across all tasks",
+        "responses": {
+          "200": {
+            "description": "Timers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerListResponse"
+                }
+              }
+            }
           },
-          "title": {
-            "type": "string",
-            "description": "Task title"
-          },
-          "description": {
-            "type": "string",
-            "description": "Task description"
-          },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "in_progress", "completed"],
-            "description": "Task status"
-          },
-          "priority": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-            "description": "Task priority"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Task creation timestamp"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Task last update timestamp"
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
-      "CreateTask": {
-        "type": "object",
-        "required": ["title"],
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "Task title"
+      "post": {
+        "summary": "Create a new timer",
+        "description": "Start a new timer for a task",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTimer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Timer created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerResponse"
+                }
+              }
+            }
           },
-          "description": {
-            "type": "string",
-            "description": "Task description"
+          "400": {
+            "description": "Invalid request data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
-          "priority": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-            "description": "Task priority"
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tasks/{taskId}/timers": {
+      "get": {
+        "summary": "Get timers for a task",
+        "description": "Retrieve all timers for a specific task",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Task ID for timer operations",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Task ID for timer operations",
+            "name": "taskId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/timers/{id}": {
+      "get": {
+        "summary": "Get a timer by ID",
+        "description": "Retrieve a specific timer by its ID",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Timer ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Timer ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timer retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Timer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
-      "UpdateTask": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "description": "Task title"
+      "put": {
+        "summary": "Update a timer",
+        "description": "Update an existing timer (typically to set end time)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Timer ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Timer ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTimer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Timer updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerResponse"
+                }
+              }
+            }
           },
-          "description": {
-            "type": "string",
-            "description": "Task description"
+          "404": {
+            "description": "Timer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
-          "status": {
-            "type": "string",
-            "enum": ["pending", "in_progress", "completed"],
-            "description": "Task status"
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a timer",
+        "description": "Delete a timer",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Timer ID",
+              "example": "01234567-89ab-cdef-0123-456789abcdef"
+            },
+            "required": true,
+            "description": "Timer ID",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timer deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimerResponse"
+                }
+              }
+            }
           },
-          "priority": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-            "description": "Task priority"
+          "404": {
+            "description": "Timer not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }

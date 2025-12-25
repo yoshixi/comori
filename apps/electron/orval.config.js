@@ -1,9 +1,9 @@
 export default {
   api: {
-    input: './openapi.json',
+    input: './openapi.json', // Use the generated schema in the same directory
     output: {
-      target: './generated/api.ts',
-      client: 'fetch',
+      target: './src/renderer/src/gen/api/api.ts',
+      client: 'swr',
       clean: true,
     },
   },

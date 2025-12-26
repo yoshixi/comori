@@ -6,9 +6,7 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types",
-    "gen:openapi": "pnpm --filter @scripts/openapischema-generator generate --",
-    "gen:openapi:electron": "pnpm --filter @scripts/openapischema-generator generate -- --path apps/electron"
+    "check-types": "turbo run check-types"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

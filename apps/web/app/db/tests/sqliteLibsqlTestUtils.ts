@@ -1,5 +1,5 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../schema/schema';
 import { getDb } from '../../core/common.db';
 
@@ -13,15 +13,26 @@ export type SqliteLibsqlTestContext = {
   reset: () => Promise<void>;
 };
 
-export const getTestDB = (location: ":memory:" | (string & {}) = ":memory:") => {
-  if (location !== ":memory:") {
-    // Ensure directory exists if using file-based database
-    fs.mkdirSync(path.dirname(location), { recursive: true })
-  }
-  
-  const sqlite = new Database(location);
-  sqlite.pragma('foreign_keys = ON');
-  return drizzle(sqlite, { schema, casing: "snake_case" });
+const IN_MEMORY_URL = 'file::memory:?cache=shared';
+
+const ensureDirectoryForUrl = (url: string) => {
+  if (!url.startsWith('file:')) return;
+  if (url.startsWith('file::memory')) return;
+
+  const filePath = url.replace(/^file:/, '');
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+};
+
+export const getTestDB = (location: ":memory:" | `file:${string}` = ":memory:") => {
+  const url = location === ":memory:" ? IN_MEMORY_URL : location;
+  ensureDirectoryForUrl(url);
+
+  const client = createClient({ url });
+  return drizzle({
+    client,
+    schema,
+    casing: "snake_case",
+  });
 };
 
 export type DB = ReturnType<typeof getDb>;

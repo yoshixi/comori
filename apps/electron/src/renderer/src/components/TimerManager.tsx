@@ -5,6 +5,12 @@ import {
   useGetApiTasksTaskIdTimers
 } from '../gen/api';
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+};
+
 /**
  * Timer Management Component
  * Demonstrates timer-related API integration
@@ -85,7 +91,7 @@ export const TimerManager: React.FC<{ taskId?: string }> = ({ taskId }) => {
       <div className="p-4 border rounded-lg bg-red-50 border-red-200">
         <h3 className="text-red-800 font-semibold mb-2">Failed to Load Timers</h3>
         <p className="text-red-600 text-sm">
-          {timersError.error || 'Unknown error'}
+          {getErrorMessage(timersError)}
         </p>
       </div>
     );

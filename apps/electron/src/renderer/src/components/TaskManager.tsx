@@ -7,6 +7,12 @@ import {
   type Task
 } from '../gen/api';
 
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error';
+};
+
 /**
  * Task Management Component
  * Demonstrates full CRUD operations with SWR hooks
@@ -101,7 +107,7 @@ export const TaskManager: React.FC = () => {
       <div className="p-4 border rounded-lg bg-red-50 border-red-200">
         <h3 className="text-red-800 font-semibold mb-2">Failed to Load Tasks</h3>
         <p className="text-red-600 text-sm">
-          {tasksError.error || 'Unknown error'}
+          {getErrorMessage(tasksError)}
         </p>
       </div>
     );

@@ -76,7 +76,11 @@ app.doc('/doc', {
   }
 })
 
+// Export the app for use by the OpenAPI schema generator
+export { app as honoApp }
+
 export const GET = handle(app)
 export const POST = handle(app)
 export const PUT = handle(app)
 export const DELETE = handle(app)
+export const OPTIONS = handle(app)

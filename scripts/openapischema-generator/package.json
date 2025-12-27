@@ -1,0 +1,19 @@
+{
+  "name": "@scripts/openapischema-generator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "tsx index.ts"
+  },
+  "devDependencies": {
+    "@apps/web": "workspace:*",
+    "@hono/zod-openapi": "catalog:",
+    "@types/node": "latest",
+    "tsx": "latest",
+    "yaml": "latest"
+  },
+  "dependencies": {
+    "commander": "^14.0.2"
+  }
+}

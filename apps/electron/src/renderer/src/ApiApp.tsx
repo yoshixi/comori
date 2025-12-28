@@ -3,15 +3,16 @@ import type { JSX } from 'react';
 import Versions from './components/Versions';
 import HealthCheck from './components/HealthCheck';
 import TaskManager from './components/TaskManager';
-import TimerManager from './components/TimerManager';
+// import TimerManager from './components/TimerManager';
 
 function ApiIntegratedApp(): JSX.Element {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tasks' | 'timers'>('dashboard');
 
   const tabs = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: '🏠' },
+    { id: 'dashboard' as const, label: 'Dashboard', icon: '🏠' },
     { id: 'tasks' as const, label: 'Tasks', icon: '📋' },
-    { id: 'timers' as const, label: 'Timers', icon: '⏱️' }
+    // { id: 'timers' as const, label: 'Timers', icon: '⏱️' }
   ];
 
   return (
@@ -40,11 +41,10 @@ function ApiIntegratedApp(): JSX.Element {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-3 py-4 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <span className="mr-2">{tab.icon}</span>
                 {tab.label}
@@ -68,10 +68,10 @@ function ApiIntegratedApp(): JSX.Element {
                 </div>
               </div>
             </div>
-            
+
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Timers</h3>
-              <TimerManager />
+              {/* <TimerManager /> */}
             </div>
           </div>
         )}
@@ -81,7 +81,7 @@ function ApiIntegratedApp(): JSX.Element {
         )}
 
         {activeTab === 'timers' && (
-          <TimerManager />
+          <div>Timer Manager</div>
         )}
       </main>
     </div>

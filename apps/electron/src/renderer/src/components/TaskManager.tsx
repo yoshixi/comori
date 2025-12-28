@@ -6,6 +6,7 @@ import {
   putApiTasksId,
   type Task
 } from '../gen/api';
+import { TaskSideMenu } from './TaskSideMenu';
 
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error) return error.message;
@@ -25,7 +26,9 @@ export const TaskManager: React.FC = () => {
     dueDate: ''
   });
   const [isUpdating, setIsUpdating] = useState(false);
+
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Fetch all tasks
   const {
@@ -159,10 +162,14 @@ export const TaskManager: React.FC = () => {
       {/* Tasks List */}
       <div className="space-y-3">
         {tasks.map((task) => (
-          <div key={task.id} className="p-4 border rounded-lg bg-white shadow-sm">
+          <div
+            key={task.id}
+            className={`p-4 border rounded-lg bg-white shadow-sm transition-shadow cursor-pointer hover:shadow-md ${selectedTask?.id === task.id ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
+            onClick={() => setSelectedTask(task)}
+          >
             {editingTask?.id === task.id ? (
               // Edit mode
-              <div className="space-y-3">
+              <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
                   value={editingTask.title || ''}
@@ -211,16 +218,13 @@ export const TaskManager: React.FC = () => {
                   </div>
                 </div>
                 {task.description && (
-                  <p className="text-gray-600 text-sm mb-3">{task.description}</p>
+                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{task.description}</p>
                 )}
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-500">
                     Created: {new Date(task.createdAt).toLocaleDateString()}
-                    {task.updatedAt && task.updatedAt !== task.createdAt && (
-                      <span> • Updated: {new Date(task.updatedAt).toLocaleDateString()}</span>
-                    )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setEditingTask(task)}
                       className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
@@ -247,6 +251,9 @@ export const TaskManager: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Side Menu */}
+      <TaskSideMenu task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   );
 };

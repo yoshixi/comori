@@ -29,6 +29,7 @@ import {
   useGetApiTasks,
   type Task
 } from './gen/api'
+import { TaskSideMenu } from './components/TaskSideMenu'
 
 interface TaskTimer {
   id: string
@@ -65,6 +66,7 @@ function App(): React.JSX.Element {
   const [isCreating, setIsCreating] = useState(false)
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null)
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const totalTasks = tasksResponse?.total ?? tasks.length
 
   // Timer state
@@ -177,10 +179,10 @@ function App(): React.JSX.Element {
     setActiveTimer((prev) =>
       prev
         ? {
-            ...prev,
-            elapsedTime: elapsed,
-            isRunning: false
-          }
+          ...prev,
+          elapsedTime: elapsed,
+          isRunning: false
+        }
         : null
     )
   }
@@ -191,10 +193,10 @@ function App(): React.JSX.Element {
     setActiveTimer((prev) =>
       prev
         ? {
-            ...prev,
-            startTime: Date.now() - prev.elapsedTime,
-            isRunning: true
-          }
+          ...prev,
+          startTime: Date.now() - prev.elapsedTime,
+          isRunning: true
+        }
         : null
     )
   }
@@ -381,9 +383,10 @@ function App(): React.JSX.Element {
                   tasks.map((task) => (
                     <TableRow
                       key={task.id}
-                      className={isTaskActive(task.id) ? 'border-primary/70 bg-primary/10' : ''}
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'border-primary/70 bg-primary/10' : ''}`}
+                      onClick={() => setSelectedTask(task)}
                     >
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <Clock4 className="h-4 w-4" />
                           <span className="font-mono text-sm min-w-[3rem]">
@@ -439,7 +442,7 @@ function App(): React.JSX.Element {
                           {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <Button size="icon" variant="ghost" onClick={() => setEditingTask(task)}>
                             <Pencil className="h-4 w-4" />
@@ -468,6 +471,8 @@ function App(): React.JSX.Element {
         onSubmit={handleUpdateTask}
         isSubmitting={!!editingTask && savingTaskId === editingTask.id}
       />
+
+      <TaskSideMenu task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   )
 }

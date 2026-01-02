@@ -25,15 +25,6 @@ import { Textarea } from './components/ui/textarea'
 import { deleteApiTasksId, postApiTasks, putApiTasksId, useGetApiTasks, type Task } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
 
-interface TaskTimer {
-  id: string
-  taskId: string
-  startTime: string
-  endTime?: string
-  createdAt: string
-  updatedAt: string
-}
-
 interface ActiveTimer {
   taskId: string
   timerId: string
@@ -65,8 +56,6 @@ function App(): React.JSX.Element {
 
   // Timer state
   const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
-  // @ts-ignore - taskTimers is used in setTaskTimers calls
-  const [taskTimers, setTaskTimers] = useState<TaskTimer[]>([])
   const [currentTime, setCurrentTime] = useState(Date.now())
 
   // Update current time every second for timer display
@@ -142,19 +131,7 @@ function App(): React.JSX.Element {
       handleStopTimer()
     }
 
-    const now = new Date().toISOString()
     const timerId = createId()
-
-    // Create a new timer record
-    const newTimer: TaskTimer = {
-      id: timerId,
-      taskId,
-      startTime: now,
-      createdAt: now,
-      updatedAt: now
-    }
-
-    setTaskTimers((prev) => [...prev, newTimer])
     setActiveTimer({
       taskId,
       timerId,
@@ -173,10 +150,10 @@ function App(): React.JSX.Element {
     setActiveTimer((prev) =>
       prev
         ? {
-          ...prev,
-          elapsedTime: elapsed,
-          isRunning: false
-        }
+            ...prev,
+            elapsedTime: elapsed,
+            isRunning: false
+          }
         : null
     )
   }
@@ -187,10 +164,10 @@ function App(): React.JSX.Element {
     setActiveTimer((prev) =>
       prev
         ? {
-          ...prev,
-          startTime: Date.now() - prev.elapsedTime,
-          isRunning: true
-        }
+            ...prev,
+            startTime: Date.now() - prev.elapsedTime,
+            isRunning: true
+          }
         : null
     )
   }
@@ -198,23 +175,12 @@ function App(): React.JSX.Element {
   function handleStopTimer(): void {
     if (!activeTimer) return
 
-    const now = new Date().toISOString()
-
-    // Update the timer record with end time
-    setTaskTimers((prev) =>
-      prev.map((timer) =>
-        timer.id === activeTimer.timerId ? { ...timer, endTime: now, updatedAt: now } : timer
-      )
-    )
-
     setActiveTimer(null)
   }
 
   function handleResetTimer(): void {
     if (!activeTimer) return
 
-    // Remove the current timer record
-    setTaskTimers((prev) => prev.filter((timer) => timer.id !== activeTimer.timerId))
     setActiveTimer(null)
   }
 
@@ -257,7 +223,9 @@ function App(): React.JSX.Element {
             <div>
               <CardTitle>Tasks</CardTitle>
               <CardDescription>
-                {tasksLoading ? 'Loading tasks...' : `${totalTasks} task${totalTasks === 1 ? '' : 's'}`}
+                {tasksLoading
+                  ? 'Loading tasks...'
+                  : `${totalTasks} task${totalTasks === 1 ? '' : 's'}`}
               </CardDescription>
             </div>
             <div className="flex items-center gap-4">

@@ -1,34 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'
 import {
   useGetApiTasks,
   usePostApiTasks,
   deleteApiTasksId,
-  putApiTasksId,
   type Task
-} from '../gen/api';
-import { TaskSideMenu } from './TaskSideMenu';
+} from '../gen/api'
+import { TaskSideMenu } from './TaskSideMenu'
 
-const getErrorMessage = (error: unknown) => {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string') return error;
-  return 'Unknown error';
-};
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return 'Unknown error'
+}
 
 /**
  * Task Management Component
  * Demonstrates full CRUD operations with SWR hooks
  */
 export const TaskManager: React.FC = () => {
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [newTask, setNewTask] = useState<{ title: string; description: string; dueDate: string }>({
+  const [newTask, setNewTask] = useState<{ title: string; description: string; dueDate: string }>(
+    {
     title: '',
     description: '',
     dueDate: ''
-  });
-  const [isUpdating, setIsUpdating] = useState(false);
+    }
+  )
 
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   // Fetch all tasks
   const {
@@ -36,61 +35,42 @@ export const TaskManager: React.FC = () => {
     error: tasksError,
     isLoading: tasksLoading,
     mutate: mutateTasks
-  } = useGetApiTasks();
+  } = useGetApiTasks()
 
-  const tasks = tasksResponse?.tasks ?? [];
+  const tasks = tasksResponse?.tasks ?? []
 
   // Create task mutation
-  const { trigger: createTask, isMutating: isCreating } = usePostApiTasks();
+  const { trigger: createTask, isMutating: isCreating } = usePostApiTasks()
 
-  const handleCreateTask = async () => {
-    if (!newTask.title?.trim()) return;
+  const handleCreateTask = async (): Promise<void> => {
+    if (!newTask.title?.trim()) return
 
     try {
       await createTask({
         title: newTask.title.trim(),
         description: newTask.description?.trim() || undefined,
         dueDate: normalizeDueDate(newTask.dueDate)
-      });
-      setNewTask({ title: '', description: '', dueDate: '' });
-      mutateTasks(); // Refresh the tasks list
+      })
+      setNewTask({ title: '', description: '', dueDate: '' })
+      mutateTasks() // Refresh the tasks list
     } catch (error) {
-      console.error('Failed to create task:', error);
+      console.error('Failed to create task:', error)
     }
-  };
+  }
 
-  const handleUpdateTask = async () => {
-    if (!editingTask || !editingTask.id) return;
+  const handleDeleteTask = async (taskId: string): Promise<void> => {
+    if (!confirm('Are you sure you want to delete this task?')) return
 
-    setIsUpdating(true);
+    setDeletingTaskId(taskId)
     try {
-      await putApiTasksId(editingTask.id, {
-        title: editingTask.title?.trim(),
-        description: editingTask.description?.trim(),
-        dueDate: normalizeDueDate(editingTask.dueDate ?? '')
-      });
-      setEditingTask(null);
-      mutateTasks(); // Refresh the tasks list
+      await deleteApiTasksId(taskId)
+      mutateTasks() // Refresh the tasks list
     } catch (error) {
-      console.error('Failed to update task:', error);
+      console.error('Failed to delete task:', error)
     } finally {
-      setIsUpdating(false);
+      setDeletingTaskId(null)
     }
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-
-    setDeletingTaskId(taskId);
-    try {
-      await deleteApiTasksId(taskId);
-      mutateTasks(); // Refresh the tasks list
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-    } finally {
-      setDeletingTaskId(null);
-    }
-  };
+  }
 
   if (tasksLoading) {
     return (
@@ -102,18 +82,16 @@ export const TaskManager: React.FC = () => {
           ))}
         </div>
       </div>
-    );
+    )
   }
 
   if (tasksError) {
     return (
       <div className="p-4 border rounded-lg bg-red-50 border-red-200">
         <h3 className="text-red-800 font-semibold mb-2">Failed to Load Tasks</h3>
-        <p className="text-red-600 text-sm">
-          {getErrorMessage(tasksError)}
-        </p>
+        <p className="text-red-600 text-sm">{getErrorMessage(tasksError)}</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -133,20 +111,20 @@ export const TaskManager: React.FC = () => {
             type="text"
             placeholder="Task title..."
             value={newTask.title || ''}
-            onChange={(e) => setNewTask(prev => ({ ...prev, title: e.target.value }))}
+            onChange={(e) => setNewTask((prev) => ({ ...prev, title: e.target.value }))}
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <textarea
             placeholder="Task description..."
             value={newTask.description || ''}
-            onChange={(e) => setNewTask(prev => ({ ...prev, description: e.target.value }))}
+            onChange={(e) => setNewTask((prev) => ({ ...prev, description: e.target.value }))}
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             rows={3}
           />
           <input
             type="date"
             value={newTask.dueDate}
-            onChange={(e) => setNewTask(prev => ({ ...prev, dueDate: e.target.value }))}
+            onChange={(e) => setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))}
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <button
@@ -167,81 +145,33 @@ export const TaskManager: React.FC = () => {
             className={`p-4 border rounded-lg bg-white shadow-sm transition-shadow cursor-pointer hover:shadow-md ${selectedTask?.id === task.id ? 'ring-2 ring-blue-400 border-blue-400' : ''}`}
             onClick={() => setSelectedTask(task)}
           >
-            {editingTask?.id === task.id ? (
-              // Edit mode
-              <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  value={editingTask.title || ''}
-                  onChange={(e) => setEditingTask(prev => (prev ? { ...prev, title: e.target.value } : null))}
-                  className="w-full p-2 border rounded focus:ring-2 focus:ring-green-500"
-                />
-                <textarea
-                  value={editingTask.description || ''}
-                  onChange={(e) => setEditingTask(prev => (prev ? { ...prev, description: e.target.value } : null))}
-                  className="w-full p-2 border rounded focus:ring-2 focus:ring-green-500"
-                  rows={2}
-                />
-                <input
-                  type="date"
-                  value={formatDateInput(editingTask.dueDate)}
-                  onChange={(e) =>
-                    setEditingTask((prev) => (prev ? { ...prev, dueDate: e.target.value } : null))
-                  }
-                  className="w-full p-2 border rounded focus:ring-2 focus:ring-green-500"
-                />
-                <div className="flex gap-2">
+            <div>
+              <div className="flex items-start justify-between mb-2">
+                <h4 className="font-semibold text-gray-900">{task.title}</h4>
+                <div className="text-xs text-gray-500">
+                  {task.dueDate
+                    ? `Due ${new Date(task.dueDate).toLocaleDateString()}`
+                    : 'No due date'}
+                </div>
+              </div>
+              {task.description && (
+                <p className="text-gray-600 text-sm mb-3 line-clamp-2">{task.description}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">
+                  Created: {new Date(task.createdAt).toLocaleDateString()}
+                </div>
+                <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                   <button
-                    onClick={handleUpdateTask}
-                    disabled={isUpdating}
-                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                    onClick={() => handleDeleteTask(task.id)}
+                    disabled={deletingTaskId === task.id}
+                    className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 disabled:opacity-50"
                   >
-                    {isUpdating ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => setEditingTask(null)}
-                    className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
-                  >
-                    Cancel
+                    Delete
                   </button>
                 </div>
               </div>
-            ) : (
-              // View mode
-              <div>
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-semibold text-gray-900">{task.title}</h4>
-                  <div className="text-xs text-gray-500">
-                    {task.dueDate
-                      ? `Due ${new Date(task.dueDate).toLocaleDateString()}`
-                      : 'No due date'}
-                  </div>
-                </div>
-                {task.description && (
-                  <p className="text-gray-600 text-sm mb-3 line-clamp-2">{task.description}</p>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-gray-500">
-                    Created: {new Date(task.createdAt).toLocaleDateString()}
-                  </div>
-                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setEditingTask(task)}
-                      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTask(task.id)}
-                      disabled={deletingTaskId === task.id}
-                      className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         ))}
 
@@ -253,29 +183,30 @@ export const TaskManager: React.FC = () => {
       </div>
 
       {/* Side Menu */}
-      <TaskSideMenu task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskSideMenu
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onTaskUpdated={(updated) => {
+          setSelectedTask(updated)
+          mutateTasks()
+        }}
+        enableEditing
+      />
     </div>
-  );
-};
-
-function formatDateInput(value?: string): string {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 10);
+  )
 }
 
 function normalizeDueDate(value: string): string | undefined {
-  if (!value) return undefined;
-  const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+  if (!value) return undefined
+  const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
   if (isoDatePattern.test(value)) {
-    const [year, month, day] = value.split('-');
-    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
-    return utcDate.toISOString();
+    const [year, month, day] = value.split('-')
+    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+    return utcDate.toISOString()
   }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-  return parsed.toISOString();
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed.toISOString()
 }
 
-export default TaskManager;
+export default TaskManager

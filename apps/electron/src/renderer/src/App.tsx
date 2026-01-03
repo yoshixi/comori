@@ -24,6 +24,12 @@ import {
 import { Textarea } from './components/ui/textarea'
 import { deleteApiTasksId, postApiTasks, putApiTasksId, useGetApiTasks, type Task } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
+import {
+  useGetApiTasksTaskIdTimers,
+  usePostApiTimers,
+  putApiTimersId,
+  type TaskTimer
+} from './gen/api'
 
 interface ActiveTimer {
   taskId: string

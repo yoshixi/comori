@@ -41,7 +41,7 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   if (!task) return null
 
   const handleTimerStarted = (): void => {
-    window.api?.openFloatingTaskWindow?.({ taskId: task.id, title: task.title })
+    window.api?.openFloatingTaskWindow?.({ taskId: task.id })
   }
 
   const handleTimerStopped = (): void => {

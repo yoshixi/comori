@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 export interface CustomRequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   url: string
-  params?: Record<string, string | number | boolean | null | undefined>
+  params?: Record<string, string | number | boolean | null | undefined | string[]>
   data?: unknown
   headers?: Record<string, string>
   responseType?: 'json' | 'text'
@@ -18,9 +18,14 @@ export const customInstance = <T>(config: CustomRequestConfig): Promise<T> => {
   const url = new URL(config.url, API_BASE_URL)
   if (config.params) {
     Object.entries(config.params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        url.searchParams.set(key, String(value))
+      if (value === undefined || value === null) return
+      if (Array.isArray(value)) {
+        value.forEach((entry) => {
+          url.searchParams.append(key, String(entry))
+        })
+        return
       }
+      url.searchParams.set(key, String(value))
     })
   }
 

@@ -529,9 +529,4 @@ function normalizeDueDate(value: string): string | undefined {
   return date.toISOString()
 }
 
-function createId(): string {
-  if (crypto?.randomUUID) return crypto.randomUUID()
-  return Math.random().toString(36).slice(2)
-}
-
 export default App

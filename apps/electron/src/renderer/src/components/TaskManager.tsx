@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   deleteApiTasksId,
-  postApiTasks,
   putApiTimersId,
   useGetApiTasks,
   useGetApiTimers,
+  usePostApiTasks,
   usePostApiTimers,
   type Task,
   type TaskTimer
@@ -53,6 +53,7 @@ export const TaskManager: React.FC = () => {
   })
 
   const { trigger: createTimer } = usePostApiTimers()
+  const { trigger: createTask, isMutating: isCreating } = usePostApiTasks()
 
   const timers = timersResponse?.timers ?? []
   const activeTimersByTaskId = useMemo(() => {
@@ -85,7 +86,7 @@ export const TaskManager: React.FC = () => {
     if (!newTask.title?.trim()) return
 
     try {
-      await postApiTasks({
+      await createTask({
         title: newTask.title.trim(),
         description: newTask.description?.trim() || undefined,
         dueDate: normalizeDueDate(newTask.dueDate)

@@ -1,5 +1,14 @@
-import React, { useState } from 'react'
-import { useGetApiTasks, usePostApiTasks, deleteApiTasksId, type Task } from '../gen/api'
+import React, { useEffect, useMemo, useState } from 'react'
+import {
+  deleteApiTasksId,
+  postApiTasks,
+  putApiTimersId,
+  useGetApiTasks,
+  useGetApiTimers,
+  usePostApiTimers,
+  type Task,
+  type TaskTimer
+} from '../gen/api'
 import { TaskSideMenu } from './TaskSideMenu'
 
 const getErrorMessage = (error: unknown): string => {
@@ -13,6 +22,7 @@ const getErrorMessage = (error: unknown): string => {
  * Demonstrates full CRUD operations with SWR hooks
  */
 export const TaskManager: React.FC = () => {
+  const [now, setNow] = useState(Date.now())
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -31,15 +41,51 @@ export const TaskManager: React.FC = () => {
   } = useGetApiTasks()
 
   const tasks = tasksResponse?.tasks ?? []
+  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks])
 
-  // Create task mutation
-  const { trigger: createTask, isMutating: isCreating } = usePostApiTasks()
+  const {
+    data: timersResponse,
+    error: timersError,
+    isLoading: timersLoading,
+    mutate: mutateTimers
+  } = useGetApiTimers(taskIds.length ? { taskIds } : undefined, {
+    swr: { enabled: taskIds.length > 0 }
+  })
+
+  const { trigger: createTimer } = usePostApiTimers()
+
+  const timers = timersResponse?.timers ?? []
+  const activeTimersByTaskId = useMemo(() => {
+    const map = new Map<string, TaskTimer>()
+    timers.forEach((timer) => {
+      if (!timer.endTime) {
+        const existing = map.get(timer.taskId)
+        if (!existing) {
+          map.set(timer.taskId, timer)
+          return
+        }
+        const existingStart = new Date(existing.startTime).getTime()
+        const nextStart = new Date(timer.startTime).getTime()
+        if (nextStart > existingStart) {
+          map.set(timer.taskId, timer)
+        }
+      }
+    })
+    return map
+  }, [timers])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleCreateTask = async (): Promise<void> => {
     if (!newTask.title?.trim()) return
 
     try {
-      await createTask({
+      await postApiTasks({
         title: newTask.title.trim(),
         description: newTask.description?.trim() || undefined,
         dueDate: normalizeDueDate(newTask.dueDate)
@@ -63,6 +109,38 @@ export const TaskManager: React.FC = () => {
     } finally {
       setDeletingTaskId(null)
     }
+  }
+
+  const handleStartTimer = async (taskId: string): Promise<void> => {
+    try {
+      await createTimer({
+        taskId,
+        startTime: new Date().toISOString()
+      })
+      await mutateTimers()
+    } catch (error) {
+      console.error('Failed to start timer:', error)
+    }
+  }
+
+  const handleStopTimer = async (timerId: string): Promise<void> => {
+    try {
+      await putApiTimersId(timerId, {
+        endTime: new Date().toISOString()
+      })
+      await mutateTimers()
+    } catch (error) {
+      console.error('Failed to stop timer:', error)
+    }
+  }
+
+  const formatDuration = (seconds: number): string => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s
+      .toString()
+      .padStart(2, '0')}`
   }
 
   if (tasksLoading) {
@@ -128,6 +206,12 @@ export const TaskManager: React.FC = () => {
         </div>
       </div>
 
+      {timersError && (
+        <div className="p-4 border rounded-lg bg-red-50 border-red-200">
+          <p className="text-red-600 text-sm">Failed to load timers.</p>
+        </div>
+      )}
+
       {/* Tasks List */}
       <div className="space-y-3">
         {tasks.map((task) => (
@@ -160,6 +244,42 @@ export const TaskManager: React.FC = () => {
                   >
                     Delete
                   </button>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-md bg-gray-50 px-3 py-2">
+                <div className="text-sm font-mono text-gray-800">
+                  {(() => {
+                    const activeTimer = activeTimersByTaskId.get(task.id)
+                    if (!activeTimer) return '00:00:00'
+                    const elapsedSeconds = Math.floor(
+                      (now - new Date(activeTimer.startTime).getTime()) / 1000
+                    )
+                    return formatDuration(elapsedSeconds)
+                  })()}
+                </div>
+                <div>
+                  {(() => {
+                    const activeTimer = activeTimersByTaskId.get(task.id)
+                    if (activeTimer) {
+                      return (
+                        <button
+                          onClick={() => handleStopTimer(activeTimer.id)}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200"
+                        >
+                          Stop
+                        </button>
+                      )
+                    }
+                    return (
+                      <button
+                        onClick={() => handleStartTimer(task.id)}
+                        disabled={timersLoading}
+                        className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 disabled:opacity-50"
+                      >
+                        Start
+                      </button>
+                    )
+                  })()}
                 </div>
               </div>
             </div>

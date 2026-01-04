@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { CalendarDays, Clock4, Pencil, Trash2, Plus, Play, Pause, RotateCcw } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, Clock4, Pencil, Trash2, Plus, Play, Pause } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
@@ -22,23 +22,18 @@ import {
   TableRow
 } from './components/ui/table'
 import { Textarea } from './components/ui/textarea'
-import { deleteApiTasksId, postApiTasks, putApiTasksId, useGetApiTasks, type Task } from './gen/api'
-import { TaskSideMenu } from './components/TaskSideMenu'
 import {
-  useGetApiTasksTaskIdTimers,
-  usePostApiTimers,
+  deleteApiTasksId,
+  postApiTasks,
+  postApiTimers,
+  putApiTasksId,
   putApiTimersId,
+  useGetApiTasks,
+  useGetApiTimers,
+  type Task,
   type TaskTimer
 } from './gen/api'
-
-interface ActiveTimer {
-  taskId: string
-  timerId: string
-  startTime: number
-  elapsedTime: number
-  isRunning: boolean
-}
-
+import { TaskSideMenu } from './components/TaskSideMenu'
 function App(): React.JSX.Element {
   const {
     data: tasksResponse,
@@ -60,9 +55,36 @@ function App(): React.JSX.Element {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const totalTasks = tasksResponse?.total ?? tasks.length
 
-  // Timer state
-  const [activeTimer, setActiveTimer] = useState<ActiveTimer | null>(null)
   const [currentTime, setCurrentTime] = useState(Date.now())
+  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks])
+
+  const {
+    data: timersResponse,
+    error: timersError,
+    isLoading: timersLoading,
+    mutate: mutateTimers
+  } = useGetApiTimers(taskIds.length ? { taskIds } : undefined, {
+    swr: { enabled: taskIds.length > 0 }
+  })
+  const timers = timersResponse?.timers ?? []
+  const activeTimersByTaskId = useMemo(() => {
+    const map = new Map<string, TaskTimer>()
+    timers.forEach((timer) => {
+      if (!timer.endTime) {
+        const existing = map.get(timer.taskId)
+        if (!existing) {
+          map.set(timer.taskId, timer)
+          return
+        }
+        const existingStart = new Date(existing.startTime).getTime()
+        const nextStart = new Date(timer.startTime).getTime()
+        if (nextStart > existingStart) {
+          map.set(timer.taskId, timer)
+        }
+      }
+    })
+    return map
+  }, [timers])
 
   // Update current time every second for timer display
   useEffect(() => {
@@ -101,11 +123,12 @@ function App(): React.JSX.Element {
   async function handleDeleteTask(taskId: string): Promise<void> {
     setDeletingTaskId(taskId)
     try {
+      const activeTimer = activeTimersByTaskId.get(taskId)
+      if (activeTimer) {
+        await handleStopTimer(activeTimer.id)
+      }
       await deleteApiTasksId(taskId)
       await mutateTasks()
-      if (activeTimer?.taskId === taskId) {
-        handleStopTimer()
-      }
     } catch (error) {
       console.error('Failed to delete task:', error)
     } finally {
@@ -130,72 +153,33 @@ function App(): React.JSX.Element {
     }
   }
 
-  // Timer functions
-  function handleStartTimer(taskId: string): void {
-    if (activeTimer) {
-      // Stop current timer first
-      handleStopTimer()
+  async function handleStartTimer(taskId: string): Promise<void> {
+    try {
+      await postApiTimers({
+        taskId,
+        startTime: new Date().toISOString()
+      })
+      await mutateTimers()
+    } catch (error) {
+      console.error('Failed to start timer:', error)
     }
-
-    const timerId = createId()
-    setActiveTimer({
-      taskId,
-      timerId,
-      startTime: Date.now(),
-      elapsedTime: 0,
-      isRunning: true
-    })
-
-    // Task timer started, no status change needed
   }
 
-  function handlePauseTimer(): void {
-    if (!activeTimer) return
-
-    const elapsed = currentTime - activeTimer.startTime + activeTimer.elapsedTime
-    setActiveTimer((prev) =>
-      prev
-        ? {
-            ...prev,
-            elapsedTime: elapsed,
-            isRunning: false
-          }
-        : null
-    )
-  }
-
-  function handleResumeTimer(): void {
-    if (!activeTimer) return
-
-    setActiveTimer((prev) =>
-      prev
-        ? {
-            ...prev,
-            startTime: Date.now() - prev.elapsedTime,
-            isRunning: true
-          }
-        : null
-    )
-  }
-
-  function handleStopTimer(): void {
-    if (!activeTimer) return
-
-    setActiveTimer(null)
-  }
-
-  function handleResetTimer(): void {
-    if (!activeTimer) return
-
-    setActiveTimer(null)
+  async function handleStopTimer(timerId: string): Promise<void> {
+    try {
+      await putApiTimersId(timerId, {
+        endTime: new Date().toISOString()
+      })
+      await mutateTimers()
+    } catch (error) {
+      console.error('Failed to stop timer:', error)
+    }
   }
 
   function getTimerDisplay(taskId: string): string {
-    if (activeTimer?.taskId === taskId) {
-      const elapsed = activeTimer.isRunning
-        ? currentTime - activeTimer.startTime + activeTimer.elapsedTime
-        : activeTimer.elapsedTime
-
+    const activeTimer = activeTimersByTaskId.get(taskId)
+    if (activeTimer) {
+      const elapsed = currentTime - new Date(activeTimer.startTime).getTime()
       const minutes = Math.floor(elapsed / 60000)
       const seconds = Math.floor((elapsed % 60000) / 1000)
       return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
@@ -204,7 +188,7 @@ function App(): React.JSX.Element {
   }
 
   function isTaskActive(taskId: string): boolean {
-    return activeTimer?.taskId === taskId && activeTimer.isRunning
+    return activeTimersByTaskId.has(taskId)
   }
 
   return (
@@ -222,6 +206,12 @@ function App(): React.JSX.Element {
             Manage your tasks in a simple table view
           </p>
         </header>
+
+        {timersError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            Failed to load timers.
+          </div>
+        )}
 
         {/* Task Table */}
         <Card>
@@ -360,42 +350,27 @@ function App(): React.JSX.Element {
                           <span className="font-mono text-sm min-w-[3rem]">
                             {getTimerDisplay(task.id)}
                           </span>
-                          {activeTimer?.taskId === task.id ? (
-                            <div className="flex gap-1">
-                              {activeTimer.isRunning ? (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={handlePauseTimer}
-                                  className="h-6 w-6"
-                                >
-                                  <Pause className="h-3 w-3" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  onClick={handleResumeTimer}
-                                  className="h-6 w-6"
-                                >
-                                  <Play className="h-3 w-3" />
-                                </Button>
-                              )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={handleResetTimer}
-                                className="h-6 w-6"
-                              >
-                                <RotateCcw className="h-3 w-3" />
-                              </Button>
-                            </div>
+                          {activeTimersByTaskId.has(task.id) ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                const activeTimer = activeTimersByTaskId.get(task.id)
+                                if (activeTimer) {
+                                  handleStopTimer(activeTimer.id)
+                                }
+                              }}
+                              className="h-6 w-6"
+                            >
+                              <Pause className="h-3 w-3" />
+                            </Button>
                           ) : (
                             <Button
                               size="icon"
                               variant="ghost"
                               onClick={() => handleStartTimer(task.id)}
                               className="h-6 w-6"
+                              disabled={timersLoading}
                             >
                               <Play className="h-3 w-3" />
                             </Button>

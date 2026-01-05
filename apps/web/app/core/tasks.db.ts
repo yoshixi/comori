@@ -64,14 +64,28 @@ export async function ensureDefaultUser(db: DB): Promise<SelectUser> {
   return user
 }
 
-export async function getAllTasks(db: DB, userId: string): Promise<Task[]> {
+type TaskFilterOptions = {
+  completed?: boolean
+}
+
+export async function getAllTasks(db: DB, userId: string, filters?: TaskFilterOptions): Promise<Task[]> {
   const dbTasks = await db
     .select()
     .from(tasksTable)
     .where(eq(tasksTable.userId, userId))
     .orderBy(desc(tasksTable.createdAt))
 
-  return dbTasks.map(convertDbTaskToApi)
+  const tasks = dbTasks.map(convertDbTaskToApi)
+
+  if (filters?.completed === true) {
+    return tasks.filter((task) => task.completedAt !== null)
+  }
+
+  if (filters?.completed === false) {
+    return tasks.filter((task) => task.completedAt === null)
+  }
+
+  return tasks
 }
 
 export async function getTaskById(db: DB, userId: string, taskId: string): Promise<Task | null> {

@@ -95,7 +95,10 @@ export const TaskResponseModel = z.object({
 
 // Task query parameters (removed status filter)
 export const TaskQueryParamsModel = z.object({
-  // No query parameters for now, but keeping the structure for future use
+  completed: z.coerce.boolean().optional().openapi({
+    description: 'Filter tasks by completion status',
+    example: false
+  })
 }).openapi('TaskQueryParams')
 
 // Path parameter models

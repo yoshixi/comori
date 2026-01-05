@@ -264,6 +264,16 @@ paths:
     get:
       summary: Get all tasks
       description: Retrieve all tasks
+      parameters:
+        - schema:
+            type: boolean
+            nullable: true
+            description: Filter tasks by completion status
+            example: false
+          required: false
+          description: Filter tasks by completion status
+          name: completed
+          in: query
       responses:
         "200":
           description: Tasks retrieved successfully

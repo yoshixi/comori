@@ -13,7 +13,7 @@ export const TaskTimerModel = z.object({
     description: 'Timestamp when the timer was started',
     example: '2024-01-01T10:00:00.000Z'
   }),
-  endTime: z.string().datetime().optional().openapi({
+  endTime: z.string().datetime().optional().nullable().openapi({
     description: 'Timestamp when the timer was ended (null for active timers)',
     example: '2024-01-01T10:25:00.000Z'
   }),

@@ -3,6 +3,7 @@ import { createClient } from "@libsql/client"
 import { v7 as uuidv7 } from "uuid"
 import path from "path"
 import fs from "fs"
+import * as schema from '../db/schema/schema';
 
 const DRIZZLE_CONFIG = {
   casing: "snake_case" as const
@@ -23,6 +24,7 @@ function createLibsqlClient(url: string) {
 function createLibsqlDrizzle(url: string) {
   return drizzleLibsql({
     client: createLibsqlClient(url),
+    schema,
     ...DRIZZLE_CONFIG
   })
 }
@@ -38,6 +40,7 @@ export function getDb() {
         url: process.env.TURSO_CONNECTION_URL,
         authToken: process.env.TURSO_AUTH_TOKEN
       },
+      schema,
       casing: "snake_case"
     })
   } else {

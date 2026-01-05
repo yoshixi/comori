@@ -1,15 +1,14 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from '../schema/schema';
-import { getDb } from '../../core/common.db';
-
 import { pushSQLiteSchema } from 'drizzle-kit/api';
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { type DB } from '../../core/common.db';
 
 export type SqliteLibsqlTestContext = {
-  db: ReturnType<typeof getDb>;
+  db: DB;
   reset: () => Promise<void>;
 };
 
@@ -23,7 +22,9 @@ const ensureDirectoryForUrl = (url: string) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 };
 
-export const getTestDB = (location: ":memory:" | `file:${string}` = ":memory:") => {
+export const getTestDB = (
+  location: ":memory:" | `file:${string}` = ":memory:"
+): DB => {
   const url = location === ":memory:" ? IN_MEMORY_URL : location;
   ensureDirectoryForUrl(url);
 
@@ -34,8 +35,6 @@ export const getTestDB = (location: ":memory:" | `file:${string}` = ":memory:") 
     casing: "snake_case",
   });
 };
-
-export type DB = ReturnType<typeof getDb>;
 
 export const migrateDB = async (db: ReturnType<typeof getTestDB>) => {
   const { apply } = await pushSQLiteSchema(schema, db);

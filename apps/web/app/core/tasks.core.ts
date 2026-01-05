@@ -19,7 +19,7 @@ export const TaskModel = z.object({
     description: 'Detailed description of the task',
     example: 'Write comprehensive documentation for the API endpoints'
   }),
-  dueDate: z.string().datetime().optional().openapi({
+  dueDate: z.string().datetime().optional().nullable().openapi({
     description: 'Due date for the task in ISO 8601 format',
     example: '2024-12-31T23:59:59.000Z'
   }),

@@ -38,7 +38,7 @@ import { TaskSideMenu } from './components/TaskSideMenu'
 function App(): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
   const taskQuery = useMemo(
-    () => (showCompleted ? undefined : { completed: false }),
+    () => (showCompleted ? undefined : { completed: 'false' as const }),
     [showCompleted]
   )
   const {
@@ -427,7 +427,15 @@ function App(): React.JSX.Element {
         isSubmitting={!!editingTask && savingTaskId === editingTask.id}
       />
 
-      <TaskSideMenu task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskSideMenu
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onTaskUpdated={async (updated) => {
+          // Update the currently selected task reference (to keep the side-menu UI in sync)
+          setSelectedTask(updated)
+          await mutateTasks()
+        }}
+      />
     </div>
   )
 }
@@ -521,14 +529,14 @@ function getErrorMessage(error: unknown): string {
   return 'Please try again.'
 }
 
-function formatDateInput(value?: string): string {
+function formatDateInput(value?: string | null): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toISOString().slice(0, 10)
 }
 
-function normalizeDueDate(value: string): string | undefined {
+function normalizeDueDate(value?: string | null): string | undefined {
   if (!value) return undefined
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined

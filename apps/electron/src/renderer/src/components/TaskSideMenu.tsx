@@ -238,14 +238,14 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   )
 }
 
-function formatDateInput(value?: string): string {
+function formatDateInput(value?: string | null): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toISOString().slice(0, 10)
 }
 
-function normalizeDueDate(value: string): string | undefined {
+function normalizeDueDate(value?: string | null): string | undefined {
   if (!value) return undefined
   const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
   if (isoDatePattern.test(value)) {

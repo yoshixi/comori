@@ -521,14 +521,14 @@ function getErrorMessage(error: unknown): string {
   return 'Please try again.'
 }
 
-function formatDateInput(value?: string): string {
+function formatDateInput(value?: string | null): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toISOString().slice(0, 10)
 }
 
-function normalizeDueDate(value: string): string | undefined {
+function normalizeDueDate(value?: string | null): string | undefined {
   if (!value) return undefined
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return undefined

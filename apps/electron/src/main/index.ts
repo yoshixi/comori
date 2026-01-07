@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -64,9 +64,34 @@ function createFloatingWindow(taskId: string): void {
     return
   }
 
+  const windowWidth = 360
+  const windowHeight = 120
+  const margin = 20
+  const verticalSpacing = 10
+
+  // Get the primary display dimensions
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
+
+  // Calculate top-right position
+  let x = screenWidth - windowWidth - margin
+  let y = margin
+
+  // Stack windows vertically if others exist
+  const existingWindows = Array.from(floatingWindows.values()).filter((w) => !w.isDestroyed())
+  if (existingWindows.length > 0) {
+    // Position below the last window
+    const lastWindow = existingWindows[existingWindows.length - 1]
+    const [lastX, lastY] = lastWindow.getPosition()
+    const [, lastHeight] = lastWindow.getSize()
+    y = lastY + lastHeight + verticalSpacing
+  }
+
   const floatingWindow = new BrowserWindow({
-    width: 360,
-    height: 120,
+    width: windowWidth,
+    height: windowHeight,
+    x,
+    y,
     resizable: false,
     minimizable: false,
     maximizable: false,

@@ -7,6 +7,14 @@
 
   # https://devenv.sh/packages/
   packages = [ pkgs.git pkgs.pnpm pkgs.turso-cli ];
+  
+  languages = {
+    # requires python to run sqlite stuff.
+    python = {
+      enable = true;
+      venv.enable = true;
+    };
+  };
 
   # https://devenv.sh/languages/
   # languages.rust.enable = true;

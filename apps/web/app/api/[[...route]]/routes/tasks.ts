@@ -4,7 +4,8 @@ import {
   TaskIdParamModel,
   TaskResponseModel,
   CreateTaskModel,
-  UpdateTaskModel
+  UpdateTaskModel,
+  TaskQueryParamsModel
 } from '../../../core/tasks.core'
 import { ErrorResponseModel } from '../../../core/common.core'
 
@@ -14,6 +15,9 @@ export const listTasksRoute = createRoute({
   path: '/tasks',
   summary: 'Get all tasks',
   description: 'Retrieve all tasks',
+  request: {
+    query: TaskQueryParamsModel
+  },
   responses: {
     200: {
       content: {

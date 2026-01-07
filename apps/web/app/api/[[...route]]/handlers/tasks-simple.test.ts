@@ -87,6 +87,48 @@ describe('Task Handlers (Simplified)', () => {
         total: 0
       });
     });
+
+    it('should filter tasks by completion status', async () => {
+      const createTask = async (title: string) => {
+        const res = await app.request(new Request('http://localhost/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        }));
+        expect(res.status).toBe(201);
+        const { task } = await res.json();
+        return task.id as string;
+      };
+
+      const incompleteTaskId = await createTask('Incomplete Task');
+      const completedTaskId = await createTask('Completed Task');
+
+      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completeRes = await app.request(new Request(`http://localhost/tasks/${completedTaskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: completionTimestamp })
+      }));
+      expect(completeRes.status).toBe(200);
+
+      const completedRes = await app.request(new Request('http://localhost/tasks?completed=true'));
+      expect(completedRes.status).toBe(200);
+      const completedData = await completedRes.json();
+      expect(completedData.tasks).toHaveLength(1);
+      expect(completedData.tasks.every((task: { completedAt: string | null }) => task.completedAt !== null)).toBe(true);
+      const completedIds = completedData.tasks.map((task: { id: string }) => task.id);
+      expect(completedIds).toContain(completedTaskId);
+      expect(completedIds).not.toContain(incompleteTaskId);
+
+      const incompleteRes = await app.request(new Request('http://localhost/tasks?completed=false'));
+      expect(incompleteRes.status).toBe(200);
+      const incompleteData = await incompleteRes.json();
+      expect(incompleteData.tasks).toHaveLength(1);
+      expect(incompleteData.tasks.every((task: { completedAt: string | null }) => task.completedAt === null)).toBe(true);
+      const incompleteIds = incompleteData.tasks.map((task: { id: string }) => task.id);
+      expect(incompleteIds).toContain(incompleteTaskId);
+      expect(incompleteIds).not.toContain(completedTaskId);
+    });
   });
 
   describe('POST /tasks', () => {
@@ -112,6 +154,7 @@ describe('Task Handlers (Simplified)', () => {
       expect(data.task.title).toBe(taskData.title);
       expect(data.task.description).toBe(taskData.description);
       expect(data.task.dueDate).toBe(taskData.dueDate);
+      expect(data.task.completedAt).toBeNull();
       expect(data.task.id).toBeTruthy();
       expect(data.task.createdAt).toBeTruthy();
       expect(data.task.updatedAt).toBeTruthy();
@@ -137,6 +180,7 @@ describe('Task Handlers (Simplified)', () => {
       expect(data.task.title).toBe(taskData.title);
       expect(data.task.description).toBe('');
       expect(data.task.dueDate).toBeNull();
+      expect(data.task.completedAt).toBeNull();
     });
 
     it('should reject empty title', async () => {
@@ -206,6 +250,41 @@ describe('Task Handlers (Simplified)', () => {
       const verifyReq = new Request(`http://localhost/tasks/${taskId}`);
       const verifyRes = await app.request(verifyReq);
       expect(verifyRes.status).toBe(404);
+    });
+  });
+
+  describe('PUT /tasks/{id}', () => {
+    it('should set and clear completion timestamp', async () => {
+      const createReq = new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Complete me' })
+      });
+      const createRes = await app.request(createReq);
+      expect(createRes.status).toBe(201);
+      const { task } = await createRes.json();
+      const taskId = task.id;
+
+      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completeReq = new Request(`http://localhost/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: completionTimestamp })
+      });
+      const completeRes = await app.request(completeReq);
+      expect(completeRes.status).toBe(200);
+      const completeData = await completeRes.json();
+      expect(completeData.task.completedAt).toBe(completionTimestamp);
+
+      const reopenReq = new Request(`http://localhost/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: null })
+      });
+      const reopenRes = await app.request(reopenReq);
+      expect(reopenRes.status).toBe(200);
+      const reopenData = await reopenRes.json();
+      expect(reopenData.task.completedAt).toBeNull();
     });
   });
 });

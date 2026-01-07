@@ -15,6 +15,7 @@ import type {
   CreateTask,
   CreateTimer,
   ErrorResponse,
+  GetApiTasksParams,
   GetApiTimersParams,
   HealthResponse,
   TaskListResponse,
@@ -67,11 +68,12 @@ export const useGetApiHealth = <TError = unknown>(options?: {
  * Retrieve all tasks
  * @summary Get all tasks
  */
-export const getApiTasks = () => {
-  return customInstance<TaskListResponse>({ url: `/api/tasks`, method: 'GET' })
+export const getApiTasks = (params?: GetApiTasksParams) => {
+  return customInstance<TaskListResponse>({ url: `/api/tasks`, method: 'GET', params })
 }
 
-export const getGetApiTasksKey = () => [`/api/tasks`] as const
+export const getGetApiTasksKey = (params?: GetApiTasksParams) =>
+  [`/api/tasks`, ...(params ? [params] : [])] as const
 
 export type GetApiTasksQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTasks>>>
 export type GetApiTasksQueryError = ErrorResponse
@@ -79,17 +81,20 @@ export type GetApiTasksQueryError = ErrorResponse
 /**
  * @summary Get all tasks
  */
-export const useGetApiTasks = <TError = ErrorResponse>(options?: {
-  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasks>>, TError> & {
-    swrKey?: Key
-    enabled?: boolean
+export const useGetApiTasks = <TError = ErrorResponse>(
+  params?: GetApiTasksParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasks>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
   }
-}) => {
+) => {
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksKey() : null))
-  const swrFn = () => getApiTasks()
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksKey(params) : null))
+  const swrFn = () => getApiTasks(params)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 

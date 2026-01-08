@@ -92,7 +92,7 @@ function createFloatingWindow(taskId: string): void {
     height: windowHeight,
     x,
     y,
-    resizable: false,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,

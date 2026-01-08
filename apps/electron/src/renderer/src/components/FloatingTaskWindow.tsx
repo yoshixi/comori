@@ -52,8 +52,8 @@ export const FloatingTaskWindow: React.FC = () => {
   }
 
   return (
-    <div className="flex bg-white/90 h-screen flex-col p-4" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
-      <div className="flex items-start justify-between mb-3" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+    <div className="flex bg-white/90 h-screen flex-col" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
+      <div className="flex items-start justify-between mb-3 pt-4 px-4">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             Running Task
@@ -71,14 +71,16 @@ export const FloatingTaskWindow: React.FC = () => {
         </Button>
       </div>
 
-      <TimerManager
-        taskId={taskId}
-        mode="compact"
-        onTimerStopped={handleClose}
-        isCompleted={isCompleted}
-        isCompleting={isCompleting}
-        onToggleCompletion={handleToggleCompletion}
-      />
+      <div className="px-4 z-10" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <TimerManager
+          taskId={taskId}
+          mode="compact"
+          onTimerStopped={handleClose}
+          isCompleted={isCompleted}
+          isCompleting={isCompleting}
+          onToggleCompletion={handleToggleCompletion}
+        />
+      </div>
     </div>
   )
 }

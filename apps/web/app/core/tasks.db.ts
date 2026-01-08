@@ -75,7 +75,7 @@ type TaskFilterOptions = {
 
 export async function getAllTasks(db: DB, userId: string, filters?: TaskFilterOptions): Promise<Task[]> {
   // Determine sort field
-  let orderByField = tasksTable.createdAt
+  let orderByField: typeof tasksTable.createdAt | typeof tasksTable.startAt | typeof tasksTable.dueAt = tasksTable.createdAt
   if (filters?.sortBy === 'startAt') {
     orderByField = tasksTable.startAt
   } else if (filters?.sortBy === 'dueDate') {

@@ -6,6 +6,7 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { Textarea } from './ui/textarea'
 import { TimerManager } from './TimerManager'
+import { formatDateInput, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from '../lib/time'
 
 interface TaskSideMenuProps {
   task: Task | null
@@ -243,44 +244,4 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
       </aside>
     </>
   )
-}
-
-function formatDateInput(value?: string | null): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
-}
-
-function formatDateTimeInput(value?: string | null): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  // Format as YYYY-MM-DDTHH:mm for datetime-local input
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day}T${hours}:${minutes}`
-}
-
-function normalizeDueDate(value?: string | null): string | undefined {
-  if (!value) return undefined
-  const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
-  if (isoDatePattern.test(value)) {
-    const [year, month, day] = value.split('-')
-    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
-    return utcDate.toISOString()
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return parsed.toISOString()
-}
-
-function normalizeDateTime(value?: string | null): string | undefined {
-  if (!value) return undefined
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return parsed.toISOString()
 }

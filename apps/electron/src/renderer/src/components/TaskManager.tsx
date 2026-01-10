@@ -11,6 +11,7 @@ import {
   type TaskTimer
 } from '../gen/api'
 import { TaskSideMenu } from './TaskSideMenu'
+import { normalizeDueDate, normalizeDateTime } from '../lib/time'
 
 const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) return error.message
@@ -356,26 +357,6 @@ export const TaskManager: React.FC = () => {
       />
     </div>
   )
-}
-
-function normalizeDueDate(value: string): string | undefined {
-  if (!value) return undefined
-  const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/
-  if (isoDatePattern.test(value)) {
-    const [year, month, day] = value.split('-')
-    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
-    return utcDate.toISOString()
-  }
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return parsed.toISOString()
-}
-
-function normalizeDateTime(value: string): string | undefined {
-  if (!value) return undefined
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return parsed.toISOString()
 }
 
 export default TaskManager

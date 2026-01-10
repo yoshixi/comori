@@ -24,6 +24,7 @@ import {
   type TaskTimer
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
+import { formatDateTime, normalizeDueDate, normalizeDateTime } from './lib/time'
 function App(): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
@@ -535,18 +536,6 @@ function App(): React.JSX.Element {
   )
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (error && typeof error === 'object' && 'error' in error) {
@@ -554,26 +543,6 @@ function getErrorMessage(error: unknown): string {
     if (message) return message
   }
   return 'Please try again.'
-}
-
-function normalizeDueDate(value?: string | null): string | undefined {
-  if (!value) return undefined
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return undefined
-  // Keep only the date portion and coerce to UTC midnight
-  const [year, month, day] = value.split('-')
-  if (year && month && day) {
-    const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 0, 0, 0))
-    return utcDate.toISOString()
-  }
-  return date.toISOString()
-}
-
-function normalizeDateTime(value?: string | null): string | undefined {
-  if (!value) return undefined
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return undefined
-  return parsed.toISOString()
 }
 
 export default App

@@ -306,6 +306,19 @@ paths:
           description: Sort tasks by field (createdAt, startAt, or dueDate)
           name: sortBy
           in: query
+        - schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            description: "Sort order: asc (ascending/oldest first) or desc
+              (descending/newest first). Defaults to desc"
+            example: asc
+          required: false
+          description: "Sort order: asc (ascending/oldest first) or desc
+            (descending/newest first). Defaults to desc"
+          name: order
+          in: query
       responses:
         "200":
           description: Tasks retrieved successfully

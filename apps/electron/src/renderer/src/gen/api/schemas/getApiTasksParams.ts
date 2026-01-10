@@ -7,6 +7,7 @@
  */
 import type { GetApiTasksCompleted } from './getApiTasksCompleted'
 import type { GetApiTasksSortBy } from './getApiTasksSortBy'
+import type { GetApiTasksOrder } from './getApiTasksOrder'
 
 export type GetApiTasksParams = {
   /**
@@ -17,4 +18,8 @@ export type GetApiTasksParams = {
    * Sort tasks by field (createdAt, startAt, or dueDate)
    */
   sortBy?: GetApiTasksSortBy
+  /**
+   * Sort order: asc (ascending/oldest first) or desc (descending/newest first). Defaults to desc
+   */
+  order?: GetApiTasksOrder
 }

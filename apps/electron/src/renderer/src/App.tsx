@@ -31,7 +31,8 @@ function App(): React.JSX.Element {
   const taskQuery = useMemo(
     () => ({
       completed: showCompleted ? undefined : ('false' as const),
-      sortBy
+      sortBy,
+      order: 'asc' as const
     }),
     [showCompleted, sortBy]
   )

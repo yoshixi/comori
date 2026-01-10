@@ -1,18 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Clock4, Pencil, Trash2, Plus, Play, Pause } from 'lucide-react'
+import { CalendarDays, Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from './components/ui/dialog'
 import { Input } from './components/ui/input'
-import { Label } from './components/ui/label'
 import {
   Table,
   TableBody,
@@ -21,10 +12,8 @@ import {
   TableHeader,
   TableRow
 } from './components/ui/table'
-import { Textarea } from './components/ui/textarea'
 import { Switch } from './components/ui/switch'
 import {
-  deleteApiTasksId,
   postApiTasks,
   postApiTimers,
   putApiTasksId,
@@ -48,7 +37,6 @@ function App(): React.JSX.Element {
     mutate: mutateTasks
   } = useGetApiTasks(taskQuery)
   const tasks = tasksResponse?.tasks ?? []
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [newTaskFields, setNewTaskFields] = useState({
     title: '',
@@ -56,9 +44,10 @@ function App(): React.JSX.Element {
     dueDate: ''
   })
   const [isCreating, setIsCreating] = useState(false)
-  const [savingTaskId, setSavingTaskId] = useState<string | null>(null)
-  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
+  const [editingValue, setEditingValue] = useState('')
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const totalTasks = tasksResponse?.total ?? tasks.length
 
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -92,11 +81,26 @@ function App(): React.JSX.Element {
     return map
   }, [timers])
 
-  // Update current time every second for timer display
+  const totalTimeByTaskId = useMemo(() => {
+    const map = new Map<string, number>()
+    timers.forEach((timer) => {
+      const startTime = new Date(timer.startTime).getTime()
+      const endTime = timer.endTime ? new Date(timer.endTime).getTime() : currentTime
+      const duration = endTime - startTime
+      const currentTotal = map.get(timer.taskId) || 0
+      map.set(timer.taskId, currentTotal + duration)
+    })
+    return map
+  }, [timers, currentTime])
+
+  // Update current time every minute for timer display
   useEffect(() => {
+    // Update immediately on mount
+    setCurrentTime(Date.now())
+
     const interval = setInterval(() => {
       setCurrentTime(Date.now())
-    }, 1000)
+    }, 60000)
 
     return () => clearInterval(interval)
   }, [])
@@ -126,36 +130,35 @@ function App(): React.JSX.Element {
     setIsAddingTask(false)
   }
 
-  async function handleDeleteTask(taskId: string): Promise<void> {
-    setDeletingTaskId(taskId)
-    try {
-      const activeTimer = activeTimersByTaskId.get(taskId)
-      if (activeTimer) {
-        await handleStopTimer(taskId, activeTimer.id)
-      }
-      await deleteApiTasksId(taskId)
-      await mutateTasks()
-    } catch (error) {
-      console.error('Failed to delete task:', error)
-    } finally {
-      setDeletingTaskId(null)
-    }
+  function handleOpenFloatingWindow(taskId: string): void {
+    window.api.openFloatingTaskWindow({ taskId })
   }
 
-  async function handleUpdateTask(updated: Task): Promise<void> {
-    setSavingTaskId(updated.id)
+  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
+    setEditingCell({ taskId, field })
+    setEditingValue(currentValue || '')
+  }
+
+  function handleCancelEditing(): void {
+    setEditingCell(null)
+    setEditingValue('')
+  }
+
+  async function handleSaveEdit(): Promise<void> {
+    if (!editingCell) return
+
+    const task = tasks.find(t => t.id === editingCell.taskId)
+    if (!task) return
+
     try {
-      await putApiTasksId(updated.id, {
-        title: updated.title,
-        description: updated.description,
-        dueDate: normalizeDueDate(updated.dueDate ?? '')
+      await putApiTasksId(editingCell.taskId, {
+        [editingCell.field]: editingValue.trim()
       })
       await mutateTasks()
-      setEditingTask(null)
+      setEditingCell(null)
+      setEditingValue('')
     } catch (error) {
       console.error('Failed to update task:', error)
-    } finally {
-      setSavingTaskId(null)
     }
   }
 
@@ -166,6 +169,7 @@ function App(): React.JSX.Element {
         startTime: new Date().toISOString()
       })
       await mutateTimers()
+      setCurrentTime(Date.now()) // Update time display immediately
       window.api.openFloatingTaskWindow({ taskId })
     } catch (error) {
       console.error('Failed to start timer:', error)
@@ -178,25 +182,47 @@ function App(): React.JSX.Element {
         endTime: new Date().toISOString()
       })
       await mutateTimers()
+      setCurrentTime(Date.now()) // Update time display immediately
       window.api.closeFloatingTaskWindow(taskId)
     } catch (error) {
       console.error('Failed to stop timer:', error)
     }
   }
 
-  function getTimerDisplay(taskId: string): string {
-    const activeTimer = activeTimersByTaskId.get(taskId)
-    if (activeTimer) {
-      const elapsed = currentTime - new Date(activeTimer.startTime).getTime()
-      const minutes = Math.floor(elapsed / 60000)
-      const seconds = Math.floor((elapsed % 60000) / 1000)
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  function getTotalTimeDisplay(taskId: string): string {
+    const totalMs = totalTimeByTaskId.get(taskId) || 0
+    const hours = Math.floor(totalMs / 3600000)
+    const minutes = Math.floor((totalMs % 3600000) / 60000)
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
     }
-    return '00:00'
+    if (minutes > 0) {
+      return `${minutes}m`
+    }
+    return '0m'
   }
 
   function isTaskActive(taskId: string): boolean {
     return activeTimersByTaskId.has(taskId)
+  }
+
+  function hasTimers(taskId: string): boolean {
+    return timers.some(timer => timer.taskId === taskId)
+  }
+
+  async function handleToggleTaskCompletion(task: Task): Promise<void> {
+    setCompletingTaskId(task.id)
+    try {
+      await putApiTasksId(task.id, {
+        completedAt: task.completedAt ? null : new Date().toISOString()
+      })
+      await mutateTasks()
+    } catch (error) {
+      console.error('Failed to update task completion:', error)
+    } finally {
+      setCompletingTaskId(null)
+    }
   }
 
   return (
@@ -249,7 +275,7 @@ function App(): React.JSX.Element {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Timer</TableHead>
+                  <TableHead>Time Tracked</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Due Date</TableHead>
@@ -260,7 +286,7 @@ function App(): React.JSX.Element {
                 {isAddingTask && (
                   <TableRow className="border-primary/50 bg-primary/5">
                     <TableCell>
-                      <span className="text-muted-foreground text-sm">00:00</span>
+                      <span className="text-muted-foreground text-sm">0m</span>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -359,8 +385,8 @@ function App(): React.JSX.Element {
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <Clock4 className="h-4 w-4" />
-                          <span className="font-mono text-sm min-w-[3rem]">
-                            {getTimerDisplay(task.id)}
+                          <span className="text-sm min-w-[3rem]">
+                            {getTotalTimeDisplay(task.id)}
                           </span>
                           {activeTimersByTaskId.has(task.id) ? (
                             <Button
@@ -372,25 +398,77 @@ function App(): React.JSX.Element {
                                   handleStopTimer(task.id, activeTimer.id)
                                 }
                               }}
-                              className="h-6 w-6"
+                              className="h-7 w-7 hover:bg-red-100"
+                              title="Stop timer"
                             >
-                              <Pause className="h-3 w-3" />
+                              <Square className="h-4 w-4 text-red-600 animate-pulse" />
                             </Button>
                           ) : (
                             <Button
                               size="icon"
                               variant="ghost"
                               onClick={() => handleStartTimer(task.id)}
-                              className="h-6 w-6"
+                              className="h-7 w-7 hover:bg-green-100"
                               disabled={timersLoading}
+                              title="Start timer"
                             >
-                              <Play className="h-3 w-3" />
+                              <Play className="h-4 w-4 text-green-600" />
                             </Button>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium">{task.title}</TableCell>
-                      <TableCell className="max-w-xs truncate">{task.description || '-'}</TableCell>
+                      <TableCell
+                        className="font-medium"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleStartEditing(task.id, 'title', task.title)
+                        }}
+                      >
+                        {editingCell?.taskId === task.id && editingCell?.field === 'title' ? (
+                          <Input
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={handleSaveEdit}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveEdit()
+                              } else if (e.key === 'Escape') {
+                                handleCancelEditing()
+                              }
+                            }}
+                            autoFocus
+                            className="h-8"
+                          />
+                        ) : (
+                          <span className="cursor-text hover:underline">{task.title}</span>
+                        )}
+                      </TableCell>
+                      <TableCell
+                        className="max-w-xs"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleStartEditing(task.id, 'description', task.description || '')
+                        }}
+                      >
+                        {editingCell?.taskId === task.id && editingCell?.field === 'description' ? (
+                          <Input
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={handleSaveEdit}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleSaveEdit()
+                              } else if (e.key === 'Escape') {
+                                handleCancelEditing()
+                              }
+                            }}
+                            autoFocus
+                            className="h-8"
+                          />
+                        ) : (
+                          <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CalendarDays className="h-4 w-4" />
@@ -399,16 +477,26 @@ function App(): React.JSX.Element {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                          <Button size="icon" variant="ghost" onClick={() => setEditingTask(task)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
+                          {hasTimers(task.id) && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleToggleTaskCompletion(task)}
+                              disabled={completingTaskId === task.id}
+                              title={task.completedAt ? 'Mark incomplete' : 'Mark complete'}
+                              className={task.completedAt ? 'opacity-50' : 'hover:bg-green-100'}
+                            >
+                              <CheckCircle className={`h-4 w-4 ${task.completedAt ? 'text-gray-400' : 'text-green-600'}`} />
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => handleDeleteTask(task.id)}
-                            disabled={deletingTaskId === task.id}
+                            onClick={() => handleOpenFloatingWindow(task.id)}
+                            title="Open floating window"
+                            className="hover:bg-blue-100"
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <Maximize2 className="h-4 w-4 text-blue-600" />
                           </Button>
                         </div>
                       </TableCell>
@@ -420,13 +508,6 @@ function App(): React.JSX.Element {
         </Card>
       </main>
 
-      <EditTaskDialog
-        task={editingTask}
-        onOpenChange={(open) => !open && setEditingTask(null)}
-        onSubmit={handleUpdateTask}
-        isSubmitting={!!editingTask && savingTaskId === editingTask.id}
-      />
-
       <TaskSideMenu
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
@@ -437,76 +518,6 @@ function App(): React.JSX.Element {
         }}
       />
     </div>
-  )
-}
-
-function EditTaskDialog({
-  task,
-  onOpenChange,
-  onSubmit,
-  isSubmitting
-}: {
-  task: Task | null
-  onOpenChange: (open: boolean) => void
-  onSubmit: (task: Task) => Promise<void> | void
-  isSubmitting: boolean
-}): React.JSX.Element | null {
-  const [localTask, setLocalTask] = useState<Task | null>(task)
-
-  useEffect(() => {
-    setLocalTask(task)
-  }, [task])
-
-  if (!task || !localTask) return null
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault()
-    if (!localTask) return
-    await onSubmit({ ...localTask, updatedAt: new Date().toISOString() })
-  }
-
-  return (
-    <Dialog open={!!task} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit task</DialogTitle>
-          <DialogDescription>Update the metadata and save.</DialogDescription>
-        </DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2">
-            <Label htmlFor="edit-title">Title</Label>
-            <Input
-              id="edit-title"
-              value={localTask.title}
-              onChange={(event) => setLocalTask({ ...localTask, title: event.target.value })}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-description">Description</Label>
-            <Textarea
-              id="edit-description"
-              value={localTask.description}
-              onChange={(event) => setLocalTask({ ...localTask, description: event.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-due">Due date</Label>
-            <Input
-              id="edit-due"
-              type="date"
-              value={formatDateInput(localTask.dueDate)}
-              onChange={(event) => setLocalTask({ ...localTask, dueDate: event.target.value })}
-            />
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save changes'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -527,13 +538,6 @@ function getErrorMessage(error: unknown): string {
     if (message) return message
   }
   return 'Please try again.'
-}
-
-function formatDateInput(value?: string | null): string {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
 }
 
 function normalizeDueDate(value?: string | null): string | undefined {

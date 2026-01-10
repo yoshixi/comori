@@ -71,7 +71,7 @@ function createFloatingWindow(taskId: string): void {
 
   // Get the primary display dimensions
   const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize
+  const { width: screenWidth } = primaryDisplay.workAreaSize
 
   // Calculate top-right position
   let x = screenWidth - windowWidth - margin
@@ -82,7 +82,7 @@ function createFloatingWindow(taskId: string): void {
   if (existingWindows.length > 0) {
     // Position below the last window
     const lastWindow = existingWindows[existingWindows.length - 1]
-    const [lastX, lastY] = lastWindow.getPosition()
+    const [, lastY] = lastWindow.getPosition()
     const [, lastHeight] = lastWindow.getSize()
     y = lastY + lastHeight + verticalSpacing
   }

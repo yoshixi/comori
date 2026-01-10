@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
+import { Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
@@ -26,9 +26,13 @@ import {
 import { TaskSideMenu } from './components/TaskSideMenu'
 function App(): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
+  const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
   const taskQuery = useMemo(
-    () => (showCompleted ? undefined : { completed: 'false' as const }),
-    [showCompleted]
+    () => ({
+      completed: showCompleted ? undefined : ('false' as const),
+      sortBy
+    }),
+    [showCompleted, sortBy]
   )
   const {
     data: tasksResponse,
@@ -41,7 +45,8 @@ function App(): React.JSX.Element {
   const [newTaskFields, setNewTaskFields] = useState({
     title: '',
     description: '',
-    dueDate: ''
+    dueDate: '',
+    startAt: ''
   })
   const [isCreating, setIsCreating] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -113,10 +118,11 @@ function App(): React.JSX.Element {
       await postApiTasks({
         title: newTaskFields.title.trim(),
         description: newTaskFields.description.trim(),
-        dueDate: normalizeDueDate(newTaskFields.dueDate)
+        dueDate: normalizeDueDate(newTaskFields.dueDate),
+        startAt: normalizeDateTime(newTaskFields.startAt)
       })
       await mutateTasks()
-      setNewTaskFields({ title: '', description: '', dueDate: '' })
+      setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
       setIsAddingTask(false)
     } catch (error) {
       console.error('Failed to create task:', error)
@@ -126,7 +132,7 @@ function App(): React.JSX.Element {
   }
 
   function handleCancelAdd(): void {
-    setNewTaskFields({ title: '', description: '', dueDate: '' })
+    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
     setIsAddingTask(false)
   }
 
@@ -260,6 +266,17 @@ function App(): React.JSX.Element {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'startAt')}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  <option value="startAt">Start Date</option>
+                  <option value="createdAt">Created Date</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Show completed</span>
                 <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
               </div>
@@ -276,9 +293,9 @@ function App(): React.JSX.Element {
               <TableHeader>
                 <TableRow>
                   <TableHead>Time Tracked</TableHead>
+                  <TableHead>Start Date</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Due Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -287,6 +304,22 @@ function App(): React.JSX.Element {
                   <TableRow className="border-primary/50 bg-primary/5">
                     <TableCell>
                       <span className="text-muted-foreground text-sm">0m</span>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="datetime-local"
+                        value={newTaskFields.startAt}
+                        onChange={(e) =>
+                          setNewTaskFields((prev) => ({ ...prev, startAt: e.target.value }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleCreateTask()
+                          } else if (e.key === 'Escape') {
+                            handleCancelAdd()
+                          }
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Input
@@ -311,22 +344,6 @@ function App(): React.JSX.Element {
                         value={newTaskFields.description}
                         onChange={(e) =>
                           setNewTaskFields((prev) => ({ ...prev, description: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCreateTask()
-                          } else if (e.key === 'Escape') {
-                            handleCancelAdd()
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="date"
-                        value={newTaskFields.dueDate}
-                        onChange={(e) =>
-                          setNewTaskFields((prev) => ({ ...prev, dueDate: e.target.value }))
                         }
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -417,6 +434,9 @@ function App(): React.JSX.Element {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell>
+                        {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
+                      </TableCell>
                       <TableCell
                         className="font-medium"
                         onClick={(e) => {
@@ -469,12 +489,6 @@ function App(): React.JSX.Element {
                           <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <CalendarDays className="h-4 w-4" />
-                          {task.dueDate ? formatDate(task.dueDate) : 'No due date'}
-                        </div>
-                      </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           {hasTimers(task.id) && (
@@ -521,13 +535,15 @@ function App(): React.JSX.Element {
   )
 }
 
-function formatDate(value: string): string {
+function formatDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
-    weekday: 'short'
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -551,6 +567,13 @@ function normalizeDueDate(value?: string | null): string | undefined {
     return utcDate.toISOString()
   }
   return date.toISOString()
+}
+
+function normalizeDateTime(value?: string | null): string | undefined {
+  if (!value) return undefined
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed.toISOString()
 }
 
 export default App

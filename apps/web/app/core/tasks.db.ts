@@ -86,7 +86,7 @@ export async function getAllTasks(db: DB, userId: string, filters?: TaskFilterOp
     .select()
     .from(tasksTable)
     .where(eq(tasksTable.userId, userId))
-    .orderBy(desc(orderByField))
+    .orderBy(asc(orderByField))
 
   const tasks = dbTasks.map(convertDbTaskToApi)
 

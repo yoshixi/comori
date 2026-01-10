@@ -27,7 +27,8 @@ export const TaskManager: React.FC = () => {
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    dueDate: ''
+    dueDate: '',
+    startAt: ''
   })
 
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
@@ -91,9 +92,10 @@ export const TaskManager: React.FC = () => {
       await createTask({
         title: newTask.title.trim(),
         description: newTask.description?.trim() || undefined,
-        dueDate: normalizeDueDate(newTask.dueDate)
+        dueDate: normalizeDueDate(newTask.dueDate),
+        startAt: normalizeDateTime(newTask.startAt)
       })
-      setNewTask({ title: '', description: '', dueDate: '' })
+      setNewTask({ title: '', description: '', dueDate: '', startAt: '' })
       mutateTasks() // Refresh the tasks list
     } catch (error) {
       console.error('Failed to create task:', error)
@@ -208,12 +210,24 @@ export const TaskManager: React.FC = () => {
             className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             rows={3}
           />
-          <input
-            type="date"
-            value={newTask.dueDate}
-            onChange={(e) => setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))}
-            className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+          <div>
+            <label className="block text-sm font-medium mb-1 text-blue-800">Due Date</label>
+            <input
+              type="date"
+              value={newTask.dueDate}
+              onChange={(e) => setNewTask((prev) => ({ ...prev, dueDate: e.target.value }))}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-blue-800">Start Date & Time</label>
+            <input
+              type="datetime-local"
+              value={newTask.startAt}
+              onChange={(e) => setNewTask((prev) => ({ ...prev, startAt: e.target.value }))}
+              className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
           <button
             onClick={handleCreateTask}
             disabled={!newTask.title?.trim() || isCreating}
@@ -352,6 +366,13 @@ function normalizeDueDate(value: string): string | undefined {
     const utcDate = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
     return utcDate.toISOString()
   }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return parsed.toISOString()
+}
+
+function normalizeDateTime(value: string): string | undefined {
+  if (!value) return undefined
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return undefined
   return parsed.toISOString()

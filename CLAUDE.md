@@ -24,8 +24,14 @@ Devenv provides:
 ### Building and Running
 
 ```sh
-# Start all apps in development mode
+# Start all apps in development mode (uses default database config)
 pnpm run dev
+
+# Start web app with local SQLite database
+pnpm --filter web run dev:local
+
+# Start web app with production Turso database (requires TURSO env vars)
+pnpm --filter web run dev:prod
 
 # Build all apps and packages
 pnpm run build
@@ -63,27 +69,116 @@ pnpm --filter electron add -D <package-name>
 
 ### Database Operations (Web App)
 
-The web app uses Drizzle ORM with SQLite (local) or Turso (production):
+The web app uses Drizzle ORM with different strategies for local and production environments.
 
+**Running the API server:**
 ```sh
-# Generate migrations
-pnpm --filter web run drizzle:generate
+# Run with local SQLite database (default for dev)
+pnpm --filter web run dev:local
 
-# Apply migrations
-pnpm --filter web run drizzle:migrate
-
-# Push schema directly to database
-pnpm --filter web run drizzle:push
-
-# Pull schema from remote database
-pnpm --filter web run drizzle:pull
-
-# Production commands (requires TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN)
-pnpm --filter web run drizzle:push:prod
-pnpm --filter web run drizzle:generate:prod
+# Run with production Turso database (requires TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN)
+pnpm --filter web run dev:prod
 ```
 
-Database configuration automatically switches between local SQLite (`./tmp/local.db`) and Turso based on environment variables.
+The server automatically selects the database based on environment variables:
+- If `TURSO_CONNECTION_URL` and `TURSO_AUTH_TOKEN` are set → Uses Turso
+- Otherwise → Uses local SQLite at `./tmp/local.db`
+
+**Local Development (SQLite):**
+- Uses `drizzle:push:local` for fast iteration without migration history
+- Configuration: `drizzle.config.local.ts` → `./tmp/local.db`
+
+```sh
+# Push schema changes directly to local database (recommended for local dev)
+pnpm --filter web run drizzle:push:local
+
+# Pull schema from local database
+pnpm --filter web run drizzle:pull:local
+
+# Open Drizzle Studio to view/edit data
+pnpm --filter web run drizzle:studio:local
+```
+
+**Production (Turso):**
+- Uses proper migrations for schema versioning and history
+- Configuration: `drizzle.config.prod.ts` → Turso database
+- Requires: `TURSO_CONNECTION_URL` and `TURSO_AUTH_TOKEN` environment variables
+
+```sh
+# Generate migration files from schema changes
+pnpm --filter web run drizzle:generate:prod
+
+# Apply migrations to production database
+pnpm --filter web run drizzle:migrate:prod
+```
+
+### Changing Database Schema
+
+The workflow differs between local development and production environments:
+
+#### Local Development Workflow (Fast Iteration)
+
+For local development, use schema push for quick iteration without maintaining migration history:
+
+1. **Modify the schema**
+   - Edit `apps/web/app/db/schema/schema.ts` to add/modify/remove columns or tables
+
+2. **Push changes to local database**
+   ```sh
+   # Enter devenv shell first
+   devenv shell
+
+   # Push schema changes directly to local database
+   pnpm --filter web run drizzle:push:local
+   ```
+
+   This directly updates your local SQLite database without creating migration files.
+
+3. **Verify the changes**
+   - Test your application to ensure the schema changes work as expected
+   - Use `pnpm --filter web run drizzle:studio:local` to inspect the database visually
+
+#### Production Workflow (Migration-based)
+
+For production, use proper migrations to maintain schema versioning and history:
+
+1. **Modify the schema**
+   - Edit `apps/web/app/db/schema/schema.ts` to add/modify/remove columns or tables
+
+2. **Generate migration**
+   ```sh
+   # Enter devenv shell first
+   devenv shell
+
+   # Ensure TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN are set
+   pnpm --filter web run drizzle:generate:prod
+   ```
+
+   This creates a new migration file in `drizzle/migrations/` with SQL statements representing your schema changes.
+
+3. **Review the migration**
+   - Check the generated SQL file in `drizzle/migrations/` to ensure it matches your intended changes
+   - The migration file will have a name like `0001_<adjective>_<noun>.sql`
+
+4. **Apply migration to production**
+   ```sh
+   # Still in devenv shell with TURSO credentials set
+   pnpm --filter web run drizzle:migrate:prod
+   ```
+
+   This applies the migration to your Turso production database.
+
+5. **Commit the migration file**
+   - Add the migration file to git: `git add apps/web/drizzle/migrations/`
+   - Commit with a descriptive message: `git commit -m "Add start_at column to tasks table"`
+
+**Important notes:**
+- **Local:** Use `drizzle:push:local` for fast iteration without migration history
+- **Production:** Always use `drizzle:generate:prod` + `drizzle:migrate:prod` to maintain migration history
+- Always run these commands within `devenv shell` to ensure the correct environment
+- Never manually edit migration files after they've been generated
+- Migration files must be committed to version control for production deployments
+- Each environment uses a separate config file: `drizzle.config.local.ts` and `drizzle.config.prod.ts`
 
 ### Electron App
 

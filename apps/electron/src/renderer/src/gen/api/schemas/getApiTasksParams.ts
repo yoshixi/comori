@@ -23,7 +23,7 @@ export type GetApiTasksParams = {
    */
   order?: GetApiTasksOrder
   /**
-   * Filter tasks by tag IDs or names (comma-separated). Returns tasks with ANY of the specified tags (OR logic)
+   * Filter tasks by tag IDs (comma-separated). Returns tasks with ANY of the specified tags (OR logic)
    */
   tags?: string[]
 }

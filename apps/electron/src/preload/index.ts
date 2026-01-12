@@ -3,7 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Custom APIs for renderer
 const api = {
-  openFloatingTaskWindow: (payload: { taskId: string }) =>
+  openFloatingTaskWindow: (payload: { taskId: string; title?: string }) =>
     ipcRenderer.invoke('floating-task:open', payload),
   closeFloatingTaskWindow: (taskId: string) => ipcRenderer.invoke('floating-task:close', taskId)
 }

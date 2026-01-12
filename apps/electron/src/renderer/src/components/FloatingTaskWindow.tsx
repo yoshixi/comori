@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Loader2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { TimerManager } from './TimerManager'
 import { putApiTasksId, useGetApiTasksId } from '../gen/api'
@@ -7,8 +7,9 @@ import { putApiTasksId, useGetApiTasksId } from '../gen/api'
 export const FloatingTaskWindow: React.FC = () => {
   const params = new URLSearchParams(window.location.search)
   const taskId = params.get('taskId')
+  const initialTitle = params.get('title')
 
-  const { data: task, mutate } = useGetApiTasksId(taskId ?? '', {
+  const { data: task, isLoading: taskLoading, mutate } = useGetApiTasksId(taskId ?? '', {
     swr: {
       enabled: !!taskId
     }
@@ -16,6 +17,8 @@ export const FloatingTaskWindow: React.FC = () => {
   const [isCompleting, setIsCompleting] = useState(false)
 
   const isCompleted = Boolean(task?.task.completedAt)
+  // Use title from query params immediately, then switch to API data when loaded
+  const taskTitle = task?.task.title ?? initialTitle ?? 'Loading...'
 
   const handleClose = (): void => {
     if (window.api?.closeFloatingTaskWindow && taskId) {
@@ -51,6 +54,15 @@ export const FloatingTaskWindow: React.FC = () => {
     )
   }
 
+  // Show loading only if we don't have any title to display
+  if (taskLoading && !initialTitle) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-white/90">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex bg-white/90 h-screen flex-col" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
       <div className="flex items-start justify-between mb-3 pt-4 px-4">
@@ -58,7 +70,7 @@ export const FloatingTaskWindow: React.FC = () => {
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
             Running Task
           </p>
-          <h1 className="truncate text-base font-semibold text-foreground">{task?.task.title}</h1>
+          <h1 className="truncate text-base font-semibold text-foreground">{taskTitle}</h1>
         </div>
         <Button
           size="icon"

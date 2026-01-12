@@ -27,7 +27,7 @@ import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
-import { formatDateTime, normalizeDueDate, normalizeDateTime } from './lib/time'
+import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
 
 type View = 'tasks' | 'settings'
 
@@ -155,7 +155,7 @@ function App(): React.JSX.Element {
   const [isCreating, setIsCreating] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
-  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' | 'startAt' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
   const totalTasks = tasksResponse?.total ?? tasks.length
@@ -276,7 +276,7 @@ function App(): React.JSX.Element {
         })
         await mutateTimers()
         setCurrentTime(Date.now())
-        window.api.openFloatingTaskWindow({ taskId: task.id })
+        window.api.openFloatingTaskWindow({ taskId: task.id, title: task.title })
       } catch (error) {
         console.error('Failed to start timer:', error)
       }
@@ -342,10 +342,11 @@ function App(): React.JSX.Element {
   }
 
   function handleOpenFloatingWindow(taskId: string): void {
-    window.api.openFloatingTaskWindow({ taskId })
+    const task = tasks.find(t => t.id === taskId)
+    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
   }
 
-  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
+  function handleStartEditing(taskId: string, field: 'title' | 'description' | 'startAt', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
   }
@@ -362,8 +363,15 @@ function App(): React.JSX.Element {
     if (!task) return
 
     try {
+      let updateValue: string | null | undefined
+      if (editingCell.field === 'startAt') {
+        updateValue = normalizeDateTime(editingValue)
+      } else {
+        updateValue = editingValue.trim()
+      }
+
       await putApiTasksId(editingCell.taskId, {
-        [editingCell.field]: editingValue.trim()
+        [editingCell.field]: updateValue
       })
       await mutateTasks()
       setEditingCell(null)
@@ -374,6 +382,7 @@ function App(): React.JSX.Element {
   }
 
   async function handleStartTimer(taskId: string): Promise<void> {
+    const task = tasks.find(t => t.id === taskId)
     try {
       await postApiTimers({
         taskId,
@@ -381,7 +390,7 @@ function App(): React.JSX.Element {
       })
       await mutateTimers()
       setCurrentTime(Date.now()) // Update time display immediately
-      window.api.openFloatingTaskWindow({ taskId })
+      window.api.openFloatingTaskWindow({ taskId, title: task?.title })
     } catch (error) {
       console.error('Failed to start timer:', error)
     }
@@ -490,8 +499,33 @@ function App(): React.JSX.Element {
             )}
           </div>
         </TableCell>
-        <TableCell>
-          {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
+        <TableCell
+          onClick={(e) => {
+            e.stopPropagation()
+            handleStartEditing(task.id, 'startAt', formatDateTimeInput(task.startAt))
+          }}
+        >
+          {editingCell?.taskId === task.id && editingCell?.field === 'startAt' ? (
+            <Input
+              type="datetime-local"
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveEdit()
+                } else if (e.key === 'Escape') {
+                  handleCancelEditing()
+                }
+              }}
+              autoFocus
+              className="h-8"
+            />
+          ) : (
+            <span className="cursor-text hover:underline">
+              {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
+            </span>
+          )}
         </TableCell>
         <TableCell
           className="font-medium"

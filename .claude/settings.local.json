@@ -8,7 +8,15 @@
       "Bash(ls:*)",
       "Bash(devenv shell)",
       "Bash(pnpm run check-types:*)",
-      "Bash(pnpm --filter electron run check-types:*)"
+      "Bash(pnpm --filter electron run check-types:*)",
+      "Bash(pnpm --filter electron run api:generate:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(pnpm --filter web run test -- --reporter=verbose)",
+      "Bash(pnpm --filter electron run typecheck:*)",
+      "Bash(npx tsc:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(pnpm --filter web run test)"
     ]
   }
 }

@@ -75,20 +75,29 @@ function resolveRendererUrl(query?: Record<string, string>): string | null {
   return null
 }
 
-function createFloatingWindow(taskId: string): void {
+function createFloatingWindow(taskId: string, title?: string): void {
+  // WORKAROUND Layer 0: Pre-check before creating floating window
+  // Ensure main window is visible before we do anything that might hide it
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (!mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+  }
+
   const existing = floatingWindows.get(taskId)
+  const query: Record<string, string> = { floating: '1', taskId }
+  if (title) {
+    query.title = title
+  }
 
   if (existing && !existing.isDestroyed()) {
-    const url = resolveRendererUrl({ floating: '1', taskId })
+    const url = resolveRendererUrl(query)
     if (url) {
       existing.loadURL(url)
     } else {
-      existing.loadFile(join(__dirname, '../renderer/index.html'), {
-        query: { floating: '1', taskId }
-      })
+      existing.loadFile(join(__dirname, '../renderer/index.html'), { query })
     }
-    existing.show()
-    existing.focus()
+    existing.showInactive()
     return
   }
 
@@ -126,7 +135,6 @@ function createFloatingWindow(taskId: string): void {
     fullscreenable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
-    parent: mainWindow ?? undefined,
     frame: false,
     transparent: true,
     webPreferences: {
@@ -135,23 +143,68 @@ function createFloatingWindow(taskId: string): void {
     }
   })
 
-  floatingWindow.setAlwaysOnTop(true, 'screen-saver') // configuration for floating window to always stay on top
+  floatingWindow.setAlwaysOnTop(true, 'floating', 1)
   floatingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+
+  // WORKAROUND: Event-based protection
+  // When floating window gains focus, ensure main window stays visible
+  // This catches cases where user interaction with floating window hides main window
+  floatingWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+  })
 
   floatingWindow.on('closed', () => {
     floatingWindows.delete(taskId)
   })
 
-  const url = resolveRendererUrl({ floating: '1', taskId })
+  floatingWindows.set(taskId, floatingWindow)
+
+  // Load content and show without stealing focus
+  const url = resolveRendererUrl(query)
   if (url) {
     floatingWindow.loadURL(url)
   } else {
-    floatingWindow.loadFile(join(__dirname, '../renderer/index.html'), {
-      query: { floating: '1', taskId }
-    })
+    floatingWindow.loadFile(join(__dirname, '../renderer/index.html'), { query })
   }
 
-  floatingWindows.set(taskId, floatingWindow)
+  // Show window without activating it (prevents stealing focus from main window)
+  floatingWindow.showInactive()
+
+  // ===================================================================================
+  // WORKAROUND: Prevent main window from hiding when floating window opens
+  // ===================================================================================
+  // On macOS, showing a floating window with skipTaskbar:true and alwaysOnTop:true
+  // can cause the main window to hide unexpectedly, making the app disappear from
+  // Cmd+Tab. The exact cause is unclear but appears to be related to macOS window
+  // management and focus handling.
+  //
+  // We use a multi-layer approach to ensure the main window stays visible:
+  //
+  // Layer 1: Synchronous - Immediately after showInactive()
+  //   Catches cases where the hide happens synchronously
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+  }
+
+  // Layer 2: Next event loop tick - Using setImmediate()
+  //   Catches cases where the hide is triggered asynchronously but before
+  //   the next timer fires
+  setImmediate(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+  })
+
+  // Layer 3: Short delay - Using setTimeout(50ms)
+  //   Final safeguard for any delayed side effects from window creation
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+  }, 50)
+  // ===================================================================================
 }
 
 function closeFloatingWindow(taskId?: string): void {
@@ -171,8 +224,8 @@ function closeFloatingWindow(taskId?: string): void {
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 670,
+    width: 1400,
+    height: 900,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -185,6 +238,21 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })
+
+  // WORKAROUND: Main window hide event protection
+  // If main window receives a hide event while floating windows exist,
+  // immediately restore it. This is the last line of defense against
+  // unexpected hiding caused by macOS window management.
+  mainWindow.on('hide', () => {
+    if (floatingWindows.size > 0 && mainWindow && !mainWindow.isDestroyed()) {
+      setImmediate(() => {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+          mainWindow.show()
+        }
+      })
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
     closeFloatingWindow()
@@ -223,9 +291,9 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.handle('floating-task:open', (_event, payload: { taskId: string; title: string }) => {
+  ipcMain.handle('floating-task:open', (_event, payload: { taskId: string; title?: string }) => {
     if (!payload?.taskId) return
-    createFloatingWindow(payload.taskId)
+    createFloatingWindow(payload.taskId, payload.title)
   })
   ipcMain.handle('floating-task:close', (_event, taskId?: string) => {
     closeFloatingWindow(taskId)

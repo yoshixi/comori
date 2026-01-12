@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { X, Check } from 'lucide-react'
 import { putApiTasksId, type Task } from '../gen/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -8,10 +8,23 @@ import { Textarea } from './ui/textarea'
 import { TimerManager } from './TimerManager'
 import { formatDateInput, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from '../lib/time'
 
+const AUTO_SAVE_DELAY_MS = 800
+
 interface TaskSideMenuProps {
   task: Task | null
   onClose: () => void
   onTaskUpdated?: (task: Task) => void
+}
+
+// Helper to check if editable fields have changed
+function hasEditableChanges(current: Task | null, saved: Task | null): boolean {
+  if (!current || !saved) return false
+  return (
+    current.title !== saved.title ||
+    current.description !== saved.description ||
+    current.dueDate !== saved.dueDate ||
+    current.startAt !== saved.startAt
+  )
 }
 
 export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
@@ -22,6 +35,11 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   const [localTask, setLocalTask] = useState<Task | null>(task)
   const [isSaving, setIsSaving] = useState(false)
   const [isCompleting, setIsCompleting] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Track the last saved state to compare against
+  const lastSavedTaskRef = useRef<Task | null>(task)
 
   const currentTask = localTask ?? task
   const isCompleted = Boolean(currentTask?.completedAt)
@@ -37,36 +55,93 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [task, onClose])
 
+  // Reset state when task prop changes
   useEffect(() => {
     setLocalTask(task)
+    lastSavedTaskRef.current = task
+    // Clear any pending save timer when switching tasks
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
   }, [task])
 
-  if (!task) return null
-
-  const handleTimerStarted = (): void => {
-    window.api?.openFloatingTaskWindow?.({ taskId: task.id })
-  }
-
-  const handleTimerStopped = (): void => {
-    window.api?.closeFloatingTaskWindow?.(task.id)
-  }
-
-  const handleSave = async (): Promise<void> => {
-    if (!localTask) return
+  // Auto-save function
+  const performSave = useCallback(async (taskToSave: Task): Promise<void> => {
     setIsSaving(true)
     try {
-      await putApiTasksId(localTask.id, {
-        title: localTask.title?.trim(),
-        description: localTask.description?.trim(),
-        dueDate: normalizeDueDate(localTask.dueDate ?? ''),
-        startAt: normalizeDateTime(localTask.startAt ?? '')
+      await putApiTasksId(taskToSave.id, {
+        title: taskToSave.title?.trim(),
+        description: taskToSave.description?.trim(),
+        dueDate: normalizeDueDate(taskToSave.dueDate ?? ''),
+        startAt: normalizeDateTime(taskToSave.startAt ?? '')
       })
-      onTaskUpdated?.({ ...localTask, updatedAt: new Date().toISOString() })
+      // Update the last saved reference after successful save
+      lastSavedTaskRef.current = taskToSave
+      onTaskUpdated?.({ ...taskToSave, updatedAt: new Date().toISOString() })
+
+      // Show saved indicator
+      setShowSaved(true)
+      if (savedIndicatorTimerRef.current) {
+        clearTimeout(savedIndicatorTimerRef.current)
+      }
+      savedIndicatorTimerRef.current = setTimeout(() => {
+        setShowSaved(false)
+      }, 2000)
     } catch (error) {
       console.error('Failed to update task:', error)
     } finally {
       setIsSaving(false)
     }
+  }, [onTaskUpdated])
+
+  // Debounced auto-save effect - only triggers when there are actual changes
+  useEffect(() => {
+    // Clear existing timer first
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+
+    // Only schedule save if there are actual changes
+    if (!localTask || !hasEditableChanges(localTask, lastSavedTaskRef.current)) {
+      return
+    }
+
+    // Set new timer for auto-save
+    debounceTimerRef.current = setTimeout(() => {
+      performSave(localTask)
+    }, AUTO_SAVE_DELAY_MS)
+
+    // Cleanup on unmount or when localTask changes
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+    }
+  }, [localTask, performSave])
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+      if (savedIndicatorTimerRef.current) {
+        clearTimeout(savedIndicatorTimerRef.current)
+      }
+    }
+  }, [])
+
+  if (!task) return null
+
+  const handleTimerStarted = (): void => {
+    window.api?.openFloatingTaskWindow?.({ taskId: task.id, title: task.title })
+  }
+
+  const handleTimerStopped = (): void => {
+    window.api?.closeFloatingTaskWindow?.(task.id)
   }
 
   const handleToggleCompletion = async (): Promise<void> => {
@@ -178,9 +253,17 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
                     }
                   />
                 </div>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? 'Saving...' : 'Save changes'}
-                </Button>
+                <div className="h-6 flex items-center">
+                  {isSaving && (
+                    <span className="text-xs text-muted-foreground">Saving...</span>
+                  )}
+                  {showSaved && !isSaving && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <Check className="h-3 w-3" />
+                      Saved
+                    </span>
+                  )}
+                </div>
               </div>
             </section>
 

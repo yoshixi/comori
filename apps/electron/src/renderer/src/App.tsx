@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
 
 import { Button } from './components/ui/button'
@@ -24,25 +24,159 @@ import {
   type TaskTimer
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
-import { formatDateTime, normalizeDueDate, normalizeDateTime } from './lib/time'
+import { AppSidebar } from './components/Sidebar'
+import { SettingsView } from './components/SettingsView'
+import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
+import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
+
+type View = 'tasks' | 'settings'
+
+// Keyboard shortcut definitions
+type KeyBinding = {
+  key: string
+  metaKey?: boolean
+  ctrlKey?: boolean
+  shiftKey?: boolean
+}
+
+const keyMaps = {
+  NEW_TASK: { key: 'n', metaKey: true },
+  TOGGLE_SIDEBAR: { key: 'e', metaKey: true },
+  TOGGLE_TIMER: { key: ' ' },
+  NAVIGATE_NEXT: { key: 'Tab' },
+  NAVIGATE_PREV: { key: 'Tab', shiftKey: true }
+} as const satisfies Record<string, KeyBinding>
+
+function matchesKeyBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
+  const metaOrCtrl = binding.metaKey ? (e.metaKey || e.ctrlKey) : true
+  const shift = binding.shiftKey ? e.shiftKey : !e.shiftKey
+  return e.key === binding.key && metaOrCtrl && shift
+}
+
+// Keyboard shortcut handler component (must be inside SidebarProvider)
+function KeyboardShortcuts({
+  onNewTask,
+  onToggleTimer,
+  onNavigateNext,
+  onNavigatePrev,
+  isAddingTask,
+  isEditing
+}: {
+  onNewTask: () => void
+  onToggleTimer: () => void
+  onNavigateNext: () => void
+  onNavigatePrev: () => void
+  isAddingTask: boolean
+  isEditing: boolean
+}): null {
+  const { toggleSidebar } = useSidebar()
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      // Command/Ctrl + N: New task
+      if (matchesKeyBinding(e, keyMaps.NEW_TASK)) {
+        e.preventDefault()
+        if (!isAddingTask) {
+          onNewTask()
+        }
+        return
+      }
+
+      // Command/Ctrl + E: Toggle sidebar
+      if (matchesKeyBinding(e, keyMaps.TOGGLE_SIDEBAR)) {
+        e.preventDefault()
+        toggleSidebar()
+        return
+      }
+
+      // Don't handle other shortcuts if adding task or editing
+      if (isAddingTask || isEditing) return
+
+      // Space: Toggle timer
+      if (matchesKeyBinding(e, keyMaps.TOGGLE_TIMER)) {
+        e.preventDefault()
+        onToggleTimer()
+        return
+      }
+
+      // Tab: Navigate tasks
+      if (matchesKeyBinding(e, keyMaps.NAVIGATE_PREV)) {
+        e.preventDefault()
+        onNavigatePrev()
+        return
+      }
+
+      if (matchesKeyBinding(e, keyMaps.NAVIGATE_NEXT)) {
+        e.preventDefault()
+        onNavigateNext()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleSidebar, onNewTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
+
+  return null
+}
+
 function App(): React.JSX.Element {
+  const [currentView, setCurrentView] = useState<View>('tasks')
   const [showCompleted, setShowCompleted] = useState(false)
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
-  const taskQuery = useMemo(
+
+  // Query for tasks with active timers (In Progress section)
+  const activeTaskQuery = useMemo(
     () => ({
       completed: showCompleted ? undefined : ('false' as const),
+      hasActiveTimer: 'true' as const,
       sortBy,
       order: 'asc' as const
     }),
     [showCompleted, sortBy]
   )
   const {
-    data: tasksResponse,
-    error: tasksError,
-    isLoading: tasksLoading,
-    mutate: mutateTasks
-  } = useGetApiTasks(taskQuery)
-  const tasks = tasksResponse?.tasks ?? []
+    data: activeTasksResponse,
+    error: activeTasksError,
+    isLoading: activeTasksLoading,
+    mutate: mutateActiveTasks
+  } = useGetApiTasks(activeTaskQuery)
+  const activeTasks = activeTasksResponse?.tasks ?? []
+
+  // Query for tasks without active timers (Tasks section)
+  const inactiveTaskQuery = useMemo(
+    () => ({
+      completed: showCompleted ? undefined : ('false' as const),
+      hasActiveTimer: 'false' as const,
+      sortBy,
+      order: 'asc' as const
+    }),
+    [showCompleted, sortBy]
+  )
+  const {
+    data: inactiveTasksResponse,
+    error: inactiveTasksError,
+    isLoading: inactiveTasksLoading,
+    mutate: mutateInactiveTasks
+  } = useGetApiTasks(inactiveTaskQuery)
+  const inactiveTasks = inactiveTasksResponse?.tasks ?? []
+
+  // Combined tasks for operations that need to find a task
+  const allTasks = useMemo(() => [...activeTasks, ...inactiveTasks], [activeTasks, inactiveTasks])
+  const tasksLoading = activeTasksLoading || inactiveTasksLoading
+  const tasksError = activeTasksError || inactiveTasksError
+
+  // Helper to mutate both task lists
+  const mutateBothTaskLists = useCallback(() => {
+    return Promise.all([mutateActiveTasks(), mutateInactiveTasks()])
+  }, [mutateActiveTasks, mutateInactiveTasks])
+
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [newTaskFields, setNewTaskFields] = useState({
     title: '',
@@ -50,15 +184,13 @@ function App(): React.JSX.Element {
     dueDate: '',
     startAt: ''
   })
-  const [isCreating, setIsCreating] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
+  const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
+  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' | 'startAt' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
-  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
-  const totalTasks = tasksResponse?.total ?? tasks.length
 
   const [currentTime, setCurrentTime] = useState(Date.now())
-  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks])
+  const taskIds = useMemo(() => allTasks.map((task) => task.id), [allTasks])
 
   const {
     data: timersResponse,
@@ -100,6 +232,19 @@ function App(): React.JSX.Element {
     return map
   }, [timers, currentTime])
 
+  // Combined list for keyboard navigation (active tasks first, then inactive)
+  const allTasksForNavigation = useMemo(() => {
+    return [...activeTasks, ...inactiveTasks]
+  }, [activeTasks, inactiveTasks])
+
+  // Get the focused task
+  const focusedTask = useMemo(() => {
+    if (focusedTaskIndex >= 0 && focusedTaskIndex < allTasksForNavigation.length) {
+      return allTasksForNavigation[focusedTaskIndex]
+    }
+    return null
+  }, [focusedTaskIndex, allTasksForNavigation])
+
   // Update current time every minute for timer display
   useEffect(() => {
     // Update immediately on mount
@@ -112,25 +257,208 @@ function App(): React.JSX.Element {
     return () => clearInterval(interval)
   }, [])
 
-  async function handleCreateTask(): Promise<void> {
+  // Helper to start adding a new task
+  const startAddingTask = useCallback(() => {
+    const now = new Date()
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16)
+    setNewTaskFields((prev) => ({ ...prev, startAt: localDateTime }))
+    setIsAddingTask(true)
+  }, [])
+
+  // Helper to toggle timer for a task
+  const toggleTaskTimer = useCallback((task: Task) => {
+    const activeTimer = activeTimersByTaskId.get(task.id)
+    if (activeTimer) {
+      // Stop the timer - move task from active to inactive list optimistically
+      setCurrentTime(Date.now())
+      window.api.closeFloatingTaskWindow(task.id)
+
+      // Optimistic update: move task from active to inactive list
+      mutateActiveTasks(
+        (currentData) => {
+          if (!currentData) return currentData
+          return {
+            ...currentData,
+            tasks: currentData.tasks.filter((t) => t.id !== task.id),
+            total: currentData.total - 1
+          }
+        },
+        { revalidate: false }
+      )
+      mutateInactiveTasks(
+        (currentData) => {
+          if (!currentData) return currentData
+          return {
+            ...currentData,
+            tasks: [task, ...currentData.tasks],
+            total: currentData.total + 1
+          }
+        },
+        { revalidate: false }
+      )
+
+      putApiTimersId(activeTimer.id, {
+        endTime: new Date().toISOString()
+      })
+        .then(() => {
+          mutateTimers()
+          mutateBothTaskLists()
+        })
+        .catch((error) => {
+          console.error('Failed to stop timer:', error)
+          mutateBothTaskLists() // Revert on error
+        })
+    } else {
+      // Start the timer - move task from inactive to active list optimistically
+      setCurrentTime(Date.now())
+      window.api.openFloatingTaskWindow({ taskId: task.id, title: task.title })
+
+      // Optimistic update: move task from inactive to active list
+      mutateInactiveTasks(
+        (currentData) => {
+          if (!currentData) return currentData
+          return {
+            ...currentData,
+            tasks: currentData.tasks.filter((t) => t.id !== task.id),
+            total: currentData.total - 1
+          }
+        },
+        { revalidate: false }
+      )
+      mutateActiveTasks(
+        (currentData) => {
+          if (!currentData) return currentData
+          return {
+            ...currentData,
+            tasks: [task, ...currentData.tasks],
+            total: currentData.total + 1
+          }
+        },
+        { revalidate: false }
+      )
+
+      postApiTimers({
+        taskId: task.id,
+        startTime: new Date().toISOString()
+      })
+        .then(() => {
+          mutateTimers()
+          mutateBothTaskLists()
+        })
+        .catch((error) => {
+          console.error('Failed to start timer:', error)
+          mutateBothTaskLists() // Revert on error
+        })
+    }
+  }, [activeTimersByTaskId, mutateTimers, mutateActiveTasks, mutateInactiveTasks, mutateBothTaskLists])
+
+  // Handle keyboard timer toggle
+  const handleKeyboardToggleTimer = useCallback(() => {
+    // If a task is focused, toggle its timer
+    if (focusedTask) {
+      toggleTaskTimer(focusedTask)
+      return
+    }
+    // Otherwise, use the oldest task by start time (first inactive task)
+    if (inactiveTasks.length > 0) {
+      setFocusedTaskIndex(activeTasks.length) // Focus the first inactive task
+      toggleTaskTimer(inactiveTasks[0])
+    }
+  }, [focusedTask, inactiveTasks, activeTasks.length, toggleTaskTimer])
+
+  // Navigate to next task
+  const handleNavigateNext = useCallback(() => {
+    if (allTasksForNavigation.length === 0) return
+    setFocusedTaskIndex((prev) => {
+      if (prev < 0) return 0
+      return (prev + 1) % allTasksForNavigation.length
+    })
+  }, [allTasksForNavigation.length])
+
+  // Navigate to previous task
+  const handleNavigatePrev = useCallback(() => {
+    if (allTasksForNavigation.length === 0) return
+    setFocusedTaskIndex((prev) => {
+      if (prev < 0) return allTasksForNavigation.length - 1
+      return (prev - 1 + allTasksForNavigation.length) % allTasksForNavigation.length
+    })
+  }, [allTasksForNavigation.length])
+
+  function handleCreateTask(): void {
     if (!newTaskFields.title.trim()) return
 
-    setIsCreating(true)
-    try {
-      await postApiTasks({
-        title: newTaskFields.title.trim(),
-        description: newTaskFields.description.trim(),
-        dueDate: normalizeDueDate(newTaskFields.dueDate),
-        startAt: normalizeDateTime(newTaskFields.startAt)
-      })
-      await mutateTasks()
-      setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
-      setIsAddingTask(false)
-    } catch (error) {
-      console.error('Failed to create task:', error)
-    } finally {
-      setIsCreating(false)
+    const now = new Date().toISOString()
+    const tempId = `temp-${Date.now()}`
+
+    // Create optimistic task object
+    const optimisticTask: Task = {
+      id: tempId,
+      title: newTaskFields.title.trim(),
+      description: newTaskFields.description.trim(),
+      dueDate: normalizeDueDate(newTaskFields.dueDate) ?? null,
+      startAt: normalizeDateTime(newTaskFields.startAt) ?? null,
+      completedAt: null,
+      tags: [],
+      createdAt: now,
+      updatedAt: now
     }
+
+    // Optimistic UI: insert task into inactive list (new tasks don't have active timers)
+    mutateInactiveTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: [optimisticTask, ...currentData.tasks],
+          total: currentData.total + 1
+        }
+      },
+      { revalidate: false }
+    )
+
+    // Close form immediately
+    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
+    setIsAddingTask(false)
+
+    // API call in background
+    postApiTasks({
+      title: optimisticTask.title,
+      description: optimisticTask.description,
+      dueDate: normalizeDueDate(newTaskFields.dueDate),
+      startAt: normalizeDateTime(newTaskFields.startAt)
+    })
+      .then((response) => {
+        // Replace optimistic task with real task from server (no full revalidation)
+        mutateInactiveTasks(
+          (currentData) => {
+            if (!currentData) return currentData
+            return {
+              ...currentData,
+              tasks: currentData.tasks.map((t) =>
+                t.id === tempId ? response.task : t
+              )
+            }
+          },
+          { revalidate: false }
+        )
+      })
+      .catch((error) => {
+        console.error('Failed to create task:', error)
+        // Remove optimistic task on error (no full revalidation)
+        mutateInactiveTasks(
+          (currentData) => {
+            if (!currentData) return currentData
+            return {
+              ...currentData,
+              tasks: currentData.tasks.filter((t) => t.id !== tempId),
+              total: currentData.total - 1
+            }
+          },
+          { revalidate: false }
+        )
+      })
   }
 
   function handleCancelAdd(): void {
@@ -139,10 +467,11 @@ function App(): React.JSX.Element {
   }
 
   function handleOpenFloatingWindow(taskId: string): void {
-    window.api.openFloatingTaskWindow({ taskId })
+    const task = allTasks.find(t => t.id === taskId)
+    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
   }
 
-  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
+  function handleStartEditing(taskId: string, field: 'title' | 'description' | 'startAt', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
   }
@@ -152,49 +481,128 @@ function App(): React.JSX.Element {
     setEditingValue('')
   }
 
-  async function handleSaveEdit(): Promise<void> {
+  function handleSaveEdit(): void {
     if (!editingCell) return
 
-    const task = tasks.find(t => t.id === editingCell.taskId)
+    const task = allTasks.find(t => t.id === editingCell.taskId)
     if (!task) return
 
-    try {
-      await putApiTasksId(editingCell.taskId, {
-        [editingCell.field]: editingValue.trim()
-      })
-      await mutateTasks()
-      setEditingCell(null)
-      setEditingValue('')
-    } catch (error) {
-      console.error('Failed to update task:', error)
+    let updateValue: string | null | undefined
+    if (editingCell.field === 'startAt') {
+      updateValue = normalizeDateTime(editingValue)
+    } else {
+      updateValue = editingValue.trim()
     }
+
+    const fieldToUpdate = editingCell.field
+    const taskIdToUpdate = editingCell.taskId
+
+    // Close edit mode immediately (optimistic UI)
+    setEditingCell(null)
+    setEditingValue('')
+
+    // Make API call in background
+    putApiTasksId(taskIdToUpdate, {
+      [fieldToUpdate]: updateValue
+    })
+      .then(() => mutateBothTaskLists())
+      .catch((error) => {
+        console.error('Failed to update task:', error)
+        // Could show a toast notification here to inform user of failure
+      })
   }
 
-  async function handleStartTimer(taskId: string): Promise<void> {
-    try {
-      await postApiTimers({
-        taskId,
-        startTime: new Date().toISOString()
+  function handleStartTimer(taskId: string): void {
+    const task = allTasks.find(t => t.id === taskId)
+    if (!task) return
+
+    // UI first (optimistic) - move task from inactive to active
+    setCurrentTime(Date.now())
+    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
+
+    // Optimistic update: move task from inactive to active list
+    mutateInactiveTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: currentData.tasks.filter((t) => t.id !== taskId),
+          total: currentData.total - 1
+        }
+      },
+      { revalidate: false }
+    )
+    mutateActiveTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: [task, ...currentData.tasks],
+          total: currentData.total + 1
+        }
+      },
+      { revalidate: false }
+    )
+
+    // API call in background
+    postApiTimers({
+      taskId,
+      startTime: new Date().toISOString()
+    })
+      .then(() => {
+        mutateTimers()
+        mutateBothTaskLists()
       })
-      await mutateTimers()
-      setCurrentTime(Date.now()) // Update time display immediately
-      window.api.openFloatingTaskWindow({ taskId })
-    } catch (error) {
-      console.error('Failed to start timer:', error)
-    }
+      .catch((error) => {
+        console.error('Failed to start timer:', error)
+        mutateBothTaskLists() // Revert on error
+      })
   }
 
-  async function handleStopTimer(taskId: string, timerId: string): Promise<void> {
-    try {
-      await putApiTimersId(timerId, {
-        endTime: new Date().toISOString()
+  function handleStopTimer(taskId: string, timerId: string): void {
+    const task = allTasks.find(t => t.id === taskId)
+    if (!task) return
+
+    // UI first (optimistic) - move task from active to inactive
+    setCurrentTime(Date.now())
+    window.api.closeFloatingTaskWindow(taskId)
+
+    // Optimistic update: move task from active to inactive list
+    mutateActiveTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: currentData.tasks.filter((t) => t.id !== taskId),
+          total: currentData.total - 1
+        }
+      },
+      { revalidate: false }
+    )
+    mutateInactiveTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: [task, ...currentData.tasks],
+          total: currentData.total + 1
+        }
+      },
+      { revalidate: false }
+    )
+
+    // API call in background
+    putApiTimersId(timerId, {
+      endTime: new Date().toISOString()
+    })
+      .then(() => {
+        mutateTimers()
+        mutateBothTaskLists()
       })
-      await mutateTimers()
-      setCurrentTime(Date.now()) // Update time display immediately
-      window.api.closeFloatingTaskWindow(taskId)
-    } catch (error) {
-      console.error('Failed to stop timer:', error)
-    }
+      .catch((error) => {
+        console.error('Failed to stop timer:', error)
+        mutateBothTaskLists() // Revert on error
+      })
   }
 
   function getTotalTimeDisplay(taskId: string): string {
@@ -219,321 +627,429 @@ function App(): React.JSX.Element {
     return timers.some(timer => timer.taskId === taskId)
   }
 
-  async function handleToggleTaskCompletion(task: Task): Promise<void> {
-    setCompletingTaskId(task.id)
-    try {
-      await putApiTasksId(task.id, {
-        completedAt: task.completedAt ? null : new Date().toISOString()
+  function handleToggleTaskCompletion(task: Task): void {
+    const newCompletedAt = task.completedAt ? null : new Date().toISOString()
+    const isInActiveList = activeTasks.some(t => t.id === task.id)
+
+    // Determine which mutator to use based on which list the task is in
+    const mutateTargetList = isInActiveList ? mutateActiveTasks : mutateInactiveTasks
+
+    // Optimistic UI: update local cache immediately
+    mutateTargetList(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: currentData.tasks.map((t) =>
+            t.id === task.id ? { ...t, completedAt: newCompletedAt } : t
+          )
+        }
+      },
+      { revalidate: false } // Don't revalidate yet
+    )
+
+    // API call in background
+    putApiTasksId(task.id, { completedAt: newCompletedAt })
+      .then(() => mutateBothTaskLists()) // Revalidate after success
+      .catch((error) => {
+        console.error('Failed to update task completion:', error)
+        mutateBothTaskLists() // Revalidate to revert on error
       })
-      await mutateTasks()
-    } catch (error) {
-      console.error('Failed to update task completion:', error)
-    } finally {
-      setCompletingTaskId(null)
-    }
+  }
+
+  function renderTaskRow(task: Task): React.JSX.Element {
+    const isCompleted = !!task.completedAt
+    const isFocused = focusedTask?.id === task.id
+    return (
+      <TableRow
+        key={task.id}
+        className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'bg-primary/5' : ''} ${isCompleted ? 'opacity-50' : ''} ${isFocused ? 'ring-2 ring-primary ring-inset' : ''}`}
+        onClick={() => {
+          setSelectedTask(task)
+          const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+          setFocusedTaskIndex(index)
+        }}
+      >
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleOpenFloatingWindow(task.id)}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="Open floating window"
+            >
+              <Clock4 className="h-4 w-4" />
+            </button>
+            <span className="text-sm min-w-[3rem]">
+              {getTotalTimeDisplay(task.id)}
+            </span>
+            {activeTimersByTaskId.has(task.id) ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  const activeTimer = activeTimersByTaskId.get(task.id)
+                  if (activeTimer) {
+                    handleStopTimer(task.id, activeTimer.id)
+                  }
+                }}
+                className="h-7 w-7 hover:bg-red-100"
+                title="Stop timer"
+              >
+                <Square className="h-4 w-4 text-red-600 animate-pulse" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => handleStartTimer(task.id)}
+                className="h-7 w-7 hover:bg-green-100"
+                disabled={timersLoading}
+                title="Start timer"
+              >
+                <Play className="h-4 w-4 text-green-600" />
+              </Button>
+            )}
+          </div>
+        </TableCell>
+        <TableCell
+          onClick={(e) => {
+            e.stopPropagation()
+            handleStartEditing(task.id, 'startAt', formatDateTimeInput(task.startAt))
+          }}
+        >
+          {editingCell?.taskId === task.id && editingCell?.field === 'startAt' ? (
+            <Input
+              type="datetime-local"
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveEdit()
+                } else if (e.key === 'Escape') {
+                  handleCancelEditing()
+                }
+              }}
+              autoFocus
+              className="h-8"
+            />
+          ) : (
+            <span className="cursor-text hover:underline">
+              {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
+            </span>
+          )}
+        </TableCell>
+        <TableCell
+          className="font-medium"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleStartEditing(task.id, 'title', task.title)
+          }}
+        >
+          {editingCell?.taskId === task.id && editingCell?.field === 'title' ? (
+            <Input
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveEdit()
+                } else if (e.key === 'Escape') {
+                  handleCancelEditing()
+                }
+              }}
+              autoFocus
+              className="h-8"
+            />
+          ) : (
+            <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
+          )}
+        </TableCell>
+        <TableCell
+          className="max-w-xs"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleStartEditing(task.id, 'description', task.description || '')
+          }}
+        >
+          {editingCell?.taskId === task.id && editingCell?.field === 'description' ? (
+            <Input
+              value={editingValue}
+              onChange={(e) => setEditingValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveEdit()
+                } else if (e.key === 'Escape') {
+                  handleCancelEditing()
+                }
+              }}
+              autoFocus
+              className="h-8"
+            />
+          ) : (
+            <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
+          )}
+        </TableCell>
+        <TableCell onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-2">
+            {hasTimers(task.id) && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => handleToggleTaskCompletion(task)}
+                title={task.completedAt ? 'Mark incomplete' : 'Mark complete'}
+                className={task.completedAt ? 'opacity-50' : 'hover:bg-green-100'}
+              >
+                <CheckCircle className={`h-4 w-4 ${task.completedAt ? 'text-gray-400' : 'text-green-600'}`} />
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                setSelectedTask(task)
+                const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+                setFocusedTaskIndex(index)
+              }}
+              title="Open task details"
+              className="hover:bg-blue-100"
+            >
+              <Maximize2 className="h-4 w-4 text-blue-600" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    )
+  }
+
+  function renderTableHeader(): React.JSX.Element {
+    return (
+      <TableHeader>
+        <TableRow>
+          <TableHead>Time Tracked</TableHead>
+          <TableHead>Start Date</TableHead>
+          <TableHead>Title</TableHead>
+          <TableHead>Description</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+    )
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <main className="mx-auto max-w-6xl">
-        <header className="mb-8 text-center">
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            <Clock4 className="h-4 w-4 text-primary" />
-            Task Management
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Task List
-          </h1>
-          <p className="mx-auto mt-3 max-w-2xl text-base text-muted-foreground">
-            Manage your tasks in a simple table view
-          </p>
-        </header>
+    <SidebarProvider defaultOpen={false}>
+      <KeyboardShortcuts
+        onNewTask={startAddingTask}
+        onToggleTimer={handleKeyboardToggleTimer}
+        onNavigateNext={handleNavigateNext}
+        onNavigatePrev={handleNavigatePrev}
+        isAddingTask={isAddingTask}
+        isEditing={!!editingCell}
+      />
+      <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+      <SidebarInset>
+        {currentView === 'settings' ? (
+          <SettingsView />
+        ) : (
+          <div className="p-8">
+            <main className="mx-auto max-w-6xl">
+              {timersError && (
+                <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                  Failed to load timers.
+                </div>
+              )}
 
-        {timersError && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-            Failed to load timers.
+              {/* Controls */}
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Sort by:</span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'startAt')}
+                      className="rounded px-2 py-1 text-sm bg-background"
+                    >
+                      <option value="startAt">Start Date</option>
+                      <option value="createdAt">Created Date</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Show completed</span>
+                    <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
+                  </div>
+                </div>
+                {!isAddingTask && (
+                  <Button onClick={startAddingTask}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Task
+                  </Button>
+                )}
+              </div>
+
+              {/* In Progress Section */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    In Progress
+                  </CardTitle>
+                  <CardDescription>
+                    {activeTasks.length} task{activeTasks.length === 1 ? '' : 's'} with timer running
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    {renderTableHeader()}
+                    <TableBody>
+                      {tasksLoading && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            Loading tasks...
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!tasksLoading && activeTasks.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            No tasks in progress
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!tasksLoading && activeTasks.map(renderTaskRow)}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Upcoming Tasks Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tasks</CardTitle>
+                  <CardDescription>
+                    {tasksLoading
+                      ? 'Loading tasks...'
+                      : `${inactiveTasks.length} task${inactiveTasks.length === 1 ? '' : 's'}`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    {renderTableHeader()}
+                    <TableBody>
+                      {isAddingTask && (
+                        <TableRow className="bg-primary/5">
+                          <TableCell>
+                            <span className="text-muted-foreground text-sm">0m</span>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="datetime-local"
+                              value={newTaskFields.startAt}
+                              onChange={(e) =>
+                                setNewTaskFields((prev) => ({ ...prev, startAt: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCreateTask()
+                                } else if (e.key === 'Escape') {
+                                  handleCancelAdd()
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              placeholder="Enter task title"
+                              value={newTaskFields.title}
+                              onChange={(e) =>
+                                setNewTaskFields((prev) => ({ ...prev, title: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCreateTask()
+                                } else if (e.key === 'Escape') {
+                                  handleCancelAdd()
+                                }
+                              }}
+                              autoFocus
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              placeholder="Enter description"
+                              value={newTaskFields.description}
+                              onChange={(e) =>
+                                setNewTaskFields((prev) => ({ ...prev, description: e.target.value }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCreateTask()
+                                } else if (e.key === 'Escape') {
+                                  handleCancelAdd()
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={handleCreateTask}
+                                disabled={!newTaskFields.title.trim()}
+                              >
+                                Save
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={handleCancelAdd}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {tasksLoading && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            Loading tasks...
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!tasksLoading && tasksError && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-destructive">
+                            Failed to load tasks. {getErrorMessage(tasksError)}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!tasksLoading && !tasksError && inactiveTasks.length === 0 && !isAddingTask && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            No tasks found
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {!tasksLoading && !tasksError && inactiveTasks.map(renderTaskRow)}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </main>
           </div>
         )}
 
-        {/* Task Table */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle>Tasks</CardTitle>
-              <CardDescription>
-                {tasksLoading
-                  ? 'Loading tasks...'
-                  : `${totalTasks} task${totalTasks === 1 ? '' : 's'}`}
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'startAt')}
-                  className="border rounded px-2 py-1 text-sm"
-                >
-                  <option value="startAt">Start Date</option>
-                  <option value="createdAt">Created Date</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Show completed</span>
-                <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
-              </div>
-              {!isAddingTask && (
-                <Button onClick={() => setIsAddingTask(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Task
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Time Tracked</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isAddingTask && (
-                  <TableRow className="border-primary/50 bg-primary/5">
-                    <TableCell>
-                      <span className="text-muted-foreground text-sm">0m</span>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="datetime-local"
-                        value={newTaskFields.startAt}
-                        onChange={(e) =>
-                          setNewTaskFields((prev) => ({ ...prev, startAt: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCreateTask()
-                          } else if (e.key === 'Escape') {
-                            handleCancelAdd()
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="Enter task title"
-                        value={newTaskFields.title}
-                        onChange={(e) =>
-                          setNewTaskFields((prev) => ({ ...prev, title: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCreateTask()
-                          } else if (e.key === 'Escape') {
-                            handleCancelAdd()
-                          }
-                        }}
-                        autoFocus
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        placeholder="Enter description"
-                        value={newTaskFields.description}
-                        onChange={(e) =>
-                          setNewTaskFields((prev) => ({ ...prev, description: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            handleCreateTask()
-                          } else if (e.key === 'Escape') {
-                            handleCancelAdd()
-                          }
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={handleCreateTask}
-                          disabled={!newTaskFields.title.trim() || isCreating}
-                        >
-                          {isCreating ? 'Saving...' : 'Save'}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleCancelAdd}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {tasksLoading && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      Loading tasks...
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!tasksLoading && tasksError && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-destructive">
-                      Failed to load tasks. {getErrorMessage(tasksError)}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!tasksLoading && !tasksError && tasks.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No tasks found
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!tasksLoading &&
-                  !tasksError &&
-                  tasks.map((task) => (
-                    <TableRow
-                      key={task.id}
-                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'border-primary/70 bg-primary/10' : ''}`}
-                      onClick={() => setSelectedTask(task)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          <Clock4 className="h-4 w-4" />
-                          <span className="text-sm min-w-[3rem]">
-                            {getTotalTimeDisplay(task.id)}
-                          </span>
-                          {activeTimersByTaskId.has(task.id) ? (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                const activeTimer = activeTimersByTaskId.get(task.id)
-                                if (activeTimer) {
-                                  handleStopTimer(task.id, activeTimer.id)
-                                }
-                              }}
-                              className="h-7 w-7 hover:bg-red-100"
-                              title="Stop timer"
-                            >
-                              <Square className="h-4 w-4 text-red-600 animate-pulse" />
-                            </Button>
-                          ) : (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleStartTimer(task.id)}
-                              className="h-7 w-7 hover:bg-green-100"
-                              disabled={timersLoading}
-                              title="Start timer"
-                            >
-                              <Play className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
-                      </TableCell>
-                      <TableCell
-                        className="font-medium"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleStartEditing(task.id, 'title', task.title)
-                        }}
-                      >
-                        {editingCell?.taskId === task.id && editingCell?.field === 'title' ? (
-                          <Input
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={handleSaveEdit}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveEdit()
-                              } else if (e.key === 'Escape') {
-                                handleCancelEditing()
-                              }
-                            }}
-                            autoFocus
-                            className="h-8"
-                          />
-                        ) : (
-                          <span className="cursor-text hover:underline">{task.title}</span>
-                        )}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-xs"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleStartEditing(task.id, 'description', task.description || '')
-                        }}
-                      >
-                        {editingCell?.taskId === task.id && editingCell?.field === 'description' ? (
-                          <Input
-                            value={editingValue}
-                            onChange={(e) => setEditingValue(e.target.value)}
-                            onBlur={handleSaveEdit}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleSaveEdit()
-                              } else if (e.key === 'Escape') {
-                                handleCancelEditing()
-                              }
-                            }}
-                            autoFocus
-                            className="h-8"
-                          />
-                        ) : (
-                          <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
-                        )}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          {hasTimers(task.id) && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleToggleTaskCompletion(task)}
-                              disabled={completingTaskId === task.id}
-                              title={task.completedAt ? 'Mark incomplete' : 'Mark complete'}
-                              className={task.completedAt ? 'opacity-50' : 'hover:bg-green-100'}
-                            >
-                              <CheckCircle className={`h-4 w-4 ${task.completedAt ? 'text-gray-400' : 'text-green-600'}`} />
-                            </Button>
-                          )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleOpenFloatingWindow(task.id)}
-                            title="Open floating window"
-                            className="hover:bg-blue-100"
-                          >
-                            <Maximize2 className="h-4 w-4 text-blue-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </main>
-
-      <TaskSideMenu
-        task={selectedTask}
-        onClose={() => setSelectedTask(null)}
-        onTaskUpdated={async (updated) => {
-          // Update the currently selected task reference (to keep the side-menu UI in sync)
-          setSelectedTask(updated)
-          await mutateTasks()
-        }}
-      />
-    </div>
+        <TaskSideMenu
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onTaskUpdated={async (updated) => {
+            // Update the currently selected task reference (to keep the side-menu UI in sync)
+            setSelectedTask(updated)
+            await mutateBothTaskLists()
+          }}
+        />
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 

@@ -187,12 +187,14 @@ function App(): React.JSX.Element {
     title: '',
     description: '',
     dueDate: '',
-    startAt: ''
+    startAt: '',
+    tagIds: [] as string[]
   })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
   const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' | 'startAt' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
+  const [editingTagsTaskId, setEditingTagsTaskId] = useState<string | null>(null)
 
   const [currentTime, setCurrentTime] = useState(Date.now())
   const taskIds = useMemo(() => allTasks.map((task) => task.id), [allTasks])
@@ -424,7 +426,7 @@ function App(): React.JSX.Element {
     )
 
     // Close form immediately
-    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
+    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '', tagIds: [] })
     setIsAddingTask(false)
 
     // API call in background
@@ -432,7 +434,8 @@ function App(): React.JSX.Element {
       title: optimisticTask.title,
       description: optimisticTask.description,
       dueDate: normalizeDueDate(newTaskFields.dueDate),
-      startAt: normalizeDateTime(newTaskFields.startAt)
+      startAt: normalizeDateTime(newTaskFields.startAt),
+      tagIds: newTaskFields.tagIds.length > 0 ? newTaskFields.tagIds : undefined
     })
       .then((response) => {
         // Replace optimistic task with real task from server (no full revalidation)
@@ -467,7 +470,7 @@ function App(): React.JSX.Element {
   }
 
   function handleCancelAdd(): void {
-    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '' })
+    setNewTaskFields({ title: '', description: '', dueDate: '', startAt: '', tagIds: [] })
     setIsAddingTask(false)
   }
 
@@ -514,6 +517,14 @@ function App(): React.JSX.Element {
       .catch((error) => {
         console.error('Failed to update task:', error)
         // Could show a toast notification here to inform user of failure
+      })
+  }
+
+  function handleUpdateTaskTags(taskId: string, tagIds: string[]): void {
+    putApiTasksId(taskId, { tagIds })
+      .then(() => mutateBothTaskLists())
+      .catch((error) => {
+        console.error('Failed to update task tags:', error)
       })
   }
 
@@ -671,11 +682,12 @@ function App(): React.JSX.Element {
         className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'bg-primary/5' : ''} ${isCompleted ? 'opacity-50' : ''} ${isFocused ? 'ring-2 ring-primary ring-inset' : ''}`}
         onClick={() => {
           setSelectedTask(task)
+          setEditingTagsTaskId(null)
           const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
           setFocusedTaskIndex(index)
         }}
       >
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleOpenFloatingWindow(task.id)}
@@ -719,6 +731,7 @@ function App(): React.JSX.Element {
         <TableCell
           onClick={(e) => {
             e.stopPropagation()
+            setEditingTagsTaskId(null)
             handleStartEditing(task.id, 'startAt', formatDateTimeInput(task.startAt))
           }}
         >
@@ -748,6 +761,7 @@ function App(): React.JSX.Element {
           className="font-medium"
           onClick={(e) => {
             e.stopPropagation()
+            setEditingTagsTaskId(null)
             handleStartEditing(task.id, 'title', task.title)
           }}
         >
@@ -767,24 +781,14 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <div className="flex items-center gap-2">
-              <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
-              {task.tags && task.tags.length > 0 && (
-                <div className="flex gap-1">
-                  {task.tags.map((tag) => (
-                    <Badge key={tag.id} variant="outline" className="text-xs px-1.5 py-0">
-                      {tag.name}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
+            <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
           )}
         </TableCell>
         <TableCell
           className="max-w-xs"
           onClick={(e) => {
             e.stopPropagation()
+            setEditingTagsTaskId(null)
             handleStartEditing(task.id, 'description', task.description || '')
           }}
         >
@@ -807,7 +811,34 @@ function App(): React.JSX.Element {
             <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
           )}
         </TableCell>
-        <TableCell onClick={(e) => e.stopPropagation()}>
+        <TableCell
+          onClick={(e) => {
+            e.stopPropagation()
+            setEditingTagsTaskId(task.id)
+          }}
+        >
+          {editingTagsTaskId === task.id ? (
+            <TagCombobox
+              selectedTagIds={task.tags?.map((t) => t.id) ?? []}
+              onSelectionChange={(tagIds) => handleUpdateTaskTags(task.id, tagIds)}
+              placeholder="Add tags..."
+              className="min-w-[150px]"
+            />
+          ) : (
+            <div className="flex flex-wrap gap-1 cursor-pointer hover:bg-muted/50 rounded p-1 min-h-[28px]">
+              {task.tags && task.tags.length > 0 ? (
+                task.tags.map((tag) => (
+                  <Badge key={tag.id} variant="outline" className="text-xs px-1.5 py-0">
+                    {tag.name}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-muted-foreground text-sm">-</span>
+              )}
+            </div>
+          )}
+        </TableCell>
+        <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
           <div className="flex items-center gap-2">
             {hasTimers(task.id) && (
               <Button
@@ -847,6 +878,7 @@ function App(): React.JSX.Element {
           <TableHead>Start Date</TableHead>
           <TableHead>Title</TableHead>
           <TableHead>Description</TableHead>
+          <TableHead>Tags</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -932,14 +964,14 @@ function App(): React.JSX.Element {
                     <TableBody>
                       {tasksLoading && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
                             Loading tasks...
                           </TableCell>
                         </TableRow>
                       )}
                       {!tasksLoading && activeTasks.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
                             No tasks in progress
                           </TableCell>
                         </TableRow>
@@ -1019,6 +1051,16 @@ function App(): React.JSX.Element {
                             />
                           </TableCell>
                           <TableCell>
+                            <TagCombobox
+                              selectedTagIds={newTaskFields.tagIds}
+                              onSelectionChange={(tagIds) =>
+                                setNewTaskFields((prev) => ({ ...prev, tagIds }))
+                              }
+                              placeholder="Add tags..."
+                              className="min-w-[120px]"
+                            />
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               <Button
                                 size="sm"
@@ -1036,21 +1078,21 @@ function App(): React.JSX.Element {
                       )}
                       {tasksLoading && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
                             Loading tasks...
                           </TableCell>
                         </TableRow>
                       )}
                       {!tasksLoading && tasksError && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-destructive">
+                          <TableCell colSpan={6} className="text-center text-destructive">
                             Failed to load tasks. {getErrorMessage(tasksError)}
                           </TableCell>
                         </TableRow>
                       )}
                       {!tasksLoading && !tasksError && inactiveTasks.length === 0 && !isAddingTask && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground">
                             No tasks found
                           </TableCell>
                         </TableRow>

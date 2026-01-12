@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
 
 import { Button } from './components/ui/button'
@@ -26,10 +26,105 @@ import {
 import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
-import { SidebarProvider, SidebarInset } from './components/ui/sidebar'
+import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { formatDateTime, normalizeDueDate, normalizeDateTime } from './lib/time'
 
 type View = 'tasks' | 'settings'
+
+// Keyboard shortcut definitions
+type KeyBinding = {
+  key: string
+  metaKey?: boolean
+  ctrlKey?: boolean
+  shiftKey?: boolean
+}
+
+const keyMaps = {
+  NEW_TASK: { key: 'n', metaKey: true },
+  TOGGLE_SIDEBAR: { key: 'e', metaKey: true },
+  TOGGLE_TIMER: { key: ' ' },
+  NAVIGATE_NEXT: { key: 'Tab' },
+  NAVIGATE_PREV: { key: 'Tab', shiftKey: true }
+} as const satisfies Record<string, KeyBinding>
+
+function matchesKeyBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
+  const metaOrCtrl = binding.metaKey ? (e.metaKey || e.ctrlKey) : true
+  const shift = binding.shiftKey ? e.shiftKey : !e.shiftKey
+  return e.key === binding.key && metaOrCtrl && shift
+}
+
+// Keyboard shortcut handler component (must be inside SidebarProvider)
+function KeyboardShortcuts({
+  onNewTask,
+  onToggleTimer,
+  onNavigateNext,
+  onNavigatePrev,
+  isAddingTask,
+  isEditing
+}: {
+  onNewTask: () => void
+  onToggleTimer: () => void
+  onNavigateNext: () => void
+  onNavigatePrev: () => void
+  isAddingTask: boolean
+  isEditing: boolean
+}): null {
+  const { toggleSidebar } = useSidebar()
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+
+      // Command/Ctrl + N: New task
+      if (matchesKeyBinding(e, keyMaps.NEW_TASK)) {
+        e.preventDefault()
+        if (!isAddingTask) {
+          onNewTask()
+        }
+        return
+      }
+
+      // Command/Ctrl + E: Toggle sidebar
+      if (matchesKeyBinding(e, keyMaps.TOGGLE_SIDEBAR)) {
+        e.preventDefault()
+        toggleSidebar()
+        return
+      }
+
+      // Don't handle other shortcuts if adding task or editing
+      if (isAddingTask || isEditing) return
+
+      // Space: Toggle timer
+      if (matchesKeyBinding(e, keyMaps.TOGGLE_TIMER)) {
+        e.preventDefault()
+        onToggleTimer()
+        return
+      }
+
+      // Tab: Navigate tasks
+      if (matchesKeyBinding(e, keyMaps.NAVIGATE_PREV)) {
+        e.preventDefault()
+        onNavigatePrev()
+        return
+      }
+
+      if (matchesKeyBinding(e, keyMaps.NAVIGATE_NEXT)) {
+        e.preventDefault()
+        onNavigateNext()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleSidebar, onNewTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
+
+  return null
+}
 
 function App(): React.JSX.Element {
   const [currentView, setCurrentView] = useState<View>('tasks')
@@ -59,6 +154,7 @@ function App(): React.JSX.Element {
   })
   const [isCreating, setIsCreating] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
   const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null)
@@ -121,6 +217,19 @@ function App(): React.JSX.Element {
     return { activeTasks: active, inactiveTasks: inactive }
   }, [tasks, activeTimersByTaskId])
 
+  // Combined list for keyboard navigation (active tasks first, then inactive)
+  const allTasksForNavigation = useMemo(() => {
+    return [...activeTasks, ...inactiveTasks]
+  }, [activeTasks, inactiveTasks])
+
+  // Get the focused task
+  const focusedTask = useMemo(() => {
+    if (focusedTaskIndex >= 0 && focusedTaskIndex < allTasksForNavigation.length) {
+      return allTasksForNavigation[focusedTaskIndex]
+    }
+    return null
+  }, [focusedTaskIndex, allTasksForNavigation])
+
   // Update current time every minute for timer display
   useEffect(() => {
     // Update immediately on mount
@@ -132,6 +241,79 @@ function App(): React.JSX.Element {
 
     return () => clearInterval(interval)
   }, [])
+
+  // Helper to start adding a new task
+  const startAddingTask = useCallback(() => {
+    const now = new Date()
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16)
+    setNewTaskFields((prev) => ({ ...prev, startAt: localDateTime }))
+    setIsAddingTask(true)
+  }, [])
+
+  // Helper to toggle timer for a task
+  const toggleTaskTimer = useCallback(async (task: Task) => {
+    const activeTimer = activeTimersByTaskId.get(task.id)
+    if (activeTimer) {
+      // Stop the timer
+      try {
+        await putApiTimersId(activeTimer.id, {
+          endTime: new Date().toISOString()
+        })
+        await mutateTimers()
+        setCurrentTime(Date.now())
+        window.api.closeFloatingTaskWindow(task.id)
+      } catch (error) {
+        console.error('Failed to stop timer:', error)
+      }
+    } else {
+      // Start the timer
+      try {
+        await postApiTimers({
+          taskId: task.id,
+          startTime: new Date().toISOString()
+        })
+        await mutateTimers()
+        setCurrentTime(Date.now())
+        window.api.openFloatingTaskWindow({ taskId: task.id })
+      } catch (error) {
+        console.error('Failed to start timer:', error)
+      }
+    }
+  }, [activeTimersByTaskId, mutateTimers])
+
+  // Handle keyboard timer toggle
+  const handleKeyboardToggleTimer = useCallback(() => {
+    // If a task is focused, toggle its timer
+    if (focusedTask) {
+      toggleTaskTimer(focusedTask)
+      return
+    }
+    // Otherwise, use the oldest task by start time (first inactive task)
+    if (inactiveTasks.length > 0) {
+      setFocusedTaskIndex(activeTasks.length) // Focus the first inactive task
+      toggleTaskTimer(inactiveTasks[0])
+    }
+  }, [focusedTask, inactiveTasks, activeTasks.length, toggleTaskTimer])
+
+  // Navigate to next task
+  const handleNavigateNext = useCallback(() => {
+    if (allTasksForNavigation.length === 0) return
+    setFocusedTaskIndex((prev) => {
+      if (prev < 0) return 0
+      return (prev + 1) % allTasksForNavigation.length
+    })
+  }, [allTasksForNavigation.length])
+
+  // Navigate to previous task
+  const handleNavigatePrev = useCallback(() => {
+    if (allTasksForNavigation.length === 0) return
+    setFocusedTaskIndex((prev) => {
+      if (prev < 0) return allTasksForNavigation.length - 1
+      return (prev - 1 + allTasksForNavigation.length) % allTasksForNavigation.length
+    })
+  }, [allTasksForNavigation.length])
 
   async function handleCreateTask(): Promise<void> {
     if (!newTaskFields.title.trim()) return
@@ -255,11 +437,17 @@ function App(): React.JSX.Element {
   }
 
   function renderTaskRow(task: Task): React.JSX.Element {
+    const isCompleted = !!task.completedAt
+    const isFocused = focusedTask?.id === task.id
     return (
       <TableRow
         key={task.id}
-        className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'bg-primary/5' : ''}`}
-        onClick={() => setSelectedTask(task)}
+        className={`cursor-pointer hover:bg-muted/50 transition-colors ${isTaskActive(task.id) ? 'bg-primary/5' : ''} ${isCompleted ? 'opacity-50' : ''} ${isFocused ? 'ring-2 ring-primary ring-inset' : ''}`}
+        onClick={() => {
+          setSelectedTask(task)
+          const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+          setFocusedTaskIndex(index)
+        }}
       >
         <TableCell onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2">
@@ -322,7 +510,7 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <span className="cursor-text hover:underline">{task.title}</span>
+            <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
           )}
         </TableCell>
         <TableCell
@@ -396,6 +584,14 @@ function App(): React.JSX.Element {
 
   return (
     <SidebarProvider>
+      <KeyboardShortcuts
+        onNewTask={startAddingTask}
+        onToggleTimer={handleKeyboardToggleTimer}
+        onNavigateNext={handleNavigateNext}
+        onNavigatePrev={handleNavigatePrev}
+        isAddingTask={isAddingTask}
+        isEditing={!!editingCell}
+      />
       <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
       <SidebarInset>
         {currentView === 'settings' ? (
@@ -429,7 +625,7 @@ function App(): React.JSX.Element {
                   </div>
                 </div>
                 {!isAddingTask && (
-                  <Button onClick={() => setIsAddingTask(true)}>
+                  <Button onClick={startAddingTask}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Task
                   </Button>

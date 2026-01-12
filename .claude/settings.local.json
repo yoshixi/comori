@@ -15,7 +15,8 @@
       "Bash(pnpm --filter electron run typecheck:*)",
       "Bash(npx tsc:*)",
       "Bash(curl:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(pnpm --filter web run test)"
     ]
   }
 }

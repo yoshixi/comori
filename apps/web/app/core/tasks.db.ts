@@ -190,19 +190,19 @@ export async function getAllTasks(db: DB, userId: string, filters?: TaskFilterOp
       return []
     }
 
-    // Get task IDs that have ANY of these tags (OR logic)
-    const taskIdsWithTags = await db
-      .selectDistinct({ taskId: taskTagsTable.taskId })
+    // Use EXISTS subquery to filter tasks that have ANY of these tags (OR logic)
+    // This lets the database handle the blob comparison correctly
+    const tagFilterSubquery = db
+      .select({ one: sql`1` })
       .from(taskTagsTable)
-      .where(inArray(taskTagsTable.tagId, tagIds))
+      .where(
+        and(
+          eq(taskTagsTable.taskId, tasksTable.id),
+          inArray(taskTagsTable.tagId, tagIds)
+        )
+      )
 
-    const tagTaskIds = taskIdsWithTags.map(row => row.taskId)
-
-    if (tagTaskIds.length === 0) {
-      return []
-    }
-
-    baseConditions.push(inArray(tasksTable.id, tagTaskIds))
+    baseConditions.push(exists(tagFilterSubquery))
   }
 
   // Apply hasActiveTimer filter using EXISTS/NOT EXISTS subquery

@@ -3,6 +3,7 @@ import { tasksTable, usersTable, taskTagsTable, tagsTable, type InsertTask, type
 import { createId, type DB } from './common.db'
 import { formatTimestamp, parseISOToUnixTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
 import { convertDbTagToApi, type Tag } from './tags.db'
+import { stopActiveTimersForTask } from './timers.db'
 
 // Define API types without zod dependencies
 export interface Task {
@@ -312,6 +313,11 @@ export async function updateTask(db: DB, userId: string, taskId: string, data: U
   }
   if (data.completedAt !== undefined) {
     updateData.completedAt = data.completedAt ? parseISOToUnixTimestamp(data.completedAt) : null
+
+    // Stop active timers when task is marked as completed
+    if (data.completedAt) {
+      await stopActiveTimersForTask(db, taskId)
+    }
   }
 
   const result = await db

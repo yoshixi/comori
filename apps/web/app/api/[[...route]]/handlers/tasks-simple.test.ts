@@ -15,6 +15,14 @@ import {
   updateTaskHandler,
   deleteTaskHandler
 } from './tasks';
+import {
+  createTimerRoute,
+  getTaskTimersRoute
+} from '../routes/timers';
+import {
+  createTimerHandler,
+  getTaskTimersHandler
+} from './timers';
 import { createSqliteLibsqlTestContext, type SqliteLibsqlTestContext } from '../../../db/tests/sqliteLibsqlTestUtils';
 
 type TestGlobal = typeof globalThis & { testDb?: SqliteLibsqlTestContext['db'] };
@@ -50,6 +58,10 @@ const createTestApp = () => {
   app.openapi(createTaskRoute, createTaskHandler);
   app.openapi(updateTaskRoute, updateTaskHandler);
   app.openapi(deleteTaskRoute, deleteTaskHandler);
+
+  // Register timer routes for integration tests
+  app.openapi(createTimerRoute, createTimerHandler);
+  app.openapi(getTaskTimersRoute, getTaskTimersHandler);
 
   return app;
 };
@@ -398,6 +410,163 @@ describe('Task Handlers (Simplified)', () => {
       expect(sortedTasks[0].title).toBe('Task 1');
       expect(sortedTasks[1].title).toBe('Task 3');
       expect(sortedTasks[2].title).toBe('Task 2');
+    });
+  });
+
+  describe('Task Completion with Active Timers', () => {
+    it('should stop active timers when task is completed', async () => {
+      // Create a task
+      const createTaskReq = new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Task with timer' })
+      });
+      const createTaskRes = await app.request(createTaskReq);
+      expect(createTaskRes.status).toBe(201);
+      const { task } = await createTaskRes.json();
+      const taskId = task.id;
+
+      // Create an active timer for the task
+      const createTimerReq = new Request('http://localhost/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskId,
+          startTime: '2024-01-01T10:00:00.000Z'
+        })
+      });
+      const createTimerRes = await app.request(createTimerReq);
+      expect(createTimerRes.status).toBe(201);
+
+      // Verify timer is active (endTime is null)
+      const getTimersBeforeReq = new Request(`http://localhost/tasks/${taskId}/timers`);
+      const getTimersBeforeRes = await app.request(getTimersBeforeReq);
+      expect(getTimersBeforeRes.status).toBe(200);
+      const timersBeforeData = await getTimersBeforeRes.json();
+      expect(timersBeforeData.timers).toHaveLength(1);
+      expect(timersBeforeData.timers[0].endTime).toBeNull();
+
+      // Complete the task
+      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completeTaskReq = new Request(`http://localhost/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: completionTimestamp })
+      });
+      const completeTaskRes = await app.request(completeTaskReq);
+      expect(completeTaskRes.status).toBe(200);
+
+      // Verify timer is now stopped (endTime is not null)
+      const getTimersAfterReq = new Request(`http://localhost/tasks/${taskId}/timers`);
+      const getTimersAfterRes = await app.request(getTimersAfterReq);
+      expect(getTimersAfterRes.status).toBe(200);
+      const timersAfterData = await getTimersAfterRes.json();
+      expect(timersAfterData.timers).toHaveLength(1);
+      expect(timersAfterData.timers[0].endTime).not.toBeNull();
+    });
+
+    it('should stop multiple active timers when task is completed', async () => {
+      // Create a task
+      const createTaskReq = new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Task with multiple timers' })
+      });
+      const createTaskRes = await app.request(createTaskReq);
+      expect(createTaskRes.status).toBe(201);
+      const { task } = await createTaskRes.json();
+      const taskId = task.id;
+
+      // Create two active timers
+      await app.request(new Request('http://localhost/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskId,
+          startTime: '2024-01-01T10:00:00.000Z'
+        })
+      }));
+      await app.request(new Request('http://localhost/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskId,
+          startTime: '2024-01-01T11:00:00.000Z'
+        })
+      }));
+
+      // Verify both timers are active
+      const getTimersBeforeRes = await app.request(new Request(`http://localhost/tasks/${taskId}/timers`));
+      const timersBeforeData = await getTimersBeforeRes.json();
+      expect(timersBeforeData.timers).toHaveLength(2);
+      expect(timersBeforeData.timers.every((t: { endTime: string | null }) => t.endTime === null)).toBe(true);
+
+      // Complete the task
+      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      await app.request(new Request(`http://localhost/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: completionTimestamp })
+      }));
+
+      // Verify all timers are now stopped
+      const getTimersAfterRes = await app.request(new Request(`http://localhost/tasks/${taskId}/timers`));
+      const timersAfterData = await getTimersAfterRes.json();
+      expect(timersAfterData.timers).toHaveLength(2);
+      expect(timersAfterData.timers.every((t: { endTime: string | null }) => t.endTime !== null)).toBe(true);
+    });
+
+    it('should not affect timers of other tasks when completing a task', async () => {
+      // Create two tasks
+      const createTask1Res = await app.request(new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Task 1' })
+      }));
+      const task1 = (await createTask1Res.json()).task;
+
+      const createTask2Res = await app.request(new Request('http://localhost/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Task 2' })
+      }));
+      const task2 = (await createTask2Res.json()).task;
+
+      // Create active timer for each task
+      await app.request(new Request('http://localhost/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: task1.id,
+          startTime: '2024-01-01T10:00:00.000Z'
+        })
+      }));
+      await app.request(new Request('http://localhost/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: task2.id,
+          startTime: '2024-01-01T11:00:00.000Z'
+        })
+      }));
+
+      // Complete task 1
+      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      await app.request(new Request(`http://localhost/tasks/${task1.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedAt: completionTimestamp })
+      }));
+
+      // Task 1's timer should be stopped
+      const task1TimersRes = await app.request(new Request(`http://localhost/tasks/${task1.id}/timers`));
+      const task1Timers = (await task1TimersRes.json()).timers;
+      expect(task1Timers[0].endTime).not.toBeNull();
+
+      // Task 2's timer should still be active
+      const task2TimersRes = await app.request(new Request(`http://localhost/tasks/${task2.id}/timers`));
+      const task2Timers = (await task2TimersRes.json()).timers;
+      expect(task2Timers[0].endTime).toBeNull();
     });
   });
 });

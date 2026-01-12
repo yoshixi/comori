@@ -451,7 +451,13 @@ function App(): React.JSX.Element {
       >
         <TableCell onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-2">
-            <Clock4 className="h-4 w-4" />
+            <button
+              onClick={() => handleOpenFloatingWindow(task.id)}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title="Open floating window"
+            >
+              <Clock4 className="h-4 w-4" />
+            </button>
             <span className="text-sm min-w-[3rem]">
               {getTotalTimeDisplay(task.id)}
             </span>
@@ -556,8 +562,12 @@ function App(): React.JSX.Element {
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => handleOpenFloatingWindow(task.id)}
-              title="Open floating window"
+              onClick={() => {
+                setSelectedTask(task)
+                const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+                setFocusedTaskIndex(index)
+              }}
+              title="Open task details"
               className="hover:bg-blue-100"
             >
               <Maximize2 className="h-4 w-4 text-blue-600" />

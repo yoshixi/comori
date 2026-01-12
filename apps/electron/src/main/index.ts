@@ -224,8 +224,8 @@ function closeFloatingWindow(taskId?: string): void {
 function createWindow(): void {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 670,
+    width: 1400,
+    height: 900,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),

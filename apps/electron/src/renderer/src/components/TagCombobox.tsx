@@ -47,12 +47,29 @@ export const TagCombobox: React.FC<TagComboboxProps> = ({
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
         setSearchValue('')
+        onClose?.()
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [onClose])
+
+  // Handle Escape key globally when onClose is provided (for inline editing mode)
+  useEffect(() => {
+    if (!onClose) return
+
+    const handleEscapeKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        setSearchValue('')
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleEscapeKey)
+    return () => document.removeEventListener('keydown', handleEscapeKey)
+  }, [onClose])
 
   const handleToggleTag = useCallback(
     (tagId: string): void => {

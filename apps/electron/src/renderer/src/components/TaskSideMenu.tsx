@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { X, Check } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { CalendarDays, X, Check } from 'lucide-react'
 import { putApiTasksId, useGetApiTasksIdActivities, type Task } from '../gen/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -53,16 +53,6 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
 
   const currentTask = localTask ?? task
   const isCompleted = Boolean(currentTask?.completedAt)
-  const scheduleValue = useMemo(() => {
-    const start = currentTask?.startAt ? formatDateTimeInput(currentTask.startAt) : ''
-    const end = currentTask?.endAt ? formatDateTimeInput(currentTask.endAt) : ''
-    if (start && end) {
-      return `${start.replace('T', ' ')} - ${end.replace('T', ' ')}`
-    }
-    if (start) return `${start.replace('T', ' ')} -`
-    if (end) return `- ${end.replace('T', ' ')}`
-    return ''
-  }, [currentTask?.startAt, currentTask?.endAt])
 
   useEffect(() => {
     if (!task) return undefined
@@ -253,16 +243,39 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
         <section className="space-y-2">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="task-schedule">Schedule</Label>
+              <Label>Schedule</Label>
               <div ref={scheduleContainerRef} className="relative">
-                <Input
-                  id="task-schedule"
-                  value={scheduleValue}
-                  placeholder="Select time range"
-                  readOnly
-                  onClick={() => setIsScheduleOpen((prev) => !prev)}
-                  className="h-9 cursor-pointer"
-                />
+                <div className="flex flex-wrap gap-2">
+                  <Input
+                    type="datetime-local"
+                    value={formatDateTimeInput(localTask?.startAt)}
+                    onChange={(event) =>
+                      setLocalTask((prev) =>
+                        prev ? { ...prev, startAt: event.target.value } : prev
+                      )
+                    }
+                    className="h-9 flex-1 min-w-[200px]"
+                  />
+                  <Input
+                    type="datetime-local"
+                    value={formatDateTimeInput(localTask?.endAt)}
+                    onChange={(event) =>
+                      setLocalTask((prev) =>
+                        prev ? { ...prev, endAt: event.target.value } : prev
+                      )
+                    }
+                    className="h-9 flex-1 min-w-[200px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsScheduleOpen((prev) => !prev)}
+                    aria-label="Open schedule picker"
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                  </Button>
+                </div>
                 {isScheduleOpen && (
                   <div className="absolute z-40 mt-2 w-[min(520px,90vw)] rounded-md border bg-white p-3 shadow-lg">
                     <TaskTimeRangePicker

@@ -149,13 +149,13 @@ function App(): React.JSX.Element {
   // Query for tasks with active timers (In Progress section)
   const activeTaskQuery = useMemo(
     () => ({
-      completed: showCompleted ? undefined : ('false' as const),
+      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
       hasActiveTimer: 'true' as const,
       sortBy,
       order: 'asc' as const,
       tags: filterTagIds.length ? filterTagIds : undefined
     }),
-    [showCompleted, sortBy, filterTagIds]
+    [showCompleted, sortBy, filterTagIds, currentView]
   )
   const {
     data: activeTasksResponse,
@@ -168,13 +168,13 @@ function App(): React.JSX.Element {
   // Query for tasks without active timers (Tasks section)
   const inactiveTaskQuery = useMemo(
     () => ({
-      completed: showCompleted ? undefined : ('false' as const),
+      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
       hasActiveTimer: 'false' as const,
       sortBy,
       order: 'asc' as const,
       tags: filterTagIds.length ? filterTagIds : undefined
     }),
-    [showCompleted, sortBy, filterTagIds]
+    [showCompleted, sortBy, filterTagIds, currentView]
   )
   const {
     data: inactiveTasksResponse,
@@ -965,7 +965,7 @@ function App(): React.JSX.Element {
                     />
                   </div>
                 </div>
-                {!isAddingTask && (
+                {!isAddingTask && currentView !== 'calendar' && (
                   <Button onClick={startAddingTask}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Task

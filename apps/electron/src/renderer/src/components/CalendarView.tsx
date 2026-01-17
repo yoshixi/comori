@@ -29,7 +29,7 @@ type TaskLayout = {
 
 type CalendarViewProps = {
   tasks: Task[]
-  onTaskSelect: (task: Task) => void
+  onTaskSelect?: (task: Task) => void
   onTaskEdit?: (task: Task) => void
   onTaskDelete?: (task: Task) => void
   onTaskMove?: (task: Task, range: { startAt: string; endAt: string }) => void
@@ -165,6 +165,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     offsetSlots: number
     startSlot: number
   } | null>(null)
+  const [didDragTask, setDidDragTask] = useState(false)
   const activeColumnRef = React.useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
 
@@ -267,6 +268,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const column = hit?.closest('[data-day-index]') as HTMLDivElement | null
       if (!column) return
       activeColumnRef.current = column
+      setDidDragTask(true)
       const dayIndex = Number(column.dataset.dayIndex ?? 0)
       const rawSlot = getSlotIndexFromEvent(event, column, slotHeight)
       const clampedStart = clamp(
@@ -364,6 +366,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       return
     }
     event.preventDefault()
+    setDidDragTask(false)
     const column = event.currentTarget.closest('[data-day-index]') as HTMLDivElement | null
     if (!column) return
     activeColumnRef.current = column
@@ -539,13 +542,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <button
                         key={item.task.id}
                         type="button"
-                        onClick={() => onTaskSelect(item.task)}
+                        onClick={() => {
+                          if (didDragTask) {
+                            setDidDragTask(false)
+                            return
+                          }
+                          onTaskSelect?.(item.task)
+                        }}
                         onMouseDown={(event) => handleTaskMouseDown(event, item)}
                         data-task-block="true"
                         className={cn(
                           'absolute rounded-md bg-primary/15 px-2 py-1 text-left text-xs outline outline-1 outline-primary/30 hover:bg-primary/20',
                           isDragging && 'opacity-40',
-                          isCompleted && 'bg-muted/60 text-muted-foreground outline-muted-foreground/30 hover:bg-muted/70',
+                          isCompleted && 'bg-muted/60 text-slate-500 outline-muted-foreground/30 hover:bg-muted/70',
                           activeTimer && 'bg-red-500/15 text-red-700 outline-red-500/40 hover:bg-red-500/20'
                         )}
                         style={{

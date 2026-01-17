@@ -14,6 +14,7 @@ import type { SWRMutationConfiguration } from 'swr/mutation'
 import type {
   CreateTag,
   CreateTask,
+  CreateTaskComment,
   CreateTimer,
   ErrorResponse,
   GetApiTasksParams,
@@ -21,12 +22,16 @@ import type {
   HealthResponse,
   TagListResponse,
   TagResponse,
+  TaskActivitiesResponse,
+  TaskCommentListResponse,
+  TaskCommentResponse,
   TaskListResponse,
   TaskResponse,
   TimerListResponse,
   TimerResponse,
   UpdateTag,
   UpdateTask,
+  UpdateTaskComment,
   UpdateTimer
 } from '../schemas'
 
@@ -287,6 +292,328 @@ export const useDeleteApiTasksId = <TError = ErrorResponse | ErrorResponse>(
   const swrFn = getDeleteApiTasksIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary List comments for a task
+ */
+export const getApiTasksTaskIdComments = (taskId: string) => {
+  return customInstance<TaskCommentListResponse>({
+    url: `/api/tasks/${taskId}/comments`,
+    method: 'GET'
+  })
+}
+
+export const getGetApiTasksTaskIdCommentsKey = (taskId: string) =>
+  [`/api/tasks/${taskId}/comments`] as const
+
+export type GetApiTasksTaskIdCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiTasksTaskIdComments>>
+>
+export type GetApiTasksTaskIdCommentsQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary List comments for a task
+ */
+export const useGetApiTasksTaskIdComments = <TError = ErrorResponse | ErrorResponse>(
+  taskId: string,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksTaskIdComments>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!taskId
+  const swrKey =
+    swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksTaskIdCommentsKey(taskId) : null))
+  const swrFn = () => getApiTasksTaskIdComments(taskId)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary Create a comment for a task
+ */
+export const postApiTasksTaskIdComments = (
+  taskId: string,
+  createTaskComment: CreateTaskComment
+) => {
+  return customInstance<TaskCommentResponse>({
+    url: `/api/tasks/${taskId}/comments`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data: createTaskComment
+  })
+}
+
+export const getPostApiTasksTaskIdCommentsMutationFetcher = (taskId: string) => {
+  return (_: Key, { arg }: { arg: CreateTaskComment }) => {
+    return postApiTasksTaskIdComments(taskId, arg)
+  }
+}
+export const getPostApiTasksTaskIdCommentsMutationKey = (taskId: string) =>
+  [`/api/tasks/${taskId}/comments`] as const
+
+export type PostApiTasksTaskIdCommentsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiTasksTaskIdComments>>
+>
+export type PostApiTasksTaskIdCommentsMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+
+/**
+ * @summary Create a comment for a task
+ */
+export const usePostApiTasksTaskIdComments = <
+  TError = ErrorResponse | ErrorResponse | ErrorResponse
+>(
+  taskId: string,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof postApiTasksTaskIdComments>>,
+      TError,
+      Key,
+      CreateTaskComment,
+      Awaited<ReturnType<typeof postApiTasksTaskIdComments>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiTasksTaskIdCommentsMutationKey(taskId)
+  const swrFn = getPostApiTasksTaskIdCommentsMutationFetcher(taskId)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary Get a single task comment
+ */
+export const getApiTasksTaskIdCommentsCommentId = (taskId: string, commentId: string) => {
+  return customInstance<TaskCommentResponse>({
+    url: `/api/tasks/${taskId}/comments/${commentId}`,
+    method: 'GET'
+  })
+}
+
+export const getGetApiTasksTaskIdCommentsCommentIdKey = (taskId: string, commentId: string) =>
+  [`/api/tasks/${taskId}/comments/${commentId}`] as const
+
+export type GetApiTasksTaskIdCommentsCommentIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiTasksTaskIdCommentsCommentId>>
+>
+export type GetApiTasksTaskIdCommentsCommentIdQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Get a single task comment
+ */
+export const useGetApiTasksTaskIdCommentsCommentId = <TError = ErrorResponse | ErrorResponse>(
+  taskId: string,
+  commentId: string,
+  options?: {
+    swr?: SWRConfiguration<
+      Awaited<ReturnType<typeof getApiTasksTaskIdCommentsCommentId>>,
+      TError
+    > & { swrKey?: Key; enabled?: boolean }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!(taskId && commentId)
+  const swrKey =
+    swrOptions?.swrKey ??
+    (() => (isEnabled ? getGetApiTasksTaskIdCommentsCommentIdKey(taskId, commentId) : null))
+  const swrFn = () => getApiTasksTaskIdCommentsCommentId(taskId, commentId)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary Update a task comment
+ */
+export const patchApiTasksTaskIdCommentsCommentId = (
+  taskId: string,
+  commentId: string,
+  updateTaskComment: UpdateTaskComment
+) => {
+  return customInstance<TaskCommentResponse>({
+    url: `/api/tasks/${taskId}/comments/${commentId}`,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data: updateTaskComment
+  })
+}
+
+export const getPatchApiTasksTaskIdCommentsCommentIdMutationFetcher = (
+  taskId: string,
+  commentId: string
+) => {
+  return (_: Key, { arg }: { arg: UpdateTaskComment }) => {
+    return patchApiTasksTaskIdCommentsCommentId(taskId, commentId, arg)
+  }
+}
+export const getPatchApiTasksTaskIdCommentsCommentIdMutationKey = (
+  taskId: string,
+  commentId: string
+) => [`/api/tasks/${taskId}/comments/${commentId}`] as const
+
+export type PatchApiTasksTaskIdCommentsCommentIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>
+>
+export type PatchApiTasksTaskIdCommentsCommentIdMutationError =
+  | ErrorResponse
+  | ErrorResponse
+  | ErrorResponse
+
+/**
+ * @summary Update a task comment
+ */
+export const usePatchApiTasksTaskIdCommentsCommentId = <
+  TError = ErrorResponse | ErrorResponse | ErrorResponse
+>(
+  taskId: string,
+  commentId: string,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>,
+      TError,
+      Key,
+      UpdateTaskComment,
+      Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey =
+    swrOptions?.swrKey ?? getPatchApiTasksTaskIdCommentsCommentIdMutationKey(taskId, commentId)
+  const swrFn = getPatchApiTasksTaskIdCommentsCommentIdMutationFetcher(taskId, commentId)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary Delete a task comment
+ */
+export const deleteApiTasksTaskIdCommentsCommentId = (taskId: string, commentId: string) => {
+  return customInstance<TaskCommentResponse>({
+    url: `/api/tasks/${taskId}/comments/${commentId}`,
+    method: 'DELETE'
+  })
+}
+
+export const getDeleteApiTasksTaskIdCommentsCommentIdMutationFetcher = (
+  taskId: string,
+  commentId: string
+) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiTasksTaskIdCommentsCommentId(taskId, commentId)
+  }
+}
+export const getDeleteApiTasksTaskIdCommentsCommentIdMutationKey = (
+  taskId: string,
+  commentId: string
+) => [`/api/tasks/${taskId}/comments/${commentId}`] as const
+
+export type DeleteApiTasksTaskIdCommentsCommentIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>
+>
+export type DeleteApiTasksTaskIdCommentsCommentIdMutationError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Delete a task comment
+ */
+export const useDeleteApiTasksTaskIdCommentsCommentId = <TError = ErrorResponse | ErrorResponse>(
+  taskId: string,
+  commentId: string,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey =
+    swrOptions?.swrKey ?? getDeleteApiTasksTaskIdCommentsCommentIdMutationKey(taskId, commentId)
+  const swrFn = getDeleteApiTasksTaskIdCommentsCommentIdMutationFetcher(taskId, commentId)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * @summary Get combined task activity timeline
+ */
+export const getApiTasksIdActivities = (id: string) => {
+  return customInstance<TaskActivitiesResponse>({
+    url: `/api/tasks/${id}/activities`,
+    method: 'GET'
+  })
+}
+
+export const getGetApiTasksIdActivitiesKey = (id: string) =>
+  [`/api/tasks/${id}/activities`] as const
+
+export type GetApiTasksIdActivitiesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiTasksIdActivities>>
+>
+export type GetApiTasksIdActivitiesQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Get combined task activity timeline
+ */
+export const useGetApiTasksIdActivities = <TError = ErrorResponse | ErrorResponse>(
+  id: string,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksIdActivities>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!id
+  const swrKey =
+    swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksIdActivitiesKey(id) : null))
+  const swrFn = () => getApiTasksIdActivities(id)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 
   return {
     swrKey,

@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, MessageSquareText } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { TimerManager } from './TimerManager'
 import { putApiTasksId, useGetApiTasksId } from '../gen/api'
+import { CommentsPanel } from './CommentsPanel'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion'
 
 export const FloatingTaskWindow: React.FC = () => {
   const params = new URLSearchParams(window.location.search)
@@ -103,6 +105,22 @@ export const FloatingTaskWindow: React.FC = () => {
           isCompleting={isCompleting}
           onToggleCompletion={handleToggleCompletion}
         />
+      </div>
+
+      <div className="mt-3 px-4 pb-4" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <Accordion type="single" collapsible className="text-xs">
+          <AccordionItem value="comments" className="bg-white/85 shadow-[0_15px_35px_-30px_rgba(15,23,42,0.6)] rounded-2xl">
+            <AccordionTrigger className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <span className="flex flex-1 items-center gap-2">
+                <MessageSquareText className="h-4 w-4" />
+                Comments
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="bg-white/80 text-xs rounded-b-2xl">
+              <CommentsPanel taskId={taskId} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   )

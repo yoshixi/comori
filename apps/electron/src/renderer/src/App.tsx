@@ -29,6 +29,7 @@ import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
+import { Dialog, DialogContent } from './components/ui/dialog'
 import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
 
 type View = 'tasks' | 'settings'
@@ -1108,16 +1109,28 @@ function App(): React.JSX.Element {
           </div>
         )}
 
-        <TaskSideMenu
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onTaskUpdated={async (updated) => {
-            // Update the currently selected task reference (to keep the side-menu UI in sync)
-            setSelectedTask(updated)
-            await mutateBothTaskLists()
-          }}
-        />
       </SidebarInset>
+      <Dialog
+        open={Boolean(selectedTask)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedTask(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl w-[95vw] border-none bg-transparent p-0 shadow-none focus-visible:outline-none">
+          {selectedTask ? (
+            <TaskSideMenu
+              task={selectedTask}
+              onClose={() => setSelectedTask(null)}
+              onTaskUpdated={async (updated) => {
+                setSelectedTask(updated)
+                await mutateBothTaskLists()
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   )
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Check } from 'lucide-react'
-import { putApiTasksId, type Task } from '../gen/api'
+import { putApiTasksId, useGetApiTasksIdActivities, type Task } from '../gen/api'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -8,6 +8,8 @@ import { Textarea } from './ui/textarea'
 import { TimerManager } from './TimerManager'
 import { TagCombobox } from './TagCombobox'
 import { formatDateTimeInput, normalizeDateTime } from '../lib/time'
+import { CommentsPanel } from './CommentsPanel'
+import { TaskActivities } from './TaskActivities'
 
 const AUTO_SAVE_DELAY_MS = 800
 
@@ -40,6 +42,9 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track the last saved state to compare against
   const lastSavedTaskRef = useRef<Task | null>(task)
+  const activitiesQuery = useGetApiTasksIdActivities(task?.id ?? '', {
+    swr: { enabled: Boolean(task?.id) }
+  })
 
   const currentTask = localTask ?? task
   const isCompleted = Boolean(currentTask?.completedAt)
@@ -172,46 +177,43 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   }
 
   return (
-    <>
-      <div className="fixed inset-0 z-40 bg-foreground/20" onClick={onClose} aria-hidden="true" />
-      <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md border-l border-border bg-card shadow-2xl">
-        <div className="flex h-full flex-col">
-          <header className="flex items-center justify-between gap-4 border-b border-border bg-muted/30 px-6 py-4">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Task Details
-              </p>
-              <h3
-                className="truncate text-lg font-semibold text-foreground"
-                title={currentTask?.title}
-              >
-                {currentTask?.title}
-              </h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant={isCompleted ? 'outline' : 'default'}
-                onClick={handleToggleCompletion}
-                disabled={isCompleting}
-              >
-                {isCompleting
-                  ? 'Updating...'
-                  : isCompleted
-                    ? 'Mark Incomplete'
-                    : 'Mark Complete'}
-              </Button>
-              <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close details">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
+    <div className="flex h-full max-h-[80vh] flex-col rounded-[32px] bg-white/95 shadow-[0_40px_120px_rgba(15,23,42,0.2)] ring-1 ring-black/5">
+      <header className="flex items-center justify-between gap-4 px-6 py-5">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Task Details
+          </p>
+          <h3
+            className="truncate text-lg font-semibold text-foreground"
+            title={currentTask?.title}
+          >
+            {currentTask?.title}
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={isCompleted ? 'outline' : 'default'}
+            onClick={handleToggleCompletion}
+            disabled={isCompleting}
+          >
+            {isCompleting
+              ? 'Updating...'
+              : isCompleted
+                ? 'Mark Incomplete'
+                : 'Mark Complete'}
+          </Button>
+          <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close details">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
 
-          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-            <section>
-              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-3">
-                Edit Task
-              </h4>
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+        <section>
+          <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-3">
+            Edit Task
+          </h4>
               <div className="space-y-3">
                 <div className="space-y-2">
                   <Label htmlFor="task-title">Title</Label>
@@ -273,21 +275,30 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
               </div>
             </section>
 
-            <section>
-              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Timers
-              </h4>
-              <div className="mt-3 rounded-lg border border-border bg-muted/20 p-4">
-                <TimerManager
-                  taskId={task.id}
-                  onTimerStarted={handleTimerStarted}
-                  onTimerStopped={handleTimerStopped}
-                />
-              </div>
-            </section>
-          </div>
-        </div>
-      </aside>
-    </>
+        <section className="mt-1">
+          <TimerManager
+            taskId={task.id}
+            onTimerStarted={handleTimerStarted}
+            onTimerStopped={handleTimerStopped}
+            onActivityRecorded={() => activitiesQuery.mutate?.()}
+          />
+        </section>
+
+        <section className="mt-4">
+          <TaskActivities
+            activities={activitiesQuery.data?.activities}
+            isLoading={activitiesQuery.isLoading}
+            error={activitiesQuery.error}
+          />
+        </section>
+
+        <section className="mt-4">
+          <CommentsPanel
+            taskId={task.id}
+            onCommentCreated={() => activitiesQuery.mutate?.()}
+          />
+        </section>
+      </div>
+    </div>
   )
 }

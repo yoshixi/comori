@@ -12,6 +12,7 @@ interface TimerManagerProps {
   mode?: 'full' | 'compact'
   onTimerStarted?: () => void
   onTimerStopped?: () => void
+  onActivityRecorded?: () => void
   isCompleted?: boolean
   isCompleting?: boolean
   onToggleCompletion?: () => void
@@ -22,6 +23,7 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
   mode = 'full',
   onTimerStarted,
   onTimerStopped,
+  onActivityRecorded,
   isCompleted,
   isCompleting,
   onToggleCompletion
@@ -78,6 +80,7 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
       })
       mutateTimers()
       onTimerStarted?.()
+      onActivityRecorded?.()
     } catch (error) {
       console.error('Failed to start timer:', error)
     }
@@ -92,6 +95,7 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
       })
       mutateTimers()
       onTimerStopped?.()
+      onActivityRecorded?.()
     } catch (error) {
       console.error('Failed to stop timer:', error)
     }
@@ -139,12 +143,6 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
     const m = Math.floor((seconds % 3600) / 60)
     const s = seconds % 60
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-
-  const calculateDuration = (start: string, end?: string | null): number => {
-    const startTime = new Date(start).getTime()
-    const endTime = end ? new Date(end).getTime() : Date.now()
-    return Math.floor((endTime - startTime) / 1000)
   }
 
   const isCompact = mode === 'compact'
@@ -214,11 +212,13 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
   }
 
   return (
-    <div className="mt-4 border-t pt-4">
-      <h5 className="text-sm font-semibold text-gray-700 mb-3">Timers</h5>
+    <div className="mt-4 space-y-4">
+      <h5 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+        Timers
+      </h5>
 
       {/* Active Timer Control */}
-      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-4">
+      <div className="flex items-center justify-between rounded-2xl border border-black/5 bg-white/90 p-4">
         <div className="flex items-center gap-3">
           <div
             className={`w-3 h-3 rounded-full ${activeTimer ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}
@@ -227,11 +227,11 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
             {activeTimer ? formatDuration(elapsedTime) : '00:00:00'}
           </span>
         </div>
-        <div>
+        <div className="flex gap-2 text-muted-foreground">
           {activeTimer ? (
             <button
               onClick={handleStopTimer}
-              className="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 text-sm font-medium transition-colors"
+              className="rounded-full bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-500/15"
             >
               Stop Timer
             </button>
@@ -239,7 +239,7 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
             <button
               onClick={handleStartTimer}
               disabled={isCreating}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 text-sm font-medium transition-colors disabled:opacity-50"
+              className="rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
             >
               Start Timer
             </button>

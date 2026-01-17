@@ -232,6 +232,86 @@ components:
           description: Array of tag IDs to associate with the task. Replaces all existing
             tags
           example: []
+    TaskComment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the comment
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        taskId:
+          type: string
+          format: uuid
+          description: Task ID associated with this comment
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        authorId:
+          type: string
+          format: uuid
+          description: Author (user) ID of the comment
+          example: 01234567-89ab-cdef-0123-456789abcdef
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Comment text content (1-2000 chars)
+          example: "Wrapped up pomodoro #1, still need to draft summary."
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the comment was created
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the comment was last updated
+      required:
+        - id
+        - taskId
+        - authorId
+        - body
+        - createdAt
+        - updatedAt
+    TaskCommentListResponse:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskComment"
+          description: List of task comments
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of comments returned
+      required:
+        - comments
+        - total
+    TaskCommentResponse:
+      type: object
+      properties:
+        comment:
+          $ref: "#/components/schemas/TaskComment"
+      required:
+        - comment
+    CreateTaskComment:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Comment text (1-2000 chars)
+          example: Summarized what happened during today’s session.
+      required:
+        - body
+    UpdateTaskComment:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: Updated comment text (1-2000 chars)
     TaskTimer:
       type: object
       properties:
@@ -272,6 +352,41 @@ components:
         - startTime
         - createdAt
         - updatedAt
+    TaskActivityItem:
+      oneOf:
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - timer
+            data:
+              $ref: "#/components/schemas/TaskTimer"
+          required:
+            - type
+            - data
+        - type: object
+          properties:
+            type:
+              type: string
+              enum:
+                - comment
+            data:
+              $ref: "#/components/schemas/TaskComment"
+          required:
+            - type
+            - data
+    TaskActivitiesResponse:
+      type: object
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskActivityItem"
+          description: Timeline entries combining timers and comments in descending
+            timestamp order
+      required:
+        - activities
     TimerListResponse:
       type: object
       properties:
@@ -581,6 +696,244 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TaskResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{taskId}/comments:
+    get:
+      summary: List comments for a task
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID for comment operations
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID for comment operations
+          name: taskId
+          in: path
+      responses:
+        "200":
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentListResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a comment for a task
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID for comment operations
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID for comment operations
+          name: taskId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskComment"
+      responses:
+        "201":
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{taskId}/comments/{commentId}:
+    get:
+      summary: Get a single task comment
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID for comment operations
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID for comment operations
+          name: taskId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+            description: Comment ID
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Comment ID
+          name: commentId
+          in: path
+      responses:
+        "200":
+          description: Comment retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentResponse"
+        "404":
+          description: Task or comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      summary: Update a task comment
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID for comment operations
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID for comment operations
+          name: taskId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+            description: Comment ID
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Comment ID
+          name: commentId
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTaskComment"
+      responses:
+        "200":
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Task or comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete a task comment
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID for comment operations
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID for comment operations
+          name: taskId
+          in: path
+        - schema:
+            type: string
+            format: uuid
+            description: Comment ID
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Comment ID
+          name: commentId
+          in: path
+      responses:
+        "200":
+          description: Comment deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCommentResponse"
+        "404":
+          description: Task or comment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/tasks/{id}/activities:
+    get:
+      summary: Get combined task activity timeline
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            description: Task ID
+            example: 01234567-89ab-cdef-0123-456789abcdef
+          required: true
+          description: Task ID
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Activities retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskActivitiesResponse"
         "404":
           description: Task not found
           content:

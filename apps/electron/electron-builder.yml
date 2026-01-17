@@ -1,5 +1,6 @@
 appId: com.shuchu.app
 productName: Shuchu
+electronVersion: 38.1.2
 directories:
   buildResources: build
 files:

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, Check } from 'lucide-react'
 import { putApiTasksId, useGetApiTasksIdActivities, type Task } from '../gen/api'
 import { Button } from './ui/button'
@@ -10,6 +10,7 @@ import { TagCombobox } from './TagCombobox'
 import { formatDateTimeInput, normalizeDateTime } from '../lib/time'
 import { CommentsPanel } from './CommentsPanel'
 import { TaskActivities } from './TaskActivities'
+import { TaskTimeRangePicker } from './TaskTimeRangePicker'
 
 const AUTO_SAVE_DELAY_MS = 800
 
@@ -36,10 +37,12 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   onTaskUpdated
 }) => {
   const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const scheduleContainerRef = useRef<HTMLDivElement | null>(null)
   const [localTask, setLocalTask] = useState<Task | null>(task)
   const [isSaving, setIsSaving] = useState(false)
   const [isCompleting, setIsCompleting] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Track the last saved state to compare against
@@ -50,6 +53,16 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
 
   const currentTask = localTask ?? task
   const isCompleted = Boolean(currentTask?.completedAt)
+  const scheduleValue = useMemo(() => {
+    const start = currentTask?.startAt ? formatDateTimeInput(currentTask.startAt) : ''
+    const end = currentTask?.endAt ? formatDateTimeInput(currentTask.endAt) : ''
+    if (start && end) {
+      return `${start.replace('T', ' ')} - ${end.replace('T', ' ')}`
+    }
+    if (start) return `${start.replace('T', ' ')} -`
+    if (end) return `- ${end.replace('T', ' ')}`
+    return ''
+  }, [currentTask?.startAt, currentTask?.endAt])
 
   useEffect(() => {
     if (!task) return undefined
@@ -61,6 +74,22 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [task, onClose])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent): void => {
+      if (
+        scheduleContainerRef.current &&
+        !scheduleContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsScheduleOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   // Reset state when task prop changes
   useEffect(() => {
@@ -223,33 +252,32 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
         <section className="space-y-2">
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="task-start-date">Start date & time</Label>
-              <Input
-                id="task-start-date"
-                type="datetime-local"
-                value={formatDateTimeInput(localTask?.startAt)}
-                onChange={(event) =>
-                  setLocalTask((prev) =>
-                    prev ? { ...prev, startAt: event.target.value } : prev
-                  )
-                }
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="task-end-date">End date & time</Label>
-              <Input
-                id="task-end-date"
-                type="datetime-local"
-                value={formatDateTimeInput(localTask?.endAt)}
-                onChange={(event) =>
-                  setLocalTask((prev) =>
-                    prev ? { ...prev, endAt: event.target.value } : prev
-                  )
-                }
-                className="h-9"
-              />
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="task-schedule">Schedule</Label>
+              <div ref={scheduleContainerRef} className="relative">
+                <Input
+                  id="task-schedule"
+                  value={scheduleValue}
+                  placeholder="Select time range"
+                  readOnly
+                  onClick={() => setIsScheduleOpen((prev) => !prev)}
+                  className="h-9 cursor-pointer"
+                />
+                {isScheduleOpen && (
+                  <div className="absolute z-40 mt-2 w-[min(520px,90vw)] rounded-md border bg-white p-3 shadow-lg">
+                    <TaskTimeRangePicker
+                      startAt={localTask?.startAt}
+                      endAt={localTask?.endAt}
+                      onChange={({ startAt, endAt }) => {
+                        setLocalTask((prev) =>
+                          prev ? { ...prev, startAt, endAt } : prev
+                        )
+                        setIsScheduleOpen(false)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-1 sm:col-span-2">
               <Label>Tags</Label>

@@ -20,7 +20,9 @@
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
       "Bash(tree:*)",
-      "Bash(pnpm --filter mobile add:*)"
+      "Bash(pnpm --filter mobile add:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

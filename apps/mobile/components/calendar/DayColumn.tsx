@@ -1,8 +1,20 @@
-import { View, Pressable } from 'react-native';
+import { useRef, useCallback } from 'react';
+import { View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  runOnJS,
+} from 'react-native-reanimated';
 import type { Task } from '@/gen/api/schemas';
 import { Text } from '@/components/ui/text';
 import { TaskBlock } from './TaskBlock';
 import { isToday } from '@/lib/time';
+
+export interface TimeRange {
+  startAt: Date;
+  endAt: Date;
+}
 
 export interface DayColumnProps {
   date: Date;
@@ -11,10 +23,12 @@ export interface DayColumnProps {
   hourHeight: number;
   columnWidth: number;
   onTaskPress: (task: Task) => void;
+  onCreateRange?: (range: TimeRange) => void;
   showDayLabel?: boolean;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const SLOT_MINUTES = 15; // 15-minute increments
 
 export function DayColumn({
   date,
@@ -23,10 +37,115 @@ export function DayColumn({
   hourHeight,
   columnWidth,
   onTaskPress,
+  onCreateRange,
   showDayLabel = false,
 }: DayColumnProps) {
   const today = isToday(date);
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Shared values for drag selection
+  const isDragging = useSharedValue(false);
+  const startY = useSharedValue(0);
+  const currentY = useSharedValue(0);
+  const selectionTop = useSharedValue(0);
+  const selectionHeight = useSharedValue(0);
+
+  const yToMinutes = useCallback(
+    (y: number) => {
+      const minutesPerPixel = 60 / hourHeight;
+      const totalMinutes = y * minutesPerPixel;
+      // Snap to 15-minute increments
+      return Math.round(totalMinutes / SLOT_MINUTES) * SLOT_MINUTES;
+    },
+    [hourHeight]
+  );
+
+  const minutesToDate = useCallback(
+    (minutes: number) => {
+      const result = new Date(date);
+      result.setHours(0, 0, 0, 0);
+      result.setMinutes(minutes);
+      return result;
+    },
+    [date]
+  );
+
+  const handleCreateRange = useCallback(
+    (startMinutes: number, endMinutes: number) => {
+      if (!onCreateRange) return;
+
+      const minMinutes = Math.min(startMinutes, endMinutes);
+      const maxMinutes = Math.max(startMinutes, endMinutes);
+
+      // Ensure minimum duration of 15 minutes
+      const actualEnd = maxMinutes <= minMinutes ? minMinutes + SLOT_MINUTES : maxMinutes;
+
+      onCreateRange({
+        startAt: minutesToDate(minMinutes),
+        endAt: minutesToDate(actualEnd),
+      });
+    },
+    [onCreateRange, minutesToDate]
+  );
+
+  const longPressGesture = Gesture.LongPress()
+    .minDuration(300)
+    .onStart((event) => {
+      isDragging.value = true;
+      startY.value = event.y;
+      currentY.value = event.y;
+      const startMinutes = yToMinutes(event.y);
+      selectionTop.value = (startMinutes / 60) * hourHeight;
+      selectionHeight.value = (SLOT_MINUTES / 60) * hourHeight;
+    });
+
+  const panGesture = Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesMove((event, stateManager) => {
+      if (isDragging.value) {
+        stateManager.activate();
+      }
+    })
+    .onUpdate((event) => {
+      if (!isDragging.value) return;
+      currentY.value = event.y;
+
+      const startMinutes = yToMinutes(startY.value);
+      const currentMinutes = yToMinutes(event.y);
+
+      const minMinutes = Math.min(startMinutes, currentMinutes);
+      const maxMinutes = Math.max(startMinutes, currentMinutes);
+
+      selectionTop.value = (minMinutes / 60) * hourHeight;
+      selectionHeight.value = Math.max(
+        ((maxMinutes - minMinutes + SLOT_MINUTES) / 60) * hourHeight,
+        (SLOT_MINUTES / 60) * hourHeight
+      );
+    })
+    .onEnd(() => {
+      if (isDragging.value) {
+        const startMinutes = yToMinutes(startY.value);
+        const endMinutes = yToMinutes(currentY.value);
+        runOnJS(handleCreateRange)(startMinutes, endMinutes);
+      }
+      isDragging.value = false;
+      selectionHeight.value = 0;
+    });
+
+  const composed = Gesture.Simultaneous(longPressGesture, panGesture);
+
+  const selectionAnimatedStyle = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: 2,
+    right: 2,
+    top: selectionTop.value,
+    height: selectionHeight.value,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.5)',
+    opacity: isDragging.value ? 1 : 0,
+  }));
 
   return (
     <View style={{ width: columnWidth }} className="border-l border-border">
@@ -45,41 +164,46 @@ export function DayColumn({
         </View>
       )}
 
-      <View className="relative">
-        {/* Hour grid lines */}
-        {HOURS.map((hour) => (
-          <View
-            key={hour}
-            style={{ height: hourHeight }}
-            className="border-b border-border/30"
-          />
-        ))}
-
-        {/* Task blocks */}
-        {tasks.map((task) => {
-          if (!task.startAt) return null;
-          const startTime = new Date(task.startAt);
-          const startMinutes = startTime.getHours() * 60 + startTime.getMinutes();
-          const top = (startMinutes / 60) * hourHeight;
-          const duration = 60; // Default 1 hour for display
-          const height = (duration / 60) * hourHeight;
-          const isActive = activeTimerTaskIds.has(task.id);
-          const isCompleted = !!task.completedAt;
-
-          return (
-            <TaskBlock
-              key={task.id}
-              task={task}
-              top={top}
-              height={Math.max(height, 30)}
-              width={columnWidth - 4}
-              isActive={isActive}
-              isCompleted={isCompleted}
-              onPress={() => onTaskPress(task)}
+      <GestureDetector gesture={composed}>
+        <Animated.View className="relative">
+          {/* Hour grid lines */}
+          {HOURS.map((hour) => (
+            <View
+              key={hour}
+              style={{ height: hourHeight }}
+              className="border-b border-border/30"
             />
-          );
-        })}
-      </View>
+          ))}
+
+          {/* Selection preview */}
+          <Animated.View style={selectionAnimatedStyle} pointerEvents="none" />
+
+          {/* Task blocks */}
+          {tasks.map((task) => {
+            if (!task.startAt) return null;
+            const startTime = new Date(task.startAt);
+            const startMinutes = startTime.getHours() * 60 + startTime.getMinutes();
+            const top = (startMinutes / 60) * hourHeight;
+            const duration = 60; // Default 1 hour for display
+            const height = (duration / 60) * hourHeight;
+            const isActive = activeTimerTaskIds.has(task.id);
+            const isCompleted = !!task.completedAt;
+
+            return (
+              <TaskBlock
+                key={task.id}
+                task={task}
+                top={top}
+                height={Math.max(height, 30)}
+                width={columnWidth - 4}
+                isActive={isActive}
+                isCompleted={isCompleted}
+                onPress={() => onTaskPress(task)}
+              />
+            );
+          })}
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }

@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, ScrollView, Pressable, Dimensions } from 'react-native';
+import { View, ScrollView, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGetApiTasks, useGetApiTimers } from '@/gen/api/endpoints/shuchuAPI.gen';
-import type { Task, TaskTimer } from '@/gen/api/schemas';
+import type { Task } from '@/gen/api/schemas';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarHeader } from './CalendarHeader';
-import { DayColumn } from './DayColumn';
+import { DayColumn, type TimeRange } from './DayColumn';
 import { CurrentTimeIndicator } from './CurrentTimeIndicator';
+import { CreateTaskSheet } from '@/components/tasks/CreateTaskSheet';
 import { addDays, startOfDay, isToday } from '@/lib/time';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -20,6 +21,8 @@ export function CalendarView() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
+  const [createTimeRange, setCreateTimeRange] = useState<TimeRange | null>(null);
 
   const { data: tasksData, isLoading: tasksLoading } = useGetApiTasks();
   const { data: timersData } = useGetApiTimers();
@@ -78,6 +81,16 @@ export function CalendarView() {
 
   const handleToggleViewMode = useCallback(() => {
     setViewMode((m) => (m === 'day' ? 'week' : 'day'));
+  }, []);
+
+  const handleCreateRange = useCallback((range: TimeRange) => {
+    setCreateTimeRange(range);
+    setShowCreateSheet(true);
+  }, []);
+
+  const handleCloseCreateSheet = useCallback(() => {
+    setShowCreateSheet(false);
+    setCreateTimeRange(null);
   }, []);
 
   if (tasksLoading) {
@@ -141,6 +154,7 @@ export function CalendarView() {
                   hourHeight={HOUR_HEIGHT}
                   columnWidth={columnWidth}
                   onTaskPress={handleTaskPress}
+                  onCreateRange={handleCreateRange}
                   showDayLabel={viewMode === 'week'}
                 />
               );
@@ -156,6 +170,13 @@ export function CalendarView() {
           />
         )}
       </ScrollView>
+
+      <CreateTaskSheet
+        visible={showCreateSheet}
+        onClose={handleCloseCreateSheet}
+        initialStartAt={createTimeRange?.startAt}
+        initialEndAt={createTimeRange?.endAt}
+      />
     </View>
   );
 }

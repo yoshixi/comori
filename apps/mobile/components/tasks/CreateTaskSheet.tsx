@@ -1,39 +1,75 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Modal, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, Calendar } from 'lucide-react-native';
 import { useSWRConfig } from 'swr';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { usePostApiTasks, getGetApiTasksKey } from '@/gen/api/endpoints/shuchuAPI.gen';
 import { Text } from '@/components/ui/text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/time';
 
 export interface CreateTaskSheetProps {
   visible: boolean;
   onClose: () => void;
+  /** Pre-filled start time (e.g., from calendar drag selection) */
+  initialStartAt?: Date | null;
+  /** Pre-filled end time (used to calculate duration) */
+  initialEndAt?: Date | null;
 }
 
-export function CreateTaskSheet({ visible, onClose }: CreateTaskSheetProps) {
+export function CreateTaskSheet({
+  visible,
+  onClose,
+  initialStartAt,
+  initialEndAt,
+}: CreateTaskSheetProps) {
   const { mutate } = useSWRConfig();
   const [title, setTitle] = useState('');
+  const [startAt, setStartAt] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const { trigger: createTask, isMutating } = usePostApiTasks();
+
+  // Update startAt when initialStartAt changes
+  useEffect(() => {
+    if (visible && initialStartAt) {
+      setStartAt(initialStartAt);
+    }
+  }, [visible, initialStartAt]);
 
   const handleCreate = useCallback(async () => {
     if (!title.trim()) return;
 
     try {
-      await createTask({ title: title.trim() });
+      await createTask({
+        title: title.trim(),
+        startAt: startAt?.toISOString(),
+      });
       await mutate(getGetApiTasksKey());
       setTitle('');
+      setStartAt(null);
       onClose();
     } catch (error) {
       console.error('Failed to create task:', error);
     }
-  }, [title, createTask, mutate, onClose]);
+  }, [title, startAt, createTask, mutate, onClose]);
 
   const handleClose = useCallback(() => {
     setTitle('');
+    setStartAt(null);
     onClose();
   }, [onClose]);
+
+  const handleDateChange = useCallback((_event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setStartAt(selectedDate);
+    }
+  }, []);
+
+  const handleClearDate = useCallback(() => {
+    setStartAt(null);
+  }, []);
 
   return (
     <Modal
@@ -55,15 +91,40 @@ export function CreateTaskSheet({ visible, onClose }: CreateTaskSheetProps) {
         </View>
 
         <View className="flex-1 p-4">
-          <Text className="text-sm text-muted-foreground mb-2">Title</Text>
-          <Input
-            value={title}
-            onChangeText={setTitle}
-            placeholder="What needs to be done?"
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={handleCreate}
-          />
+          <View className="mb-4">
+            <Text className="text-sm text-muted-foreground mb-2">Title</Text>
+            <Input
+              value={title}
+              onChangeText={setTitle}
+              placeholder="What needs to be done?"
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleCreate}
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm text-muted-foreground mb-2">Schedule</Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm">Start Time</Text>
+              <View className="flex-row items-center gap-2">
+                {startAt && (
+                  <Pressable onPress={handleClearDate}>
+                    <X size={16} className="text-muted-foreground" />
+                  </Pressable>
+                )}
+                <Pressable
+                  onPress={() => setShowDatePicker(true)}
+                  className="flex-row items-center gap-2 bg-muted px-3 py-2 rounded"
+                >
+                  <Calendar size={14} className="text-muted-foreground" />
+                  <Text className="text-sm">
+                    {startAt ? formatDateTime(startAt.toISOString()) : 'Set start time'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
         </View>
 
         <View className="p-4 border-t border-border">
@@ -73,6 +134,15 @@ export function CreateTaskSheet({ visible, onClose }: CreateTaskSheetProps) {
             </Text>
           </Button>
         </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={startAt || new Date()}
+            mode="datetime"
+            display="spinner"
+            onChange={handleDateChange}
+          />
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );

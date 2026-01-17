@@ -30,6 +30,16 @@ export const taskTimersTable = sqliteTable('task_timers', {
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 });
 
+// TaskComments table
+export const taskCommentsTable = sqliteTable('task_comments', {
+  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
+  taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
+  authorId: blob('author_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }).$type<string>(),
+  body: text('body').notNull(),
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+});
+
 // Tags table (user-scoped tags)
 export const tagsTable = sqliteTable('tags', {
   id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
@@ -54,6 +64,7 @@ export const taskTagsTable = sqliteTable('task_tags', {
 // Indexes
 export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
 export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
+export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_created_at_idx').on(taskCommentsTable.taskId, taskCommentsTable.createdAt);
 export const tagsUserIdIdx = index('tags_user_id_idx').on(tagsTable.userId);
 export const taskTagsTaskIdIdx = index('task_tags_task_id_idx').on(taskTagsTable.taskId);
 export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.tagId);
@@ -65,6 +76,8 @@ export type InsertTask = typeof tasksTable.$inferInsert;
 export type SelectTask = typeof tasksTable.$inferSelect;
 export type InsertTaskTimer = typeof taskTimersTable.$inferInsert;
 export type SelectTaskTimer = typeof taskTimersTable.$inferSelect;
+export type InsertTaskComment = typeof taskCommentsTable.$inferInsert;
+export type SelectTaskComment = typeof taskCommentsTable.$inferSelect;
 export type InsertTag = typeof tagsTable.$inferInsert;
 export type SelectTag = typeof tagsTable.$inferSelect;
 export type InsertTaskTag = typeof taskTagsTable.$inferInsert;

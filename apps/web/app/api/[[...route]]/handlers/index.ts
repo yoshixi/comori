@@ -5,6 +5,8 @@ import { healthRoute } from '../routes/health'
 export * from './tasks'
 export * from './timers'
 export * from './tags'
+export * from './comments'
+export * from './activities'
 
 // Health check handler  
 export const healthHandler: RouteHandler<typeof healthRoute> = (c) => {

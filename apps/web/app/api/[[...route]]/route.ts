@@ -9,6 +9,12 @@ import {
   createTaskRoute,
   updateTaskRoute,
   deleteTaskRoute,
+  listTaskCommentsRoute,
+  createTaskCommentRoute,
+  getTaskCommentRoute,
+  updateTaskCommentRoute,
+  deleteTaskCommentRoute,
+  getTaskActivitiesRoute,
   listTimersRoute,
   getTaskTimersRoute,
   getTimerRoute,
@@ -30,6 +36,12 @@ import {
   createTaskHandler,
   updateTaskHandler,
   deleteTaskHandler,
+  listTaskCommentsHandler,
+  createTaskCommentHandler,
+  getTaskCommentHandler,
+  updateTaskCommentHandler,
+  deleteTaskCommentHandler,
+  getTaskActivitiesHandler,
   listTimersHandler,
   getTaskTimersHandler,
   getTimerHandler,
@@ -67,6 +79,16 @@ app.openapi(getTaskRoute, getTaskHandler)
 app.openapi(createTaskRoute, createTaskHandler)
 app.openapi(updateTaskRoute, updateTaskHandler)
 app.openapi(deleteTaskRoute, deleteTaskHandler)
+
+// Register task comment routes
+app.openapi(listTaskCommentsRoute, listTaskCommentsHandler)
+app.openapi(createTaskCommentRoute, createTaskCommentHandler)
+app.openapi(getTaskCommentRoute, getTaskCommentHandler)
+app.openapi(updateTaskCommentRoute, updateTaskCommentHandler)
+app.openapi(deleteTaskCommentRoute, deleteTaskCommentHandler)
+
+// Register task activity route
+app.openapi(getTaskActivitiesRoute, getTaskActivitiesHandler)
 
 // Register timer routes
 app.openapi(listTimersRoute, listTimersHandler)

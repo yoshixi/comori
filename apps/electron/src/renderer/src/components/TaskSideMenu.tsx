@@ -25,7 +25,8 @@ function hasEditableChanges(current: Task | null, saved: Task | null): boolean {
   return (
     current.title !== saved.title ||
     current.description !== saved.description ||
-    current.startAt !== saved.startAt
+    current.startAt !== saved.startAt ||
+    current.endAt !== saved.endAt
   )
 }
 
@@ -34,6 +35,7 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   onClose,
   onTaskUpdated
 }) => {
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
   const [localTask, setLocalTask] = useState<Task | null>(task)
   const [isSaving, setIsSaving] = useState(false)
   const [isCompleting, setIsCompleting] = useState(false)
@@ -69,6 +71,11 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
       clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = null
     }
+    if (titleInputRef.current) {
+      requestAnimationFrame(() => {
+        titleInputRef.current?.blur()
+      })
+    }
   }, [task])
 
   // Auto-save function
@@ -78,7 +85,8 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
       await putApiTasksId(taskToSave.id, {
         title: taskToSave.title?.trim(),
         description: taskToSave.description?.trim(),
-        startAt: normalizeDateTime(taskToSave.startAt ?? '')
+        startAt: normalizeDateTime(taskToSave.startAt ?? ''),
+        endAt: normalizeDateTime(taskToSave.endAt ?? '')
       })
       // Update the last saved reference after successful save
       lastSavedTaskRef.current = taskToSave
@@ -179,112 +187,104 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   return (
     <div className="flex h-full max-h-[80vh] flex-col rounded-[32px] bg-white/95 shadow-[0_40px_120px_rgba(15,23,42,0.2)] ring-1 ring-black/5">
       <header className="flex items-center justify-between gap-4 px-6 py-5">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Task Details
-          </p>
-          <h3
-            className="truncate text-lg font-semibold text-foreground"
-            title={currentTask?.title}
-          >
-            {currentTask?.title}
-          </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant={isCompleted ? 'outline' : 'default'}
-            onClick={handleToggleCompletion}
-            disabled={isCompleting}
-          >
-            {isCompleting
-              ? 'Updating...'
-              : isCompleted
-                ? 'Mark Incomplete'
-                : 'Mark Complete'}
-          </Button>
-          <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close details">
-            <X className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-1 items-center gap-4">
+          <div className="min-w-0 space-y-2 flex-1">
+            <Input
+              ref={titleInputRef}
+              value={localTask?.title ?? ''}
+              onChange={(event) =>
+                setLocalTask((prev) =>
+                  prev ? { ...prev, title: event.target.value } : prev
+                )
+              }
+              className="text-lg font-semibold"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {task && (
+              <TimerManager
+                taskId={task.id}
+                mode="compact"
+                onTimerStarted={handleTimerStarted}
+                onTimerStopped={handleTimerStopped}
+                onActivityRecorded={() => activitiesQuery.mutate?.()}
+                isCompleted={isCompleted}
+                onToggleCompletion={handleToggleCompletion}
+                isCompleting={isCompleting}
+              />
+            )}
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close details">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
-        <section>
-          <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-3">
-            Edit Task
-          </h4>
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="task-title">Title</Label>
-                  <Input
-                    id="task-title"
-                    value={localTask?.title ?? ''}
-                    onChange={(event) =>
-                      setLocalTask((prev) =>
-                        prev ? { ...prev, title: event.target.value } : prev
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="task-description">Description</Label>
-                  <Textarea
-                    id="task-description"
-                    value={localTask?.description ?? ''}
-                    onChange={(event) =>
-                      setLocalTask((prev) =>
-                        prev ? { ...prev, description: event.target.value } : prev
-                      )
-                    }
-                    rows={4}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="task-start-date">Start date & time</Label>
-                  <Input
-                    id="task-start-date"
-                    type="datetime-local"
-                    value={formatDateTimeInput(localTask?.startAt)}
-                    onChange={(event) =>
-                      setLocalTask((prev) =>
-                        prev ? { ...prev, startAt: event.target.value } : prev
-                      )
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tags</Label>
-                  <TagCombobox
-                    selectedTagIds={localTask?.tags?.map((t) => t.id) ?? []}
-                    onSelectionChange={handleTagsChange}
-                    placeholder="Add tags..."
-                  />
-                </div>
-                <div className="h-6 flex items-center">
-                  {isSaving && (
-                    <span className="text-xs text-muted-foreground">Saving...</span>
-                  )}
-                  {showSaved && !isSaving && (
-                    <span className="text-xs text-green-600 flex items-center gap-1">
-                      <Check className="h-3 w-3" />
-                      Saved
-                    </span>
-                  )}
-                </div>
-              </div>
-            </section>
-
-        <section className="mt-1">
-          <TimerManager
-            taskId={task.id}
-            onTimerStarted={handleTimerStarted}
-            onTimerStopped={handleTimerStopped}
-            onActivityRecorded={() => activitiesQuery.mutate?.()}
-          />
+        <section className="space-y-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="task-start-date">Start date & time</Label>
+              <Input
+                id="task-start-date"
+                type="datetime-local"
+                value={formatDateTimeInput(localTask?.startAt)}
+                onChange={(event) =>
+                  setLocalTask((prev) =>
+                    prev ? { ...prev, startAt: event.target.value } : prev
+                  )
+                }
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="task-end-date">End date & time</Label>
+              <Input
+                id="task-end-date"
+                type="datetime-local"
+                value={formatDateTimeInput(localTask?.endAt)}
+                onChange={(event) =>
+                  setLocalTask((prev) =>
+                    prev ? { ...prev, endAt: event.target.value } : prev
+                  )
+                }
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>Tags</Label>
+              <TagCombobox
+                selectedTagIds={localTask?.tags?.map((t) => t.id) ?? []}
+                onSelectionChange={handleTagsChange}
+                placeholder="Add tags..."
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="task-description">Description</Label>
+            <Textarea
+              id="task-description"
+              value={localTask?.description ?? ''}
+              onChange={(event) =>
+                setLocalTask((prev) =>
+                  prev ? { ...prev, description: event.target.value } : prev
+                )
+              }
+              rows={4}
+            />
+          </div>
+          <div className="h-6 flex items-center">
+            {isSaving && <span className="text-xs text-muted-foreground">Saving...</span>}
+            {showSaved && !isSaving && (
+              <span className="text-xs text-green-600 flex items-center gap-1">
+                <Check className="h-3 w-3" />
+                Saved
+              </span>
+            )}
+          </div>
         </section>
 
-        <section className="mt-4">
+        <section className="mt-1">
           <TaskActivities
             activities={activitiesQuery.data?.activities}
             isLoading={activitiesQuery.isLoading}

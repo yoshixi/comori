@@ -160,50 +160,48 @@ export const TimerManager: React.FC<TimerManagerProps> = ({
 
   if (isCompact) {
     return (
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 rounded-full bg-muted/40 px-2 py-1 text-xs font-semibold text-foreground">
           <span
             className={`h-2 w-2 rounded-full ${
-              activeTimer ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/50'
+              activeTimer ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/60'
             }`}
           ></span>
-          <span className="font-mono text-base font-semibold text-foreground">
+          <span className="font-mono text-sm">
             {activeTimer ? formatDuration(elapsedTime) : '00:00:00'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {activeTimer ? (
-            <>
-              <button
-                onClick={handleStopTimer}
-                className="rounded-md bg-destructive/15 p-2 text-destructive transition-colors hover:bg-destructive/25"
-                aria-label="Stop Timer"
-              >
-                <Square className="h-4 w-4" />
-              </button>
-              {onToggleCompletion && (
-                <button
-                  onClick={onToggleCompletion}
-                  disabled={isCompleting}
-                  className={`rounded-md p-2 transition-colors ${
-                    isCompleted
-                      ? 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                      : 'bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25'
-                  } disabled:opacity-50`}
-                  aria-label={isCompleted ? 'Reopen' : 'Complete'}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                </button>
-              )}
-            </>
+            <button
+              onClick={handleStopTimer}
+              className="rounded-full border border-destructive/30 bg-destructive/10 p-2 text-destructive transition-colors hover:bg-destructive/20"
+              aria-label="Stop Timer"
+            >
+              <Square className="h-3.5 w-3.5" />
+            </button>
           ) : (
             <button
               onClick={handleStartTimer}
               disabled={isCreating}
-              className="rounded-md bg-primary/10 p-2 text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+              className="rounded-full border border-primary/40 bg-primary/10 p-2 text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
               aria-label="Start Timer"
             >
-              <Play className="h-4 w-4" />
+              <Play className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {onToggleCompletion && (
+            <button
+              onClick={onToggleCompletion}
+              disabled={isCompleting}
+              className={`rounded-full border p-2 transition-colors ${
+                isCompleted
+                  ? 'border-green-500/40 bg-green-500/10 text-green-700'
+                  : 'border-muted-foreground/30 text-muted-foreground hover:border-foreground/40'
+              } disabled:opacity-50`}
+              aria-label={isCompleted ? 'Mark incomplete' : 'Mark complete'}
+            >
+              <CheckCircle className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

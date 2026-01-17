@@ -122,7 +122,9 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
           <MessageSquareText className="h-4 w-4" />
         </div>
         <div className="flex-1 text-sm">
-          <p className="whitespace-pre-wrap text-foreground">{activity.data.body}</p>
+          <p className="whitespace-pre-wrap text-foreground">
+            {renderBodyWithLinks(activity.data.body)}
+          </p>
           <p className="text-xs text-muted-foreground">{formatTimestamp(activity.data.createdAt)}</p>
         </div>
       </article>
@@ -130,4 +132,33 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
   }
 
   return null
+}
+
+const renderBodyWithLinks = (body: string) => {
+  const urlRegex = /(https?:\/\/[^\s]+)/g
+  const urlOnlyRegex = /^https?:\/\/[^\s]+$/i
+  const segments = body.split(urlRegex)
+  return segments.map((segment, idx) => {
+    if (urlOnlyRegex.test(segment)) {
+      return (
+        <a
+          key={`link-${idx}`}
+          href={segment}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline underline-offset-4"
+        >
+          {segment}
+        </a>
+      )
+    }
+    if (!segment) {
+      return null
+    }
+    return (
+      <span key={`text-${idx}`}>
+        {segment}
+      </span>
+    )
+  })
 }

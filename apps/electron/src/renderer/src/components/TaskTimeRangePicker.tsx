@@ -3,11 +3,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 
-const SLOT_MINUTES = 5
+const SLOT_MINUTES = 15
 const SLOTS_PER_HOUR = 60 / SLOT_MINUTES
 const MINUTES_PER_DAY = 24 * 60
-const SLOT_HEIGHT_PX = 8
+const SLOT_HEIGHT_PX = 6
 const SLOT_COUNT = MINUTES_PER_DAY / SLOT_MINUTES
+const VISIBLE_START_HOUR = 6
+const VISIBLE_END_HOUR = 18
 
 type ViewMode = 'day' | 'week'
 
@@ -93,6 +95,21 @@ const getSelectionFromRange = (
   return { dayIndex, startSlot, endSlot }
 }
 
+/**
+ * TaskTimeRangePicker
+ * - Day/week timeline with 15-minute slots.
+ * - Drag to select a range; emits startAt/endAt on mouse up.
+ * - Auto-scrolls to the current selection (or 06:00 by default).
+ *
+ * Example:
+ * <TaskTimeRangePicker
+ *   startAt={task.startAt}
+ *   endAt={task.endAt}
+ *   onChange={({ startAt, endAt }) =>
+ *     setTask((prev) => (prev ? { ...prev, startAt, endAt } : prev))
+ *   }
+ * />
+ */
 export const TaskTimeRangePicker: React.FC<TaskTimeRangePickerProps> = ({
   startAt,
   endAt,
@@ -182,6 +199,13 @@ export const TaskTimeRangePicker: React.FC<TaskTimeRangePickerProps> = ({
     container.scrollTop = centeredTop
   }, [selectionToRender, viewMode])
 
+  useEffect(() => {
+    if (!scrollContainerRef.current || selectionToRender) return
+    const container = scrollContainerRef.current
+    const targetTop = VISIBLE_START_HOUR * SLOTS_PER_HOUR * SLOT_HEIGHT_PX
+    container.scrollTop = targetTop
+  }, [viewMode, selectionToRender])
+
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -250,7 +274,16 @@ export const TaskTimeRangePicker: React.FC<TaskTimeRangePickerProps> = ({
             ))}
           </div>
         </div>
-        <div ref={scrollContainerRef} className="flex overflow-y-auto" style={{ height: 320 }}>
+        <div
+          ref={scrollContainerRef}
+          className="flex overflow-y-auto"
+          style={{
+            height:
+              (VISIBLE_END_HOUR - VISIBLE_START_HOUR) *
+              SLOTS_PER_HOUR *
+              SLOT_HEIGHT_PX
+          }}
+        >
           <div className="w-12 flex-shrink-0">
             <div className="relative" style={{ height: totalHeight }}>
               {Array.from({ length: 24 }, (_, hour) => (
@@ -306,7 +339,7 @@ export const TaskTimeRangePicker: React.FC<TaskTimeRangePickerProps> = ({
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Drag to set a time range in 5-minute increments.
+        Drag to set a time range in 15-minute increments.
       </div>
     </div>
   )

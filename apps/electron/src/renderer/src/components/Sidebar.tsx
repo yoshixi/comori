@@ -1,5 +1,5 @@
 import React from 'react'
-import { ListTodo, Settings } from 'lucide-react'
+import { CalendarDays, ListTodo, Settings } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -12,7 +12,7 @@ import {
   SidebarTrigger
 } from './ui/sidebar'
 
-type View = 'tasks' | 'settings'
+type View = 'tasks' | 'calendar' | 'settings'
 
 interface AppSidebarProps {
   currentView: View
@@ -21,6 +21,7 @@ interface AppSidebarProps {
 
 const menuItems = [
   { id: 'tasks' as const, label: 'Tasks', icon: ListTodo },
+  { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { id: 'settings' as const, label: 'Settings', icon: Settings }
 ]
 

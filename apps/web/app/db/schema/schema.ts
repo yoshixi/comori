@@ -15,6 +15,7 @@ export const tasksTable = sqliteTable('tasks', {
   description: text('description'),
   dueAt: integer('due_at', { mode: 'number' }), // Unix timestamp
   startAt: integer('start_at', { mode: 'number' }), // Unix timestamp
+  endAt: integer('end_at', { mode: 'number' }), // Unix timestamp
   completedAt: integer('completed_at', { mode: 'number' }), // Unix timestamp
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
@@ -26,6 +27,16 @@ export const taskTimersTable = sqliteTable('task_timers', {
   taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
   startTime: integer('start_time', { mode: 'number' }).notNull(), // Unix timestamp (seconds)
   endTime: integer('end_time', { mode: 'number' }), // Unix timestamp (seconds, optional)
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+});
+
+// TaskComments table
+export const taskCommentsTable = sqliteTable('task_comments', {
+  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
+  taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
+  authorId: blob('author_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }).$type<string>(),
+  body: text('body').notNull(),
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 });
@@ -54,6 +65,7 @@ export const taskTagsTable = sqliteTable('task_tags', {
 // Indexes
 export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
 export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
+export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_created_at_idx').on(taskCommentsTable.taskId, taskCommentsTable.createdAt);
 export const tagsUserIdIdx = index('tags_user_id_idx').on(tagsTable.userId);
 export const taskTagsTaskIdIdx = index('task_tags_task_id_idx').on(taskTagsTable.taskId);
 export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.tagId);
@@ -65,6 +77,8 @@ export type InsertTask = typeof tasksTable.$inferInsert;
 export type SelectTask = typeof tasksTable.$inferSelect;
 export type InsertTaskTimer = typeof taskTimersTable.$inferInsert;
 export type SelectTaskTimer = typeof taskTimersTable.$inferSelect;
+export type InsertTaskComment = typeof taskCommentsTable.$inferInsert;
+export type SelectTaskComment = typeof taskCommentsTable.$inferSelect;
 export type InsertTag = typeof tagsTable.$inferInsert;
 export type SelectTag = typeof tagsTable.$inferSelect;
 export type InsertTaskTag = typeof taskTagsTable.$inferInsert;

@@ -13,6 +13,7 @@ export function convertDbTaskToApi(dbTask: SelectTask): Task {
     description: dbTask.description || '',
     dueDate: dbTask.dueAt ? new Date(dbTask.dueAt * 1000).toISOString() : undefined,
     startAt: dbTask.startAt ? new Date(dbTask.startAt * 1000).toISOString() : undefined,
+    endAt: dbTask.endAt ? new Date(dbTask.endAt * 1000).toISOString() : undefined,
     completedAt: dbTask.completedAt ? new Date(dbTask.completedAt * 1000).toISOString() : undefined,
     tags: [], // This old implementation doesn't load tags - use app/core/tasks.db.ts for full functionality
     createdAt: new Date(dbTask.createdAt * 1000).toISOString(),
@@ -74,6 +75,7 @@ export async function createTask(db: DB, userId: string, data: CreateTask): Prom
     title: data.title.trim(),
     description: data.description?.trim() || null,
     dueAt: data.dueDate ? Math.floor(new Date(data.dueDate).getTime() / 1000) : null,
+    endAt: data.endAt ? Math.floor(new Date(data.endAt).getTime() / 1000) : null,
     createdAt: now,
     updatedAt: now
   }
@@ -105,6 +107,7 @@ export async function updateTask(db: DB, userId: string, taskId: string, data: U
   if (data.title !== undefined) updateData.title = data.title.trim()
   if (data.description !== undefined) updateData.description = data.description.trim() || null
   if (data.dueDate !== undefined) updateData.dueAt = data.dueDate ? Math.floor(new Date(data.dueDate).getTime() / 1000) : null
+  if (data.endAt !== undefined) updateData.endAt = data.endAt ? Math.floor(new Date(data.endAt).getTime() / 1000) : null
 
   const result = await db
     .update(tasksTable)

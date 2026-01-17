@@ -123,7 +123,7 @@ export const TagCombobox: React.FC<TagComboboxProps> = ({
       {/* Trigger / Selected tags display */}
       <div
         className={cn(
-          'flex min-h-10 w-full items-center gap-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm cursor-pointer',
+          'flex min-h-10 w-full items-center gap-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm cursor-pointer transition-colors',
           'focus-within:outline-none focus-within:ring-1 focus-within:ring-ring',
           isOpen && 'ring-1 ring-ring'
         )}

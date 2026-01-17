@@ -4,6 +4,8 @@ import { Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Input } from './components/ui/input'
+import { Textarea } from './components/ui/textarea'
+import { Label } from './components/ui/label'
 import {
   Table,
   TableBody,
@@ -16,6 +18,7 @@ import { Switch } from './components/ui/switch'
 import { Badge } from './components/ui/badge'
 import { TagCombobox } from './components/TagCombobox'
 import {
+  deleteApiTasksId,
   postApiTasks,
   postApiTimers,
   putApiTasksId,
@@ -29,9 +32,11 @@ import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
+import { Dialog, DialogContent } from './components/ui/dialog'
 import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
+import { CalendarView } from './components/CalendarView'
 
-type View = 'tasks' | 'settings'
+type View = 'tasks' | 'calendar' | 'settings'
 
 // Keyboard shortcut definitions
 type KeyBinding = {
@@ -133,17 +138,25 @@ function App(): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
+  const [calendarDraft, setCalendarDraft] = useState<{
+    title: string
+    description: string
+    startAt: string
+    endAt: string
+    tagIds: string[]
+  } | null>(null)
+  const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
 
   // Query for tasks with active timers (In Progress section)
   const activeTaskQuery = useMemo(
     () => ({
-      completed: showCompleted ? undefined : ('false' as const),
+      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
       hasActiveTimer: 'true' as const,
       sortBy,
       order: 'asc' as const,
       tags: filterTagIds.length ? filterTagIds : undefined
     }),
-    [showCompleted, sortBy, filterTagIds]
+    [showCompleted, sortBy, filterTagIds, currentView]
   )
   const {
     data: activeTasksResponse,
@@ -156,13 +169,13 @@ function App(): React.JSX.Element {
   // Query for tasks without active timers (Tasks section)
   const inactiveTaskQuery = useMemo(
     () => ({
-      completed: showCompleted ? undefined : ('false' as const),
+      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
       hasActiveTimer: 'false' as const,
       sortBy,
       order: 'asc' as const,
       tags: filterTagIds.length ? filterTagIds : undefined
     }),
-    [showCompleted, sortBy, filterTagIds]
+    [showCompleted, sortBy, filterTagIds, currentView]
   )
   const {
     data: inactiveTasksResponse,
@@ -521,12 +534,63 @@ function App(): React.JSX.Element {
       })
   }
 
+  const handleCalendarMoveTask = async (
+    task: Task,
+    range: { startAt: string; endAt: string }
+  ): Promise<void> => {
+    try {
+      await putApiTasksId(task.id, {
+        startAt: normalizeDateTime(range.startAt),
+        endAt: normalizeDateTime(range.endAt)
+      })
+      await mutateBothTaskLists()
+    } catch (error) {
+      console.error('Failed to update task time range:', error)
+    }
+  }
+
+  const handleCalendarCreate = async (): Promise<void> => {
+    if (!calendarDraft || !calendarDraft.title.trim()) return
+    setIsCreatingCalendarTask(true)
+    const payload = {
+      title: calendarDraft.title.trim(),
+      description: calendarDraft.description.trim() || undefined,
+      startAt: normalizeDateTime(calendarDraft.startAt),
+      endAt: normalizeDateTime(calendarDraft.endAt),
+      tagIds: calendarDraft.tagIds.length > 0 ? calendarDraft.tagIds : undefined
+    }
+
+    try {
+      await postApiTasks(payload)
+      setCalendarDraft(null)
+      await mutateBothTaskLists()
+    } catch (error) {
+      console.error('Failed to create task:', error)
+    } finally {
+      setIsCreatingCalendarTask(false)
+    }
+  }
+
   function handleUpdateTaskTags(taskId: string, tagIds: string[]): void {
     putApiTasksId(taskId, { tagIds })
       .then(() => mutateBothTaskLists())
       .catch((error) => {
         console.error('Failed to update task tags:', error)
       })
+  }
+
+  const handleDeleteTask = async (taskId: string): Promise<void> => {
+    if (!confirm('Are you sure you want to delete this task?')) return
+
+    try {
+      await deleteApiTasksId(taskId)
+      if (selectedTask?.id === taskId) {
+        setSelectedTask(null)
+      }
+      await mutateBothTaskLists()
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+    }
   }
 
   function handleStartTimer(taskId: string): void {
@@ -901,6 +965,71 @@ function App(): React.JSX.Element {
       <SidebarInset>
         {currentView === 'settings' ? (
           <SettingsView />
+        ) : currentView === 'calendar' ? (
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-8">
+            <main className="flex min-h-0 flex-1 flex-col gap-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Tags:</span>
+                    <TagCombobox
+                      selectedTagIds={filterTagIds}
+                      onSelectionChange={setFilterTagIds}
+                      placeholder="All tags"
+                      className="w-48"
+                    />
+                  </div>
+                </div>
+                {!isAddingTask && currentView !== 'calendar' && (
+                  <Button onClick={startAddingTask}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Task
+                  </Button>
+                )}
+              </div>
+
+              {tasksLoading && (
+                <div className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
+                  Loading tasks...
+                </div>
+              )}
+              {!tasksLoading && tasksError && (
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                  Failed to load tasks. {getErrorMessage(tasksError)}
+                </div>
+              )}
+              {!tasksLoading && !tasksError && (
+                <CalendarView
+                  className="flex-1 min-h-0"
+                  tasks={allTasks}
+                  onTaskSelect={(task) => {
+                    setSelectedTask(task)
+                    const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+                    setFocusedTaskIndex(index)
+                  }}
+                  onTaskEdit={(task) => {
+                    setSelectedTask(task)
+                    const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+                    setFocusedTaskIndex(index)
+                  }}
+                  onTaskDelete={(task) => handleDeleteTask(task.id)}
+                  onTaskMove={handleCalendarMoveTask}
+                  activeTimersByTaskId={activeTimersByTaskId}
+                  onTaskStartTimer={handleStartTimer}
+                  onTaskStopTimer={handleStopTimer}
+                  onCreateRange={({ startAt, endAt }) => {
+                    setCalendarDraft({
+                      title: '',
+                      description: '',
+                      startAt,
+                      endAt,
+                      tagIds: filterTagIds
+                    })
+                  }}
+                />
+              )}
+            </main>
+          </div>
         ) : (
           <div className="p-8">
             <main className="mx-auto max-w-6xl">
@@ -1108,16 +1237,123 @@ function App(): React.JSX.Element {
           </div>
         )}
 
-        <TaskSideMenu
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onTaskUpdated={async (updated) => {
-            // Update the currently selected task reference (to keep the side-menu UI in sync)
-            setSelectedTask(updated)
-            await mutateBothTaskLists()
-          }}
-        />
       </SidebarInset>
+      <Dialog
+        open={Boolean(calendarDraft)}
+        onOpenChange={(open) => {
+          if (!open && !isCreatingCalendarTask) {
+            setCalendarDraft(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl w-[95vw]">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <div className="text-lg font-semibold">New task</div>
+              {calendarDraft && (
+                <div className="text-sm text-muted-foreground">
+                  {`${formatDateTime(calendarDraft.startAt)} -> ${formatDateTime(calendarDraft.endAt)}`}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="calendar-start-at">Start time</Label>
+                <Input
+                  id="calendar-start-at"
+                  type="datetime-local"
+                  value={calendarDraft ? formatDateTimeInput(calendarDraft.startAt) : ''}
+                  onChange={(event) =>
+                    setCalendarDraft((prev) =>
+                      prev ? { ...prev, startAt: event.target.value } : prev
+                    )
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="calendar-end-at">End time</Label>
+                <Input
+                  id="calendar-end-at"
+                  type="datetime-local"
+                  value={calendarDraft ? formatDateTimeInput(calendarDraft.endAt) : ''}
+                  onChange={(event) =>
+                    setCalendarDraft((prev) =>
+                      prev ? { ...prev, endAt: event.target.value } : prev
+                    )
+                  }
+                />
+              </div>
+            </div>
+            <Input
+              placeholder="Title"
+              value={calendarDraft?.title ?? ''}
+              onChange={(event) =>
+                setCalendarDraft((prev) =>
+                  prev ? { ...prev, title: event.target.value } : prev
+                )
+              }
+            />
+            <Textarea
+              placeholder="Description"
+              rows={3}
+              value={calendarDraft?.description ?? ''}
+              onChange={(event) =>
+                setCalendarDraft((prev) =>
+                  prev ? { ...prev, description: event.target.value } : prev
+                )
+              }
+            />
+            <div className="flex flex-wrap items-center gap-3">
+              <TagCombobox
+                selectedTagIds={calendarDraft?.tagIds ?? []}
+                onSelectionChange={(tagIds) =>
+                  setCalendarDraft((prev) =>
+                    prev ? { ...prev, tagIds } : prev
+                  )
+                }
+                placeholder="Add tags"
+                className="w-64"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                onClick={handleCalendarCreate}
+                disabled={isCreatingCalendarTask || !calendarDraft?.title.trim()}
+              >
+                {isCreatingCalendarTask ? 'Creating...' : 'Create task'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setCalendarDraft(null)}
+                disabled={isCreatingCalendarTask}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={Boolean(selectedTask)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedTask(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl w-[95vw] border-none bg-transparent p-0 shadow-none focus-visible:outline-none">
+          {selectedTask ? (
+            <TaskSideMenu
+              task={selectedTask}
+              onClose={() => setSelectedTask(null)}
+              onTaskUpdated={async (updated) => {
+                setSelectedTask(updated)
+                await mutateBothTaskLists()
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   )
 }

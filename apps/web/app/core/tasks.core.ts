@@ -23,6 +23,10 @@ export const TaskModel = z.object({
     description: 'Start date for the task in ISO 8601 format',
     example: '2024-01-01T09:00:00.000Z'
   }),
+  endAt: z.iso.datetime().optional().nullable().openapi({
+    description: 'End date for the task in ISO 8601 format',
+    example: '2024-01-01T17:00:00.000Z'
+  }),
   completedAt: z.iso.datetime().optional().nullable().openapi({
     description: 'Completion timestamp in ISO 8601 format',
     example: '2024-01-02T08:00:00.000Z'
@@ -59,6 +63,10 @@ export const CreateTaskModel = z.object({
     description: 'Start date for the task in ISO 8601 format',
     example: '2024-01-01T09:00:00.000Z'
   }),
+  endAt: z.iso.datetime().optional().openapi({
+    description: 'End date for the task in ISO 8601 format',
+    example: '2024-01-01T17:00:00.000Z'
+  }),
   completedAt: z.iso.datetime().optional().nullable().openapi({
     description: 'Completion timestamp. Use null to mark the task as incomplete',
     example: '2024-01-02T08:00:00.000Z'
@@ -86,6 +94,10 @@ export const UpdateTaskModel = z.object({
   startAt: z.iso.datetime().optional().nullable().openapi({
     description: 'Start date for the task in ISO 8601 format. Use null to remove start date',
     example: '2024-01-01T09:00:00.000Z'
+  }),
+  endAt: z.iso.datetime().optional().nullable().openapi({
+    description: 'End date for the task in ISO 8601 format. Use null to remove end date',
+    example: '2024-01-01T17:00:00.000Z'
   }),
   completedAt: z.iso.datetime().optional().nullable().openapi({
     description: 'Completion timestamp. Use null to mark the task as incomplete',

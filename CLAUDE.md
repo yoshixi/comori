@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Shuchu is a task management application built as a monorepo with a Next.js backend API and an Electron desktop client. The project uses Turbo for build orchestration and pnpm for package management.
 
+## Agent Notes
+- Always run `pnpm run check-types` after making edits to ensure we keep the repo type-safe. Keep this as part of your default workflow.
+
 ## Development Environment
 
 This project uses **devenv** for environment management. Before starting development:

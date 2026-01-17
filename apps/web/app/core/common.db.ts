@@ -33,7 +33,7 @@ function createLibsqlDrizzle(url: string) {
 export function getDb() {
   // Use Turso for production, SQLite for development
   if (process.env.TURSO_CONNECTION_URL && process.env.TURSO_AUTH_TOKEN) {
-    // Production: Use Turso/libsql
+    // ProductioUse Turso/libsql
     console.log('🌐 Using Turso database for production')
     return drizzleLibsql({
       connection: {
@@ -45,8 +45,8 @@ export function getDb() {
     })
   } else {
     // Development: Use local SQLite
-      // console.log('💾 Using local SQLite database for development')
-    
+    // console.log('💾 Using local SQLite database for development')
+
     // const dbPath = getLocalDbPath()
     // return createBetterSqlite3Connection(dbPath)
     // console.error('❌ Failed to initialize SQLite database:', error)
@@ -54,6 +54,7 @@ export function getDb() {
 
     const dbPath = getLocalDbPath()
     const fileUrl = `file:${dbPath}`
+    console.log("use local database")
 
     try {
       return createLibsqlDrizzle(fileUrl)

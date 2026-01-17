@@ -12,6 +12,7 @@ export interface Task {
   description: string
   dueDate: string | null
   startAt: string | null
+  endAt: string | null
   completedAt: string | null
   tags: Tag[]
   createdAt: string
@@ -23,6 +24,7 @@ export interface CreateTask {
   description?: string
   dueDate?: string
   startAt?: string
+  endAt?: string
   completedAt?: string | null
   tagIds?: string[]
 }
@@ -32,6 +34,7 @@ export interface UpdateTask {
   description?: string
   dueDate?: string | null
   startAt?: string | null
+  endAt?: string | null
   completedAt?: string | null
   tagIds?: string[]
 }
@@ -122,6 +125,7 @@ export function convertDbTaskToApi(dbTask: SelectTask, tags: Tag[] = []): Task {
     description: dbTask.description || '',
     dueDate: dbTask.dueAt ? formatTimestamp(dbTask.dueAt) : null,
     startAt: dbTask.startAt ? formatTimestamp(dbTask.startAt) : null,
+    endAt: dbTask.endAt ? formatTimestamp(dbTask.endAt) : null,
     completedAt: dbTask.completedAt ? formatTimestamp(dbTask.completedAt) : null,
     tags: tags,
     createdAt: formatTimestamp(dbTask.createdAt),
@@ -280,6 +284,7 @@ export async function createTask(db: DB, userId: string, data: CreateTask): Prom
     description: data.description?.trim() || null,
     dueAt: data.dueDate ? parseISOToUnixTimestamp(data.dueDate) : null,
     startAt: data.startAt ? parseISOToUnixTimestamp(data.startAt) : null,
+    endAt: data.endAt ? parseISOToUnixTimestamp(data.endAt) : null,
     completedAt: data.completedAt ? parseISOToUnixTimestamp(data.completedAt) : null,
     createdAt: now,
     updatedAt: now
@@ -327,6 +332,9 @@ export async function updateTask(db: DB, userId: string, taskId: string, data: U
   }
   if (data.startAt !== undefined) {
     updateData.startAt = data.startAt ? parseISOToUnixTimestamp(data.startAt) : null
+  }
+  if (data.endAt !== undefined) {
+    updateData.endAt = data.endAt ? parseISOToUnixTimestamp(data.endAt) : null
   }
   if (data.completedAt !== undefined) {
     updateData.completedAt = data.completedAt ? parseISOToUnixTimestamp(data.completedAt) : null

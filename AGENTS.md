@@ -1,3 +1,6 @@
+Please read CLAUDE.md first.
+
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization

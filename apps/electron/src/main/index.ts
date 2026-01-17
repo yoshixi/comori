@@ -133,7 +133,9 @@ function createFloatingWindow(taskId: string, title?: string): void {
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
-    skipTaskbar: true,
+    // On macOS, skipTaskbar windows can cause the app to disappear from Dock/Cmd+Tab
+    // if the main window gets hidden. Keep Dock presence by not skipping there.
+    skipTaskbar: process.platform !== 'darwin',
     alwaysOnTop: true,
     frame: false,
     transparent: true,

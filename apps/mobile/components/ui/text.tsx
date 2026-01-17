@@ -86,4 +86,10 @@ function Text({
   );
 }
 
-export { Text, TextClassContext };
+type TextProps = React.ComponentProps<typeof RNText> &
+  TextVariantProps &
+  React.RefAttributes<RNText> & {
+    asChild?: boolean;
+  };
+
+export { Text, TextClassContext, type TextProps };

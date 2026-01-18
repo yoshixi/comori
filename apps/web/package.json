@@ -27,7 +27,6 @@
     "@hono/zod-openapi": "catalog:",
     "@libsql/client": "^0.15.15",
     "@repo/ui": "workspace:*",
-    "better-sqlite3": "^11.7.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.7",
     "hono": "^4.10.6",
@@ -40,7 +39,6 @@
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.6",
     "@types/react-dom": "19.2.3",

@@ -49,3 +49,4 @@ devenv.local.yaml
 # pre-commit
 .pre-commit-config.yaml
 apps/web/tmp
+apps/electron/electron.vite.config.*.mjs

@@ -9,7 +9,7 @@ This project uses a hybrid database configuration:
 The database connection automatically detects the environment:
 
 1. **Local Development** (default):
-   - Uses `better-sqlite3` with local file at `tmp/local.db`
+   - Uses libsql file database at `tmp/local.db`
    - No environment variables needed
    - Fast, offline development
 
@@ -74,8 +74,7 @@ pnpm drizzle:generate:prod # Generate migrations for Turso
 
 ## Dependencies
 
-- **`better-sqlite3`**: Local SQLite database driver
-- **`@libsql/client`**: Turso/libsql client for production
+- **`@libsql/client`**: Libsql client for local file and Turso
 - **`drizzle-orm`**: ORM with dual driver support
 
 ## Files Modified

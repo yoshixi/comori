@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, screen, session } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, session, Menu, globalShortcut } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -65,6 +65,109 @@ function resolvePreloadPath(): string {
 let mainWindow: BrowserWindow | null = null
 const floatingWindows = new Map<string, BrowserWindow>()
 let trayManager: TrayManager | null = null
+
+function createApplicationMenu(): void {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App menu (macOS only)
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
+      : []),
+    // Edit menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac
+          ? [
+              { role: 'pasteAndMatchStyle' as const },
+              { role: 'delete' as const },
+              { role: 'selectAll' as const }
+            ]
+          : [{ role: 'delete' as const }, { type: 'separator' as const }, { role: 'selectAll' as const }])
+      ]
+    },
+    // View menu with zoom controls
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Actual Size',
+          accelerator: 'CmdOrCtrl+0',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              focusedWindow.webContents.setZoomLevel(0)
+            }
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const currentZoom = focusedWindow.webContents.getZoomLevel()
+              focusedWindow.webContents.setZoomLevel(currentZoom + 0.5)
+            }
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CommandOrControl+-',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const currentZoom = focusedWindow.webContents.getZoomLevel()
+              focusedWindow.webContents.setZoomLevel(currentZoom - 0.5)
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac
+          ? [{ type: 'separator' as const }, { role: 'front' as const }, { type: 'separator' as const }, { role: 'window' as const }]
+          : [{ role: 'close' as const }])
+      ]
+    }
+  ]
+
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
+}
 
 function resolveRendererUrl(query?: Record<string, string>): string | null {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -275,6 +378,9 @@ app.whenReady().then(() => {
   // Setup CSP based on environment configuration
   setupContentSecurityPolicy()
 
+  // Setup application menu with standard shortcuts (zoom, edit, etc.)
+  createApplicationMenu()
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -305,6 +411,15 @@ app.whenReady().then(() => {
 
   createWindow()
 
+  // Register global shortcuts for zoom (fallback for keyboard layouts where menu accelerators don't work)
+  globalShortcut.register('CommandOrControl+-', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow()
+    if (focusedWindow) {
+      const currentZoom = focusedWindow.webContents.getZoomLevel()
+      focusedWindow.webContents.setZoomLevel(currentZoom - 0.5)
+    }
+  })
+
   // Initialize tray after window is created
   trayManager = new TrayManager(() => mainWindow)
   trayManager.init()
@@ -330,8 +445,9 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Cleanup tray before quitting
+// Cleanup tray and shortcuts before quitting
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll()
   trayManager?.destroy()
   trayManager = null
 })

@@ -20,7 +20,8 @@
       "Bash(gh pr:*)",
       "Bash(gh api:*)",
       "Bash(grep:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "WebSearch"
     ]
   }
 }

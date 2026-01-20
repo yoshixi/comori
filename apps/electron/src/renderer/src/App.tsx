@@ -34,7 +34,7 @@ import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { Dialog, DialogContent } from './components/ui/dialog'
 import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
-import { CalendarView } from './components/CalendarView'
+import { CalendarView, type ViewMode } from './components/CalendarView'
 
 type View = 'tasks' | 'calendar' | 'settings'
 
@@ -138,6 +138,7 @@ function App(): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
+  const [calendarViewMode, setCalendarViewMode] = useState<ViewMode>('day')
   const [calendarDraft, setCalendarDraft] = useState<{
     title: string
     description: string
@@ -1039,6 +1040,8 @@ function App(): React.JSX.Element {
                 <CalendarView
                   className="flex-1 min-h-0"
                   tasks={allTasks}
+                  viewMode={calendarViewMode}
+                  onViewModeChange={setCalendarViewMode}
                   onTaskSelect={(task) => {
                     setSelectedTask(task)
                     const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
@@ -1285,7 +1288,15 @@ function App(): React.JSX.Element {
           }
         }}
       >
-        <DialogContent className="max-w-xl w-[95vw]">
+        <DialogContent
+          className="max-w-xl w-[95vw]"
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !event.metaKey) return
+            event.preventDefault()
+            if (isCreatingCalendarTask || !calendarDraft?.title.trim()) return
+            handleCalendarCreate()
+          }}
+        >
           <div className="space-y-4">
             <div className="space-y-1">
               <div className="text-lg font-semibold">New task</div>

@@ -14,7 +14,7 @@ const VISIBLE_START_HOUR = 6
 const VISIBLE_END_HOUR = 18
 const MIN_SLOT_HEIGHT_PX = 4
 
-type ViewMode = 'day' | 'week'
+export type ViewMode = 'day' | 'week'
 
 type TaskLayout = {
   task: Task
@@ -29,6 +29,8 @@ type TaskLayout = {
 
 type CalendarViewProps = {
   tasks: Task[]
+  viewMode?: ViewMode
+  onViewModeChange?: (mode: ViewMode) => void
   onTaskSelect?: (task: Task) => void
   onTaskEdit?: (task: Task) => void
   onTaskDelete?: (task: Task) => void
@@ -139,6 +141,8 @@ const assignLanes = (tasks: TaskLayout[]): TaskLayout[] => {
  */
 export const CalendarView: React.FC<CalendarViewProps> = ({
   tasks,
+  viewMode: viewModeProp,
+  onViewModeChange,
   onTaskSelect,
   onTaskEdit,
   onTaskDelete,
@@ -149,7 +153,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onCreateRange,
   className
 }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('week')
+  const [internalViewMode, setInternalViewMode] = useState<ViewMode>('day')
+  const viewMode = viewModeProp ?? internalViewMode
+  const handleViewModeChange = React.useCallback(
+    (mode: ViewMode) => {
+      onViewModeChange?.(mode)
+      if (viewModeProp === undefined) {
+        setInternalViewMode(mode)
+      }
+    },
+    [onViewModeChange, viewModeProp]
+  )
   const [anchorDate, setAnchorDate] = useState<Date>(() => startOfDay(new Date()))
   const [now, setNow] = useState<Date>(() => new Date())
   const [slotHeight, setSlotHeight] = useState<number>(6)
@@ -430,14 +444,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <Button
             size="sm"
             variant={viewMode === 'day' ? 'default' : 'outline'}
-            onClick={() => setViewMode('day')}
+            onClick={() => handleViewModeChange('day')}
           >
             Day
           </Button>
           <Button
             size="sm"
             variant={viewMode === 'week' ? 'default' : 'outline'}
-            onClick={() => setViewMode('week')}
+            onClick={() => handleViewModeChange('week')}
           >
             Week
           </Button>

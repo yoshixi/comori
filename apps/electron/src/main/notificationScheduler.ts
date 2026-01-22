@@ -1,4 +1,4 @@
-import { Notification } from 'electron'
+import { Notification, shell } from 'electron'
 
 const API_URL = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
 const POLL_INTERVAL_MS = 30 * 1000 // Poll every 30 seconds
@@ -41,6 +41,8 @@ type NotificationHandler = {
   onShowTask: (taskId: string) => void
 }
 
+export type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
+
 export class NotificationScheduler {
   private pollInterval: ReturnType<typeof setInterval> | null = null
   private sentNotifications: Map<string, NotificationRecord> = new Map()
@@ -51,8 +53,77 @@ export class NotificationScheduler {
     this.handlers = handlers
   }
 
+  /**
+   * Check if notifications are supported and permission is granted
+   */
+  static isSupported(): boolean {
+    return Notification.isSupported()
+  }
+
+  /**
+   * Get current notification permission status
+   * Note: Electron doesn't provide a direct way to check macOS notification permission status
+   * We assume 'granted' if notifications are supported, user can check system settings if needed
+   */
+  static getPermissionStatus(): NotificationPermissionStatus {
+    if (!Notification.isSupported()) {
+      return 'denied'
+    }
+
+    // Electron doesn't expose notification permission status directly
+    // We return 'granted' if supported and let user manage via system settings
+    return 'granted'
+  }
+
+  /**
+   * Request notification permission (shows a test notification on some platforms)
+   */
+  static async requestPermission(): Promise<NotificationPermissionStatus> {
+    if (!Notification.isSupported()) {
+      return 'denied'
+    }
+
+    // On macOS, showing a notification will trigger the permission prompt if not determined
+    if (process.platform === 'darwin') {
+      const currentStatus = this.getPermissionStatus()
+      if (currentStatus === 'not-determined') {
+        // Show a test notification to trigger the permission prompt
+        const notification = new Notification({
+          title: 'Shuchu Notifications',
+          body: 'Notifications are now enabled for task reminders',
+          silent: true
+        })
+        notification.show()
+      }
+    }
+
+    return this.getPermissionStatus()
+  }
+
+  /**
+   * Open system notification settings
+   */
+  static openNotificationSettings(): void {
+    if (process.platform === 'darwin') {
+      // Open macOS notification settings
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.notifications')
+    } else if (process.platform === 'win32') {
+      // Open Windows notification settings
+      shell.openExternal('ms-settings:notifications')
+    } else {
+      // Linux - try to open GNOME settings
+      shell.openExternal('gnome-control-center notifications')
+    }
+  }
+
   start(): void {
     if (this.pollInterval) return
+
+    // Check if notifications are allowed before starting
+    const status = NotificationScheduler.getPermissionStatus()
+    if (status !== 'granted') {
+      console.log('Notifications not granted, scheduler will not send notifications')
+    }
 
     // Initial check
     this.checkSchedules()

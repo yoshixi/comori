@@ -1,6 +1,9 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Keyboard, Info } from 'lucide-react'
+import { Button } from './ui/button'
+import { Keyboard, Info, Bell, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+
+type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
 const keyboardShortcuts = [
   { keys: ['⌘', 'N'], description: 'Create a new task' },
@@ -10,7 +13,55 @@ const keyboardShortcuts = [
   { keys: ['Shift', 'Tab'], description: 'Navigate to previous task' }
 ]
 
+function NotificationStatusBadge({ status }: { status: NotificationPermissionStatus }): React.JSX.Element {
+  switch (status) {
+    case 'granted':
+      return (
+        <div className="flex items-center gap-1.5 text-green-600">
+          <CheckCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">Enabled</span>
+        </div>
+      )
+    case 'denied':
+      return (
+        <div className="flex items-center gap-1.5 text-red-600">
+          <XCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">Disabled</span>
+        </div>
+      )
+    case 'not-determined':
+      return (
+        <div className="flex items-center gap-1.5 text-yellow-600">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">Not Set</span>
+        </div>
+      )
+  }
+}
+
 export function SettingsView(): React.JSX.Element {
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>('not-determined')
+  const [isRequesting, setIsRequesting] = useState(false)
+
+  useEffect(() => {
+    // Check notification permission on mount
+    window.api.getNotificationPermission().then(setNotificationStatus)
+  }, [])
+
+  const handleRequestPermission = async (): Promise<void> => {
+    setIsRequesting(true)
+    try {
+      const status = await window.api.requestNotificationPermission()
+      setNotificationStatus(status)
+    } finally {
+      setIsRequesting(false)
+    }
+  }
+
+  const handleOpenSettings = (): void => {
+    window.api.openNotificationSettings()
+  }
+
   return (
     <div className="p-8">
       <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
@@ -19,6 +70,67 @@ export function SettingsView(): React.JSX.Element {
       </p>
 
       <div className="mt-8 space-y-6">
+        {/* Notifications */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Notifications
+            </CardTitle>
+            <CardDescription>
+              Get reminders when tasks are about to start or end
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Permission Status</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {notificationStatus === 'granted'
+                      ? 'You will receive task reminders'
+                      : notificationStatus === 'denied'
+                        ? 'Enable notifications in system settings'
+                        : 'Allow notifications to receive task reminders'}
+                  </p>
+                </div>
+                <NotificationStatusBadge status={notificationStatus} />
+              </div>
+
+              <div className="flex gap-2">
+                {notificationStatus === 'not-determined' && (
+                  <Button
+                    size="sm"
+                    onClick={handleRequestPermission}
+                    disabled={isRequesting}
+                  >
+                    {isRequesting ? 'Requesting...' : 'Enable Notifications'}
+                  </Button>
+                )}
+                {notificationStatus === 'denied' && (
+                  <Button size="sm" variant="outline" onClick={handleOpenSettings}>
+                    Open System Settings
+                  </Button>
+                )}
+                {notificationStatus === 'granted' && (
+                  <Button size="sm" variant="outline" onClick={handleOpenSettings}>
+                    Manage in System Settings
+                  </Button>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Notification triggers:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  <li>1 minute before a task starts</li>
+                  <li>1 minute before a task ends</li>
+                  <li>Option to snooze for 5, 15, or 30 minutes</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Keyboard Shortcuts */}
         <Card>
           <CardHeader>

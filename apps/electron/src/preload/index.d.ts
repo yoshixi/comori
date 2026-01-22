@@ -7,6 +7,8 @@ interface TimerState {
   startTime: string
 }
 
+type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
+
 declare global {
   interface Window {
     electron: ElectronAPI
@@ -17,6 +19,9 @@ declare global {
       onShowTaskDetail: (callback: (taskId: string) => void) => () => void
       onNotificationTimerStarted: (callback: (taskId: string) => void) => () => void
       onNotificationTimerStopped: (callback: (taskId: string) => void) => () => void
+      getNotificationPermission: () => Promise<NotificationPermissionStatus>
+      requestNotificationPermission: () => Promise<NotificationPermissionStatus>
+      openNotificationSettings: () => Promise<void>
     }
   }
 }

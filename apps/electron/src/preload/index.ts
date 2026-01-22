@@ -9,6 +9,9 @@ interface TimerState {
   startTime: string
 }
 
+// Notification permission status type
+type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
+
 // Custom APIs for renderer
 const api = {
   openFloatingTaskWindow: (payload: { taskId: string; title?: string }) =>
@@ -47,7 +50,14 @@ const api = {
     return () => {
       ipcRenderer.removeListener('notification:timer-stopped', handler)
     }
-  }
+  },
+  // Notification permission APIs
+  getNotificationPermission: (): Promise<NotificationPermissionStatus> =>
+    ipcRenderer.invoke('notification:get-permission'),
+  requestNotificationPermission: (): Promise<NotificationPermissionStatus> =>
+    ipcRenderer.invoke('notification:request-permission'),
+  openNotificationSettings: (): Promise<void> =>
+    ipcRenderer.invoke('notification:open-settings')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -4,7 +4,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/logo@2x.png?asset'
 import { TrayManager } from './tray'
-import { NotificationScheduler } from './notificationScheduler'
+import { NotificationScheduler, type NotificationPermissionStatus } from './notificationScheduler'
 
 function setupContentSecurityPolicy(): void {
   const apiUrl = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
@@ -398,6 +398,17 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('floating-task:close', (_event, taskId?: string) => {
     closeFloatingWindow(taskId)
+  })
+
+  // Notification permission handlers
+  ipcMain.handle('notification:get-permission', (): NotificationPermissionStatus => {
+    return NotificationScheduler.getPermissionStatus()
+  })
+  ipcMain.handle('notification:request-permission', async (): Promise<NotificationPermissionStatus> => {
+    return NotificationScheduler.requestPermission()
+  })
+  ipcMain.handle('notification:open-settings', () => {
+    NotificationScheduler.openNotificationSettings()
   })
 
   // Timer states updates from renderer for tray display (supports multiple timers)

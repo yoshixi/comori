@@ -3,6 +3,7 @@ import { CalendarDays, ListTodo, Settings } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -11,12 +12,18 @@ import {
   SidebarMenuItem,
   SidebarTrigger
 } from './ui/sidebar'
+import { InProgressPanel } from './InProgressPanel'
+import type { Task, TaskTimer } from '../gen/api'
 
 type View = 'tasks' | 'calendar' | 'settings'
 
 interface AppSidebarProps {
   currentView: View
   onViewChange: (view: View) => void
+  activeTasks: Task[]
+  activeTimersByTaskId: Map<string, TaskTimer>
+  onStopTimer: (taskId: string, timerId: string) => void
+  onOpenTaskDetail: (task: Task) => void
 }
 
 const menuItems = [
@@ -25,7 +32,14 @@ const menuItems = [
   { id: 'settings' as const, label: 'Settings', icon: Settings }
 ]
 
-export function AppSidebar({ currentView, onViewChange }: AppSidebarProps): React.JSX.Element {
+export function AppSidebar({
+  currentView,
+  onViewChange,
+  activeTasks,
+  activeTimersByTaskId,
+  onStopTimer,
+  onOpenTaskDetail
+}: AppSidebarProps): React.JSX.Element {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex flex-row items-center justify-between p-4">
@@ -52,6 +66,14 @@ export function AppSidebar({ currentView, onViewChange }: AppSidebarProps): Reac
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-0 mt-auto">
+        <InProgressPanel
+          tasks={activeTasks}
+          activeTimersByTaskId={activeTimersByTaskId}
+          onStopTimer={onStopTimer}
+          onOpenTaskDetail={onOpenTaskDetail}
+        />
+      </SidebarFooter>
     </Sidebar>
   )
 }

@@ -1018,7 +1018,14 @@ function App(): React.JSX.Element {
         isAddingTask={isAddingTask}
         isEditing={!!editingCell}
       />
-      <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+      <AppSidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        activeTasks={activeTasks}
+        activeTimersByTaskId={activeTimersByTaskId}
+        onStopTimer={handleStopTimer}
+        onOpenTaskDetail={setSelectedTask}
+      />
       <SidebarInset>
         {currentView === 'settings' ? (
           <SettingsView />

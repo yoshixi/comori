@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clock4, Plus, Play, Square, CheckCircle, Maximize2, ArrowUpDown } from 'lucide-react'
+import { Plus, Play, Square, CheckCircle, Maximize2, ArrowUpDown } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
@@ -69,14 +69,18 @@ function matchesKeyBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
 
 // Keyboard shortcut handler component (must be inside SidebarProvider)
 function KeyboardShortcuts({
+  currentView,
   onNewTask,
+  onNewCalendarTask,
   onToggleTimer,
   onNavigateNext,
   onNavigatePrev,
   isAddingTask,
   isEditing
 }: {
+  currentView: View
   onNewTask: () => void
+  onNewCalendarTask: () => void
   onToggleTimer: () => void
   onNavigateNext: () => void
   onNavigatePrev: () => void
@@ -93,10 +97,12 @@ function KeyboardShortcuts({
         return
       }
 
-      // Command/Ctrl + N: New task
+      // Command/Ctrl + N: New task (behavior depends on current view)
       if (matchesKeyBinding(e, keyMaps.NEW_TASK)) {
         e.preventDefault()
-        if (!isAddingTask) {
+        if (currentView === 'calendar') {
+          onNewCalendarTask()
+        } else if (currentView === 'tasks' && !isAddingTask) {
           onNewTask()
         }
         return
@@ -135,13 +141,13 @@ function KeyboardShortcuts({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleSidebar, onNewTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
+  }, [toggleSidebar, currentView, onNewTask, onNewCalendarTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
 
   return null
 }
 
 function App(): React.JSX.Element {
-  const [currentView, setCurrentView] = useState<View>('tasks')
+  const [currentView, setCurrentView] = useState<View>('calendar')
   const [showCompleted, setShowCompleted] = useState(false)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
@@ -156,7 +162,7 @@ function App(): React.JSX.Element {
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
 
-  // Query for tasks with active timers (In Progress section)
+  // Query for tasks with active timers (filtered by current view settings)
   const activeTaskQuery = useMemo(
     () => ({
       completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
@@ -174,6 +180,21 @@ function App(): React.JSX.Element {
     mutate: mutateActiveTasks
   } = useGetApiTasks(activeTaskQuery)
   const activeTasks = activeTasksResponse?.tasks ?? []
+
+  // Query for ALL tasks with active timers (for sidebar - no filters applied)
+  const sidebarActiveTaskQuery = useMemo(
+    () => ({
+      hasActiveTimer: 'true' as const,
+      sortBy: 'startAt' as const,
+      order: 'asc' as const
+    }),
+    []
+  )
+  const {
+    data: sidebarActiveTasksResponse,
+    mutate: mutateSidebarActiveTasks
+  } = useGetApiTasks(sidebarActiveTaskQuery)
+  const sidebarActiveTasks = sidebarActiveTasksResponse?.tasks ?? []
 
   // Query for tasks without active timers (Tasks section)
   const inactiveTaskQuery = useMemo(
@@ -195,14 +216,21 @@ function App(): React.JSX.Element {
   const inactiveTasks = inactiveTasksResponse?.tasks ?? []
 
   // Combined tasks for operations that need to find a task
-  const allTasks = useMemo(() => [...activeTasks, ...inactiveTasks], [activeTasks, inactiveTasks])
+  const allTasks = useMemo(() => {
+    // Merge activeTasks, inactiveTasks, and sidebarActiveTasks, removing duplicates
+    const taskMap = new Map<string, Task>()
+    for (const task of [...activeTasks, ...inactiveTasks, ...sidebarActiveTasks]) {
+      taskMap.set(task.id, task)
+    }
+    return Array.from(taskMap.values())
+  }, [activeTasks, inactiveTasks, sidebarActiveTasks])
   const tasksLoading = activeTasksLoading || inactiveTasksLoading
   const tasksError = activeTasksError || inactiveTasksError
 
-  // Helper to mutate both task lists
+  // Helper to mutate all task lists
   const mutateBothTaskLists = useCallback(() => {
-    return Promise.all([mutateActiveTasks(), mutateInactiveTasks()])
-  }, [mutateActiveTasks, mutateInactiveTasks])
+    return Promise.all([mutateActiveTasks(), mutateInactiveTasks(), mutateSidebarActiveTasks()])
+  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks])
 
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [newTaskFields, setNewTaskFields] = useState({
@@ -320,6 +348,24 @@ function App(): React.JSX.Element {
     return unsubscribe
   }, [allTasks])
 
+  // Listen for timer events from system notifications
+  useEffect(() => {
+    const unsubscribeStart = window.api.onNotificationTimerStarted(() => {
+      // Refresh both task lists and timers when timer is started from notification
+      mutateBothTaskLists()
+      mutateTimers()
+    })
+    const unsubscribeStop = window.api.onNotificationTimerStopped(() => {
+      // Refresh both task lists and timers when timer is stopped from notification
+      mutateBothTaskLists()
+      mutateTimers()
+    })
+    return () => {
+      unsubscribeStart()
+      unsubscribeStop()
+    }
+  }, [mutateBothTaskLists, mutateTimers])
+
   // Helper to start adding a new task
   const startAddingTask = useCallback(() => {
     const now = new Date()
@@ -330,13 +376,28 @@ function App(): React.JSX.Element {
     setIsAddingTask(true)
   }, [filterTagIds])
 
+  // Helper to start adding a new task via calendar (opens dialog with current time)
+  const startAddingCalendarTask = useCallback(() => {
+    const now = new Date()
+    const endTime = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour later
+    const formatLocal = (date: Date): string =>
+      new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    setCalendarCreateError(null)
+    setCalendarDraft({
+      title: '',
+      description: '',
+      startAt: formatLocal(now),
+      endAt: formatLocal(endTime),
+      tagIds: filterTagIds
+    })
+  }, [filterTagIds])
+
   // Helper to toggle timer for a task
   const toggleTaskTimer = useCallback((task: Task) => {
     const activeTimer = activeTimersByTaskId.get(task.id)
     if (activeTimer) {
       // Stop the timer - move task from active to inactive list optimistically
       setCurrentTime(Date.now())
-      window.api.closeFloatingTaskWindow(task.id)
 
       // Optimistic update: move task from active to inactive list
       mutateActiveTasks(
@@ -376,7 +437,6 @@ function App(): React.JSX.Element {
     } else {
       // Start the timer - move task from inactive to active list optimistically
       setCurrentTime(Date.now())
-      window.api.openFloatingTaskWindow({ taskId: task.id, title: task.title })
 
       // Optimistic update: move task from inactive to active list
       mutateInactiveTasks(
@@ -530,11 +590,6 @@ function App(): React.JSX.Element {
     setIsAddingTask(false)
   }
 
-  function handleOpenFloatingWindow(taskId: string): void {
-    const task = allTasks.find(t => t.id === taskId)
-    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
-  }
-
   function handleStartEditing(taskId: string, field: 'title' | 'description' | 'startAt', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
@@ -644,7 +699,6 @@ function App(): React.JSX.Element {
 
     // UI first (optimistic) - move task from inactive to active
     setCurrentTime(Date.now())
-    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
 
     // Optimistic update: move task from inactive to active list
     mutateInactiveTasks(
@@ -691,7 +745,6 @@ function App(): React.JSX.Element {
 
     // UI first (optimistic) - move task from active to inactive
     setCurrentTime(Date.now())
-    window.api.closeFloatingTaskWindow(taskId)
 
     // Optimistic update: move task from active to inactive list
     mutateActiveTasks(
@@ -795,13 +848,6 @@ function App(): React.JSX.Element {
       >
         <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleOpenFloatingWindow(task.id)}
-              className="p-1 rounded hover:bg-muted transition-colors"
-              title="Open floating window"
-            >
-              <Clock4 className="h-4 w-4" />
-            </button>
             <span className="text-sm min-w-[3rem]">
               {getTotalTimeDisplay(task.id)}
             </span>
@@ -991,16 +1037,25 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <KeyboardShortcuts
+        currentView={currentView}
         onNewTask={startAddingTask}
+        onNewCalendarTask={startAddingCalendarTask}
         onToggleTimer={handleKeyboardToggleTimer}
         onNavigateNext={handleNavigateNext}
         onNavigatePrev={handleNavigatePrev}
         isAddingTask={isAddingTask}
         isEditing={!!editingCell}
       />
-      <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+      <AppSidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        activeTasks={sidebarActiveTasks}
+        activeTimersByTaskId={activeTimersByTaskId}
+        onStopTimer={handleStopTimer}
+        onOpenTaskDetail={setSelectedTask}
+      />
       <SidebarInset>
         {currentView === 'settings' ? (
           <SettingsView />
@@ -1081,45 +1136,7 @@ function App(): React.JSX.Element {
                 </div>
               )}
 
-              {/* In Progress Section */}
-              <Card className="shrink-0">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    In Progress
-                  </CardTitle>
-                  <CardDescription>
-                    {activeTasks.length} task{activeTasks.length === 1 ? '' : 's'} with timer running
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    {renderTableHeader()}
-                    <TableBody>
-                      {tasksLoading && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            Loading tasks...
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {!tasksLoading && activeTasks.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            No tasks in progress
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {!tasksLoading && activeTasks.map(renderTaskRow)}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-
-              {/* Upcoming Tasks Section */}
+              {/* Tasks Section */}
               <Card className="flex flex-col min-h-0 flex-1">
                 <CardHeader className="shrink-0">
                   <div className="flex items-center justify-between">
@@ -1308,19 +1325,22 @@ function App(): React.JSX.Element {
           }}
         >
           <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="text-lg font-semibold">New task</div>
-              {calendarDraft && (
-                <div className="text-sm text-muted-foreground">
-                  {`${formatDateTime(calendarDraft.startAt)} -> ${formatDateTime(calendarDraft.endAt)}`}
-                </div>
-              )}
-            </div>
+            <div className="text-lg font-semibold">New task</div>
             {calendarCreateError && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 {calendarCreateError}
               </div>
             )}
+            <Input
+              placeholder="Title"
+              value={calendarDraft?.title ?? ''}
+              onChange={(event) =>
+                setCalendarDraft((prev) =>
+                  prev ? { ...prev, title: event.target.value } : prev
+                )
+              }
+              autoFocus
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="calendar-start-at">Start time</Label>
@@ -1349,15 +1369,6 @@ function App(): React.JSX.Element {
                 />
               </div>
             </div>
-            <Input
-              placeholder="Title"
-              value={calendarDraft?.title ?? ''}
-              onChange={(event) =>
-                setCalendarDraft((prev) =>
-                  prev ? { ...prev, title: event.target.value } : prev
-                )
-              }
-            />
             <Textarea
               placeholder="Description"
               rows={3}

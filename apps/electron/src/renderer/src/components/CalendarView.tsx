@@ -1,70 +1,192 @@
-import React, { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Pencil, Play, Square, Trash2 } from 'lucide-react'
+/**
+ * CalendarView.tsx
+ *
+ * A day/week calendar timeline component for visualizing and managing scheduled tasks.
+ *
+ * Features:
+ * - Day and week view modes with navigation
+ * - Drag-to-create new time ranges on empty space
+ * - Drag-to-move existing tasks to different times/days
+ * - Drag-to-resize tasks from top or bottom edges
+ * - Zoom in/out with buttons or Cmd/Ctrl + scroll wheel
+ * - Dynamic slot granularity that adjusts based on zoom level
+ * - Current time indicator with auto-scroll on mount
+ * - Lane-based layout for overlapping tasks
+ */
+import React, { useMemo, useState, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Minus, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
 import type { Task, TaskTimer } from '../gen/api'
 
-const SLOT_MINUTES = 15
-const SLOTS_PER_HOUR = 60 / SLOT_MINUTES
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Total minutes in a day (24 hours * 60 minutes) */
 const MINUTES_PER_DAY = 24 * 60
-const SLOT_COUNT = MINUTES_PER_DAY / SLOT_MINUTES
+
+/** Default task duration when endAt is not specified */
 const DEFAULT_DURATION_MINUTES = 30
+
+/** Milliseconds in a day, used for date calculations */
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Start hour for the default visible window (6 AM) */
 const VISIBLE_START_HOUR = 6
-const VISIBLE_END_HOUR = 18
+
+/** End hour for the default visible window (12 PM / noon) */
+const VISIBLE_END_HOUR = 12
+
+/** Minimum slot height in pixels to ensure readability */
 const MIN_SLOT_HEIGHT_PX = 4
 
+/** Vertical offset to center hour labels with grid lines. See usage comment for details. */
+const HOUR_LABEL_VERTICAL_OFFSET = 6
+
+// ============================================================================
+// Zoom Configuration
+// ============================================================================
+
+/** Minimum zoom level (50% = zoomed out, shows more time in less space) */
+const MIN_ZOOM = 0.5
+
+/** Maximum zoom level (300% = zoomed in, shows less time in more detail) */
+const MAX_ZOOM = 3.0
+
+/** Increment/decrement step for zoom controls */
+const ZOOM_STEP = 0.25
+
+/** Default zoom level (100%) */
+const DEFAULT_ZOOM = 1.0
+
+/**
+ * Determines slot granularity (minutes per slot) based on zoom level.
+ * Lower zoom levels use coarser slots for better overview,
+ * higher zoom levels use finer slots for precise scheduling.
+ *
+ * @param zoom - Current zoom level (0.5 to 3.0)
+ * @returns Minutes per time slot (30, 15, 10, or 5)
+ */
+const getSlotMinutesForZoom = (zoom: number): number => {
+  if (zoom <= 0.75) return 30  // 30 min slots when zoomed out (overview)
+  if (zoom <= 1.5) return 15   // 15 min slots at default zoom
+  if (zoom <= 2.25) return 10  // 10 min slots when zoomed in
+  return 5                      // 5 min slots when fully zoomed in (precise)
+}
+
+/**
+ * Calculates slot configuration based on zoom level.
+ *
+ * @param zoom - Current zoom level
+ * @returns Object containing slotMinutes, slotsPerHour, and total slotCount
+ */
+const getSlotConfig = (zoom: number) => {
+  const slotMinutes = getSlotMinutesForZoom(zoom)
+  return {
+    slotMinutes,
+    slotsPerHour: 60 / slotMinutes,
+    slotCount: MINUTES_PER_DAY / slotMinutes
+  }
+}
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Calendar view mode: single day or full week */
 export type ViewMode = 'day' | 'week'
 
+/**
+ * Internal representation of a task positioned on the calendar grid.
+ * Contains layout information for rendering (lane assignment, slot positions).
+ */
 type TaskLayout = {
   task: Task
+  /** Which day column (0 for day view, 0-6 for week view) */
   dayIndex: number
+  /** Starting slot index (inclusive) */
   startSlot: number
+  /** Ending slot index (exclusive) */
   endSlot: number
+  /** Horizontal lane for overlapping tasks (0-based) */
   lane: number
+  /** Total number of lanes in this time range */
   laneCount: number
+  /** Parsed start date */
   startDate: Date
+  /** Parsed/computed end date */
   endDate: Date
 }
 
+/** Props for the CalendarView component */
 type CalendarViewProps = {
+  /** Array of tasks to display on the calendar */
   tasks: Task[]
+  /** Controlled view mode (day or week) */
   viewMode?: ViewMode
+  /** Callback when view mode changes */
   onViewModeChange?: (mode: ViewMode) => void
+  /** Callback when a task is clicked (for viewing details) */
   onTaskSelect?: (task: Task) => void
+  /** Callback when edit button is clicked on a task */
   onTaskEdit?: (task: Task) => void
+  /** Callback when delete button is clicked on a task */
   onTaskDelete?: (task: Task) => void
+  /** Callback when a task is dragged to a new time/day */
   onTaskMove?: (task: Task, range: { startAt: string; endAt: string }) => void
+  /** Map of task IDs to their active timers (for showing timer state) */
   activeTimersByTaskId?: Map<string, TaskTimer>
+  /** Callback to start a timer for a task */
   onTaskStartTimer?: (taskId: string) => void
+  /** Callback to stop a timer for a task */
   onTaskStopTimer?: (taskId: string, timerId: string) => void
+  /** Callback when user drags to create a new time range */
   onCreateRange?: (range: { startAt: string; endAt: string }) => void
+  /** Additional CSS classes */
   className?: string
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/** Clamps a value between min and max bounds */
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value))
 
+/** Returns midnight (00:00:00) of the given date */
 const startOfDay = (date: Date): Date =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate())
 
+/**
+ * Returns the Monday of the week containing the given date.
+ * Week starts on Monday (ISO week).
+ */
 const startOfWeek = (date: Date): Date => {
   const day = date.getDay()
-  const diff = (day + 6) % 7
+  const diff = (day + 6) % 7 // Days since Monday
   const start = new Date(date)
   start.setDate(start.getDate() - diff)
   return startOfDay(start)
 }
 
+/** Adds (or subtracts) days from a date */
 const addDays = (date: Date, days: number): Date => {
   const next = new Date(date)
   next.setDate(next.getDate() + days)
   return next
 }
 
+// ============================================================================
+// Formatting Functions
+// ============================================================================
+
+/** Formats a date as "Mon, Jan 1" for day column headers */
 const formatDayLabel = (date: Date): string =>
   date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 
+/** Formats a week range as "Jan 1 - Jan 7" for week view header */
 const formatWeekLabel = (start: Date): string => {
   const end = addDays(start, 6)
   const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
@@ -72,11 +194,17 @@ const formatWeekLabel = (start: Date): string => {
   return `${startLabel} - ${endLabel}`
 }
 
+/** Formats an hour as "09:00" for the time gutter */
 const formatHourLabel = (hour: number): string => `${String(hour).padStart(2, '0')}:00`
 
+/** Formats a time range as "09:00 - 10:30" for task display */
 const formatTimeRange = (start: Date, end: Date): string =>
   `${start.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`
 
+/**
+ * Computes the end date for a task.
+ * If endAt is provided and valid, uses that; otherwise defaults to start + DEFAULT_DURATION_MINUTES.
+ */
 const computeTaskEnd = (start: Date, endAt?: string | null): Date => {
   if (endAt) {
     const parsed = new Date(endAt)
@@ -85,42 +213,79 @@ const computeTaskEnd = (start: Date, endAt?: string | null): Date => {
   return new Date(start.getTime() + DEFAULT_DURATION_MINUTES * 60 * 1000)
 }
 
+// ============================================================================
+// Grid Calculation Functions
+// ============================================================================
+
+/**
+ * Converts a mouse event Y position to a slot index within a day column.
+ *
+ * @param event - The mouse event
+ * @param column - The day column DOM element
+ * @param slotHeight - Height of each slot in pixels
+ * @param slotCount - Total number of slots in a day
+ * @returns The slot index (0 to slotCount-1)
+ */
 const getSlotIndexFromEvent = (
   event: MouseEvent,
   column: HTMLDivElement,
-  slotHeight: number
+  slotHeight: number,
+  slotCount: number
 ): number => {
   const rect = column.getBoundingClientRect()
   const offset = event.clientY - rect.top
   const clamped = clamp(offset, 0, rect.height - 1)
-  return clamp(Math.floor(clamped / slotHeight), 0, SLOT_COUNT - 1)
+  return clamp(Math.floor(clamped / slotHeight), 0, slotCount - 1)
 }
 
-const dateForSlot = (baseDate: Date, slot: number): Date => {
-  const minutes = slot * SLOT_MINUTES
+/**
+ * Converts a slot index to a Date object.
+ *
+ * @param baseDate - The midnight date of the day
+ * @param slot - The slot index
+ * @param slotMinutes - Minutes per slot
+ * @returns Date object at the start of that slot
+ */
+const dateForSlot = (baseDate: Date, slot: number, slotMinutes: number): Date => {
+  const minutes = slot * slotMinutes
   const result = new Date(baseDate)
   result.setMinutes(minutes, 0, 0)
   return result
 }
 
+/**
+ * Assigns horizontal lanes to overlapping tasks using a greedy algorithm.
+ * Tasks are sorted by start time, then assigned to the first available lane
+ * that doesn't overlap with their time range.
+ *
+ * @param tasks - Array of TaskLayout items to assign lanes to
+ * @returns The same tasks with lane and laneCount properties populated
+ */
 const assignLanes = (tasks: TaskLayout[]): TaskLayout[] => {
+  // Track the end slot of the last task in each lane
   const lanesEnd: number[] = []
+
+  // Sort by start time (then by end time for same start)
   const sorted = [...tasks].sort((a, b) => {
     if (a.startSlot === b.startSlot) return a.endSlot - b.endSlot
     return a.startSlot - b.startSlot
   })
 
   sorted.forEach((item) => {
+    // Find first lane where this task fits (no overlap)
     let laneIndex = lanesEnd.findIndex((endSlot) => item.startSlot >= endSlot)
     if (laneIndex === -1) {
+      // No available lane, create a new one
       laneIndex = lanesEnd.length
       lanesEnd.push(item.endSlot)
     } else {
+      // Reuse this lane and update its end slot
       lanesEnd[laneIndex] = item.endSlot
     }
     item.lane = laneIndex
   })
 
+  // Set laneCount on all items so they know how wide to render
   const laneCount = Math.max(lanesEnd.length, 1)
   return sorted.map((item) => ({ ...item, laneCount }))
 }
@@ -153,6 +318,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onCreateRange,
   className
 }) => {
+  // ==========================================================================
+  // State: View Mode (controlled or uncontrolled)
+  // ==========================================================================
   const [internalViewMode, setInternalViewMode] = useState<ViewMode>('day')
   const viewMode = viewModeProp ?? internalViewMode
   const handleViewModeChange = React.useCallback(
@@ -164,21 +332,50 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     },
     [onViewModeChange, viewModeProp]
   )
+
+  // ==========================================================================
+  // State: Navigation & Time
+  // ==========================================================================
+  /** The reference date for the current view (start of day for day view, used for week calculation) */
   const [anchorDate, setAnchorDate] = useState<Date>(() => startOfDay(new Date()))
+  /** Current time, updated every minute for the "now" indicator */
   const [now, setNow] = useState<Date>(() => new Date())
-  const [slotHeight, setSlotHeight] = useState<number>(6)
+
+  // ==========================================================================
+  // State: Zoom & Slot Configuration
+  // ==========================================================================
+  /** Current zoom level (0.5 to 3.0) */
+  const [zoomLevel, setZoomLevel] = useState<number>(DEFAULT_ZOOM)
+  /** Base slot height before zoom is applied (calculated from container height) */
+  const [baseSlotHeight, setBaseSlotHeight] = useState<number>(15)
+  /** Actual slot height in pixels (baseSlotHeight * zoomLevel) */
+  const slotHeight = Math.max(MIN_SLOT_HEIGHT_PX, Math.round(baseSlotHeight * zoomLevel))
+
+  /** Slot configuration derived from zoom level (slotMinutes, slotsPerHour, slotCount) */
+  const slotConfig = useMemo(() => getSlotConfig(zoomLevel), [zoomLevel])
+  const { slotMinutes, slotsPerHour, slotCount } = slotConfig
+
+  // ==========================================================================
+  // State: Drag Operations
+  // ==========================================================================
+  /** Active drag-to-create selection (creating new task time range) */
   const [dragSelection, setDragSelection] = useState<{
     dayIndex: number
     startSlot: number
     endSlot: number
   } | null>(null)
+
+  /** Active drag-to-move operation (moving existing task) */
   const [dragTask, setDragTask] = useState<{
     task: Task
     dayIndex: number
     durationSlots: number
+    /** Offset from pointer to task start, for smooth dragging */
     offsetSlots: number
     startSlot: number
   } | null>(null)
+
+  /** Active drag-to-resize operation */
   const [dragResize, setDragResize] = useState<{
     task: Task
     dayIndex: number
@@ -186,15 +383,73 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     endSlot: number
     edge: 'top' | 'bottom'
   } | null>(null)
+
+  /** Flag to distinguish click from drag-end on tasks */
   const [didDragTask, setDidDragTask] = useState(false)
+
+  // ==========================================================================
+  // Refs
+  // ==========================================================================
+  /** Reference to the current day column being interacted with */
   const activeColumnRef = React.useRef<HTMLDivElement | null>(null)
+  /** Reference to the scrollable container for auto-scroll and wheel zoom */
   const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
 
+  // ==========================================================================
+  // Zoom Handlers
+  // ==========================================================================
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP))
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(MIN_ZOOM, prev - ZOOM_STEP))
+  }, [])
+
+  // ==========================================================================
+  // Effect: Cmd/Ctrl + Scroll Wheel Zoom
+  // ==========================================================================
+  React.useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const handleWheel = (event: WheelEvent): void => {
+      // Only zoom when Cmd (Mac) or Ctrl (Windows/Linux) is pressed
+      if (!event.metaKey && !event.ctrlKey) return
+
+      event.preventDefault()
+
+      // Determine zoom direction based on scroll
+      if (event.deltaY < 0) {
+        // Scroll up = zoom in
+        setZoomLevel((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP))
+      } else if (event.deltaY > 0) {
+        // Scroll down = zoom out
+        setZoomLevel((prev) => Math.max(MIN_ZOOM, prev - ZOOM_STEP))
+      }
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheel)
+  }, [])
+
+  // ==========================================================================
+  // Derived Values: Date Calculations
+  // ==========================================================================
   const dayStart = useMemo(() => startOfDay(anchorDate), [anchorDate])
   const weekStart = useMemo(() => startOfWeek(anchorDate), [anchorDate])
+  /** Base date for the current view (day start or week start) */
   const activeBase = viewMode === 'day' ? dayStart : weekStart
+  /** Number of day columns to render (1 for day view, 7 for week view) */
   const dayCount = viewMode === 'day' ? 1 : 7
 
+  // ==========================================================================
+  // Memoized: Task Layout Calculation
+  // ==========================================================================
+  /**
+   * Processes tasks into layout items grouped by day.
+   * Calculates slot positions, handles overlaps via lane assignment.
+   */
   const { scheduledByDay } = useMemo(() => {
     const scheduledMap = new Map<number, TaskLayout[]>()
 
@@ -217,13 +472,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const startMinutes = startDate.getHours() * 60 + startDate.getMinutes()
       let endDate = endDateRaw
       if (endDate <= startDate) {
-        endDate = new Date(startDate.getTime() + SLOT_MINUTES * 60 * 1000)
+        endDate = new Date(startDate.getTime() + slotMinutes * 60 * 1000)
       }
       const endMinutesRaw = endDate.getHours() * 60 + endDate.getMinutes()
       const endMinutes = clamp(endMinutesRaw, 0, MINUTES_PER_DAY)
 
-      const startSlot = clamp(Math.floor(startMinutes / SLOT_MINUTES), 0, SLOT_COUNT - 1)
-      const endSlot = clamp(Math.ceil(endMinutes / SLOT_MINUTES), startSlot + 1, SLOT_COUNT)
+      const startSlot = clamp(Math.floor(startMinutes / slotMinutes), 0, slotCount - 1)
+      const endSlot = clamp(Math.ceil(endMinutes / slotMinutes), startSlot + 1, slotCount)
 
       const entry: TaskLayout = {
         task,
@@ -247,14 +502,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     })
 
     return { scheduledByDay: finalized }
-  }, [tasks, activeBase, dayCount])
+  }, [tasks, activeBase, dayCount, slotMinutes, slotCount])
 
+  // ==========================================================================
+  // Effect: Drag-to-Create (New Task Time Range)
+  // ==========================================================================
   React.useEffect(() => {
     if (!dragSelection) return undefined
 
     const handleMouseMove = (event: MouseEvent): void => {
       if (!activeColumnRef.current) return
-      const endSlot = getSlotIndexFromEvent(event, activeColumnRef.current, slotHeight)
+      const endSlot = getSlotIndexFromEvent(event, activeColumnRef.current, slotHeight, slotCount)
       setDragSelection((prev) =>
         prev ? { ...prev, endSlot } : prev
       )
@@ -265,8 +523,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const { dayIndex, startSlot, endSlot } = dragSelection
       const [minSlot, maxSlot] = startSlot <= endSlot ? [startSlot, endSlot] : [endSlot, startSlot]
       const baseDate = addDays(activeBase, viewMode === 'day' ? 0 : dayIndex)
-      const startDate = dateForSlot(baseDate, minSlot)
-      const endDate = dateForSlot(baseDate, maxSlot + 1)
+      const startDate = dateForSlot(baseDate, minSlot, slotMinutes)
+      const endDate = dateForSlot(baseDate, maxSlot + 1, slotMinutes)
       onCreateRange?.({ startAt: startDate.toISOString(), endAt: endDate.toISOString() })
       setDragSelection(null)
       activeColumnRef.current = null
@@ -279,8 +537,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [dragSelection, activeBase, viewMode, onCreateRange])
+  }, [dragSelection, activeBase, viewMode, onCreateRange, slotHeight, slotCount, slotMinutes])
 
+  // ==========================================================================
+  // Effect: Drag-to-Move (Existing Task)
+  // ==========================================================================
   React.useEffect(() => {
     if (!dragTask) return undefined
 
@@ -291,19 +552,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       activeColumnRef.current = column
       setDidDragTask(true)
       const dayIndex = Number(column.dataset.dayIndex ?? 0)
-      const rawSlot = getSlotIndexFromEvent(event, column, slotHeight)
+      const rawSlot = getSlotIndexFromEvent(event, column, slotHeight, slotCount)
       const clampedStart = clamp(
         rawSlot - dragTask.offsetSlots,
         0,
-        SLOT_COUNT - dragTask.durationSlots
+        slotCount - dragTask.durationSlots
       )
       setDragTask((prev) =>
         prev
           ? {
-              ...prev,
-              dayIndex,
-              startSlot: clampedStart
-            }
+            ...prev,
+            dayIndex,
+            startSlot: clampedStart
+          }
           : prev
       )
     }
@@ -311,8 +572,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const handleMouseUp = (): void => {
       if (!dragTask) return
       const baseDate = addDays(activeBase, viewMode === 'day' ? 0 : dragTask.dayIndex)
-      const startDate = dateForSlot(baseDate, dragTask.startSlot)
-      const endDate = dateForSlot(baseDate, dragTask.startSlot + dragTask.durationSlots)
+      const startDate = dateForSlot(baseDate, dragTask.startSlot, slotMinutes)
+      const endDate = dateForSlot(baseDate, dragTask.startSlot + dragTask.durationSlots, slotMinutes)
       onTaskMove?.(dragTask.task, {
         startAt: startDate.toISOString(),
         endAt: endDate.toISOString()
@@ -328,9 +589,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [dragTask, activeBase, viewMode, onTaskMove])
+  }, [dragTask, activeBase, viewMode, onTaskMove, slotHeight, slotCount, slotMinutes])
 
-  // Effect for drag-to-resize task
+  // ==========================================================================
+  // Effect: Drag-to-Resize (Task Top/Bottom Edge)
+  // ==========================================================================
   React.useEffect(() => {
     if (!dragResize) return undefined
 
@@ -339,7 +602,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const column = hit?.closest('[data-day-index]') as HTMLDivElement | null
       if (!column) return
 
-      const pointerSlot = getSlotIndexFromEvent(event, column, slotHeight)
+      const pointerSlot = getSlotIndexFromEvent(event, column, slotHeight, slotCount)
 
       setDragResize((prev) => {
         if (!prev) return prev
@@ -351,7 +614,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         } else {
           // Dragging bottom edge - adjust endSlot, keep startSlot fixed
           // endSlot is exclusive, so pointerSlot + 1 makes the task cover that slot
-          const newEndSlot = clamp(pointerSlot + 1, prev.startSlot + 1, SLOT_COUNT)
+          const newEndSlot = clamp(pointerSlot + 1, prev.startSlot + 1, slotCount)
           return { ...prev, endSlot: newEndSlot }
         }
       })
@@ -360,8 +623,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const handleMouseUp = (): void => {
       if (!dragResize) return
       const baseDate = addDays(activeBase, viewMode === 'day' ? 0 : dragResize.dayIndex)
-      const startDate = dateForSlot(baseDate, dragResize.startSlot)
-      const endDate = dateForSlot(baseDate, dragResize.endSlot)
+      const startDate = dateForSlot(baseDate, dragResize.startSlot, slotMinutes)
+      const endDate = dateForSlot(baseDate, dragResize.endSlot, slotMinutes)
       onTaskMove?.(dragResize.task, {
         startAt: startDate.toISOString(),
         endAt: endDate.toISOString()
@@ -376,36 +639,63 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       window.removeEventListener('mousemove', handleMouseMove)
       window.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [dragResize, activeBase, viewMode, onTaskMove, slotHeight])
+  }, [dragResize, activeBase, viewMode, onTaskMove, slotHeight, slotCount, slotMinutes])
 
-  React.useEffect(() => {
-    if (!scrollContainerRef.current) return
-    const targetTop = VISIBLE_START_HOUR * SLOTS_PER_HOUR * slotHeight
-    scrollContainerRef.current.scrollTop = targetTop
-  }, [viewMode, slotHeight])
-
+  // ==========================================================================
+  // Effect: Auto-Scroll to Current Time
+  // Centers the current time in the viewport on mount and when view changes.
+  // Does not re-scroll on every minute update to avoid disrupting user scroll.
+  // ==========================================================================
   React.useEffect(() => {
     if (!scrollContainerRef.current) return
     const container = scrollContainerRef.current
-    const visibleSlots = (VISIBLE_END_HOUR - VISIBLE_START_HOUR) * SLOTS_PER_HOUR
+    const containerHeight = container.clientHeight
+    const totalContentHeight = slotCount * slotHeight
 
-    // Slot height is derived from the scroll container height so the visible window
-    // (06:00-18:00) fills the available space without leaving empty gaps.
-    const updateSlotHeight = () => {
+    // Calculate current time position (use fresh Date for accurate time)
+    const currentTime = new Date()
+    const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes()
+    const currentTimeTop = (currentMinutes / slotMinutes) * slotHeight
+
+    // Try to center current time in viewport
+    let targetScrollTop = currentTimeTop - containerHeight / 2
+
+    // Clamp to valid scroll range (no whitespace at bottom)
+    const maxScrollTop = Math.max(0, totalContentHeight - containerHeight)
+    targetScrollTop = clamp(targetScrollTop, 0, maxScrollTop)
+
+    container.scrollTop = targetScrollTop
+  }, [viewMode, slotHeight, slotCount, slotMinutes])
+
+  // ==========================================================================
+  // Effect: Calculate Base Slot Height from Container Size
+  // Ensures the visible time window (VISIBLE_START_HOUR to VISIBLE_END_HOUR)
+  // fills the container at 100% zoom. Responds to container resizes.
+  // ==========================================================================
+  React.useEffect(() => {
+    if (!scrollContainerRef.current) return
+    const container = scrollContainerRef.current
+    const defaultConfig = getSlotConfig(DEFAULT_ZOOM)
+    const visibleSlots = (VISIBLE_END_HOUR - VISIBLE_START_HOUR) * defaultConfig.slotsPerHour
+
+    const updateBaseSlotHeight = () => {
       const nextHeight = Math.max(
         MIN_SLOT_HEIGHT_PX,
         Math.floor(container.clientHeight / visibleSlots)
       )
-      setSlotHeight(nextHeight)
+      setBaseSlotHeight(nextHeight)
     }
 
-    updateSlotHeight()
+    updateBaseSlotHeight()
 
-    const observer = new ResizeObserver(updateSlotHeight)
+    const observer = new ResizeObserver(updateBaseSlotHeight)
     observer.observe(container)
     return () => observer.disconnect()
   }, [])
 
+  // ==========================================================================
+  // Effect: Update Current Time Every Minute
+  // ==========================================================================
   React.useEffect(() => {
     const interval = window.setInterval(() => {
       setNow(new Date())
@@ -413,24 +703,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return () => window.clearInterval(interval)
   }, [])
 
+  // ==========================================================================
+  // Event Handlers
+  // ==========================================================================
+
+  /**
+   * Handles mousedown on empty space in a day column.
+   * Initiates drag-to-create mode for new task time ranges.
+   */
   const handleColumnMouseDown = (
     event: React.MouseEvent<HTMLDivElement>,
     dayIndex: number
   ): void => {
+    // Ignore if clicking on a task block
     if ((event.target as HTMLElement).closest('[data-task-block="true"]')) {
       return
     }
     event.preventDefault()
     const column = event.currentTarget
     activeColumnRef.current = column
-    const startSlot = getSlotIndexFromEvent(event.nativeEvent, column, slotHeight)
+    const startSlot = getSlotIndexFromEvent(event.nativeEvent, column, slotHeight, slotCount)
     setDragSelection({ dayIndex, startSlot, endSlot: startSlot })
   }
 
+  /**
+   * Handles mousedown on a task block.
+   * Initiates drag-to-move mode (unless clicking an action button).
+   */
   const handleTaskMouseDown = (
     event: React.MouseEvent<HTMLButtonElement>,
     item: TaskLayout
   ): void => {
+    // Ignore if clicking on action buttons (play, edit, delete)
     if ((event.target as HTMLElement).closest('[data-task-action="true"]')) {
       return
     }
@@ -439,17 +743,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     const column = event.currentTarget.closest('[data-day-index]') as HTMLDivElement | null
     if (!column) return
     activeColumnRef.current = column
-    const slotAtPointer = getSlotIndexFromEvent(event.nativeEvent, column, slotHeight)
+    const slotAtPointer = getSlotIndexFromEvent(event.nativeEvent, column, slotHeight, slotCount)
     const durationSlots = Math.max(1, item.endSlot - item.startSlot)
     setDragTask({
       task: item.task,
       dayIndex: item.dayIndex,
       durationSlots,
+      // Calculate offset so task doesn't jump to pointer position
       offsetSlots: clamp(slotAtPointer - item.startSlot, 0, durationSlots - 1),
       startSlot: item.startSlot
     })
   }
 
+  /**
+   * Handles mousedown on task resize handles (top or bottom edge).
+   * Initiates drag-to-resize mode.
+   */
   const handleResizeMouseDown = (
     event: React.MouseEvent<HTMLDivElement>,
     item: TaskLayout,
@@ -457,7 +766,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   ): void => {
     event.preventDefault()
     event.stopPropagation()
-    setDidDragTask(true)
+    setDidDragTask(true) // Prevent click handler from firing
     setDragResize({
       task: item.task,
       dayIndex: item.dayIndex,
@@ -467,12 +776,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     })
   }
 
+  // ==========================================================================
+  // Render Helpers
+  // ==========================================================================
+  /** Column header labels for each day */
   const dayLabels = viewMode === 'day'
     ? [formatDayLabel(dayStart)]
     : Array.from({ length: 7 }, (_, index) => formatDayLabel(addDays(weekStart, index)))
 
-  const totalHeight = SLOT_COUNT * slotHeight
+  /** Total height of the time grid in pixels */
+  const totalHeight = slotCount * slotHeight
 
+  // ==========================================================================
+  // Render
+  // ==========================================================================
   return (
     <div className={cn('flex h-full min-h-0 flex-col gap-4', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -513,6 +830,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             : formatWeekLabel(weekStart)}
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 mr-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleZoomOut}
+              disabled={zoomLevel <= MIN_ZOOM}
+              title="Zoom out (Cmd/Ctrl + Scroll)"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-muted-foreground w-12 text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleZoomIn}
+              disabled={zoomLevel >= MAX_ZOOM}
+              title="Zoom in (Cmd/Ctrl + Scroll)"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             size="sm"
             variant={viewMode === 'day' ? 'default' : 'outline'}
@@ -545,11 +885,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div ref={scrollContainerRef} className="flex min-h-0 flex-1 overflow-y-auto">
           <div className="w-12 flex-shrink-0">
             <div className="relative" style={{ height: totalHeight }}>
+              {/* Hour labels (00:00, 01:00, etc.)
+                  Note: HOUR_LABEL_VERTICAL_OFFSET centers the label with the hour line.
+                  If you change text-[10px], update HOUR_LABEL_VERTICAL_OFFSET accordingly
+                  (should be ~half the line height). */}
               {Array.from({ length: 24 }, (_, hour) => (
                 <div
                   key={hour}
                   className="absolute left-2 text-[10px] text-muted-foreground"
-                  style={{ top: hour * SLOTS_PER_HOUR * slotHeight - 6 }}
+                  style={{ top: hour * slotsPerHour * slotHeight - HOUR_LABEL_VERTICAL_OFFSET }}
                 >
                   {formatHourLabel(hour)}
                 </div>
@@ -573,9 +917,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 startOfDay(dayDate).getTime() === startOfDay(now).getTime()
               const nowMinutes = now.getHours() * 60 + now.getMinutes()
               const nowTop = clamp(
-                Math.round(nowMinutes / SLOT_MINUTES) * slotHeight,
+                Math.round(nowMinutes / slotMinutes) * slotHeight,
                 0,
-                SLOT_COUNT * slotHeight
+                slotCount * slotHeight
               )
 
               return (
@@ -589,7 +933,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <div
                       key={`hour-${dayIndex}-${hour}`}
                       className="absolute left-0 right-0 border-t border-muted-foreground/20"
-                      style={{ top: hour * SLOTS_PER_HOUR * slotHeight }}
+                      style={{ top: hour * slotsPerHour * slotHeight }}
                     />
                   ))}
                   {selection && (

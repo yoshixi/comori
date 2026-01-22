@@ -21,7 +21,11 @@
       "Bash(gh api:*)",
       "Bash(grep:*)",
       "Bash(sips:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git push:*)"
     ]
   }
 }

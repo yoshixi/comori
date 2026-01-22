@@ -141,15 +141,25 @@ export class TrayManager {
     }
 
     if (process.platform === 'darwin') {
-      // macOS: Show timer count in menu bar title
+      // macOS: Show task name and elapsed time in menu bar
+      // Sort by most recent start time first
+      const sortedTimers = [...this.activeTimers].sort((a, b) => {
+        return new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+      })
+      const mostRecentTimer = sortedTimers[0]
+      const elapsed = this.calculateElapsed(mostRecentTimer.startTime)
+      const timeString = this.formatElapsedShort(elapsed)
+      const truncatedTitle = this.truncateTitle(mostRecentTimer.taskTitle, 10)
+
       if (count === 1) {
-        this.tray.setTitle(' 1 timer')
+        this.tray.setTitle(` ${truncatedTitle}: ${timeString}`)
       } else {
-        this.tray.setTitle(` ${count} timers`)
+        // Show most recent task + indicator of additional timers
+        this.tray.setTitle(` ${truncatedTitle}: ${timeString} (+${count - 1})`)
       }
     }
 
-    // Tooltip: show count and first task
+    // Tooltip: show full details
     if (count === 1) {
       const timer = this.activeTimers[0]
       const elapsed = this.calculateElapsed(timer.startTime)
@@ -183,6 +193,19 @@ export class TrayManager {
       return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
     }
     return `${m}:${s.toString().padStart(2, '0')}`
+  }
+
+  private formatElapsedShort(seconds: number): string {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+
+    // Always show mm:ss format for menu bar
+    if (h > 0) {
+      const totalMinutes = h * 60 + m
+      return `${totalMinutes.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    }
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   private truncateTitle(title: string, maxLength: number): string {

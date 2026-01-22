@@ -1037,7 +1037,7 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <KeyboardShortcuts
         currentView={currentView}
         onNewTask={startAddingTask}

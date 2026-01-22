@@ -1325,19 +1325,22 @@ function App(): React.JSX.Element {
           }}
         >
           <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="text-lg font-semibold">New task</div>
-              {calendarDraft && (
-                <div className="text-sm text-muted-foreground">
-                  {`${formatDateTime(calendarDraft.startAt)} -> ${formatDateTime(calendarDraft.endAt)}`}
-                </div>
-              )}
-            </div>
+            <div className="text-lg font-semibold">New task</div>
             {calendarCreateError && (
               <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 {calendarCreateError}
               </div>
             )}
+            <Input
+              placeholder="Title"
+              value={calendarDraft?.title ?? ''}
+              onChange={(event) =>
+                setCalendarDraft((prev) =>
+                  prev ? { ...prev, title: event.target.value } : prev
+                )
+              }
+              autoFocus
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="calendar-start-at">Start time</Label>
@@ -1366,15 +1369,6 @@ function App(): React.JSX.Element {
                 />
               </div>
             </div>
-            <Input
-              placeholder="Title"
-              value={calendarDraft?.title ?? ''}
-              onChange={(event) =>
-                setCalendarDraft((prev) =>
-                  prev ? { ...prev, title: event.target.value } : prev
-                )
-              }
-            />
             <Textarea
               placeholder="Description"
               rows={3}

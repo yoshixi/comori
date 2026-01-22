@@ -23,7 +23,9 @@
       "Bash(sips:*)",
       "WebSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git push:*)"
     ]
   }
 }

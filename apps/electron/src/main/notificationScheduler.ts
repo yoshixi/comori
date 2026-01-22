@@ -1,4 +1,5 @@
-import { Notification, shell } from 'electron'
+import { Notification, shell, systemPreferences } from 'electron'
+import { spawn } from 'child_process'
 
 const API_URL = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
 const POLL_INTERVAL_MS = 30 * 1000 // Poll every 30 seconds
@@ -62,16 +63,43 @@ export class NotificationScheduler {
 
   /**
    * Get current notification permission status
-   * Note: Electron doesn't provide a direct way to check macOS notification permission status
-   * We assume 'granted' if notifications are supported, user can check system settings if needed
+   * On macOS, uses systemPreferences to get actual OS-level permission
+   * On other platforms, falls back to checking if notifications are supported
    */
   static getPermissionStatus(): NotificationPermissionStatus {
     if (!Notification.isSupported()) {
       return 'denied'
     }
 
-    // Electron doesn't expose notification permission status directly
-    // We return 'granted' if supported and let user manage via system settings
+    // On macOS, check actual notification authorization status
+    if (process.platform === 'darwin') {
+      // getNotificationSettings() is available in Electron 24+
+      // Type assertion needed as TypeScript types may not include this method
+      const getNotificationSettings = (
+        systemPreferences as unknown as {
+          getNotificationSettings?: () => { authorizationStatus: number }
+        }
+      ).getNotificationSettings
+
+      if (getNotificationSettings) {
+        const settings = getNotificationSettings()
+        // authorizationStatus: 0 = notDetermined, 1 = denied, 2 = authorized, 3 = provisional
+        switch (settings.authorizationStatus) {
+          case 0:
+            return 'not-determined'
+          case 1:
+            return 'denied'
+          case 2:
+          case 3: // provisional is treated as granted
+            return 'granted'
+          default:
+            return 'not-determined'
+        }
+      }
+    }
+
+    // On Windows and Linux, assume granted if supported
+    // (these platforms don't have the same permission model)
     return 'granted'
   }
 
@@ -111,8 +139,13 @@ export class NotificationScheduler {
       // Open Windows notification settings
       shell.openExternal('ms-settings:notifications')
     } else {
-      // Linux - try to open GNOME settings
-      shell.openExternal('gnome-control-center notifications')
+      // Linux - spawn gnome-control-center directly (not a URL, so can't use openExternal)
+      // Try GNOME settings first, fall back silently if not available
+      const child = spawn('gnome-control-center', ['notifications'], {
+        detached: true,
+        stdio: 'ignore'
+      })
+      child.unref()
     }
   }
 

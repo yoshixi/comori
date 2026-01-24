@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Play, Square, CheckCircle, Maximize2, ArrowUpDown } from 'lucide-react'
+import { Plus, Play, Square, CheckCircle, Maximize2, ArrowUpDown, CalendarDays } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
@@ -40,8 +40,9 @@ import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { Dialog, DialogContent } from './components/ui/dialog'
-import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
+import { formatDateTimeInput, normalizeDueDate, normalizeDateTime, getTodayRange, formatTimeRangeShort } from './lib/time'
 import { CalendarView, type ViewMode } from './components/CalendarView'
+import { TaskTimeRangePicker } from './components/TaskTimeRangePicker'
 
 type View = 'tasks' | 'calendar' | 'settings'
 
@@ -149,7 +150,7 @@ function KeyboardShortcuts({
 function App(): React.JSX.Element {
   const [currentView, setCurrentView] = useState<View>('calendar')
   const [showCompleted, setShowCompleted] = useState(false)
-  const [showUnscheduled, setShowUnscheduled] = useState(true)
+  const [showTodayOnly, setShowTodayOnly] = useState(true)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
   const [calendarViewMode, setCalendarViewMode] = useState<ViewMode>('day')
@@ -163,17 +164,39 @@ function App(): React.JSX.Element {
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
 
+  // Calculate today's date range for "Today" filter
+  const todayRange = useMemo(() => getTodayRange(), [])
+
   // Query for tasks with active timers (filtered by current view settings)
   const activeTaskQuery = useMemo(
-    () => ({
-      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
-      hasActiveTimer: 'true' as const,
-      scheduled: currentView === 'calendar' ? undefined : (showUnscheduled ? undefined : ('true' as const)),
-      sortBy,
-      order: 'asc' as const,
-      tags: filterTagIds.length ? filterTagIds : undefined
-    }),
-    [showCompleted, showUnscheduled, sortBy, filterTagIds, currentView]
+    () => {
+      // For calendar view, don't apply date/scheduled filters
+      if (currentView === 'calendar') {
+        return {
+          completed: undefined,
+          hasActiveTimer: 'true' as const,
+          scheduled: undefined,
+          startAtFrom: undefined,
+          startAtTo: undefined,
+          sortBy,
+          order: 'asc' as const,
+          tags: filterTagIds.length ? filterTagIds : undefined
+        }
+      }
+
+      // For tasks view: showTodayOnly filter shows today's tasks OR unscheduled
+      return {
+        completed: showCompleted ? undefined : ('false' as const),
+        hasActiveTimer: 'true' as const,
+        scheduled: showTodayOnly ? ('false' as const) : undefined,
+        startAtFrom: showTodayOnly ? todayRange.startAt : undefined,
+        startAtTo: showTodayOnly ? todayRange.endAt : undefined,
+        sortBy,
+        order: 'asc' as const,
+        tags: filterTagIds.length ? filterTagIds : undefined
+      }
+    },
+    [showCompleted, showTodayOnly, sortBy, filterTagIds, currentView, todayRange]
   )
   const {
     data: activeTasksResponse,
@@ -200,15 +223,34 @@ function App(): React.JSX.Element {
 
   // Query for tasks without active timers (Tasks section)
   const inactiveTaskQuery = useMemo(
-    () => ({
-      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
-      hasActiveTimer: 'false' as const,
-      scheduled: currentView === 'calendar' ? undefined : (showUnscheduled ? undefined : ('true' as const)),
-      sortBy,
-      order: 'asc' as const,
-      tags: filterTagIds.length ? filterTagIds : undefined
-    }),
-    [showCompleted, showUnscheduled, sortBy, filterTagIds, currentView]
+    () => {
+      // For calendar view, don't apply date/scheduled filters
+      if (currentView === 'calendar') {
+        return {
+          completed: undefined,
+          hasActiveTimer: 'false' as const,
+          scheduled: undefined,
+          startAtFrom: undefined,
+          startAtTo: undefined,
+          sortBy,
+          order: 'asc' as const,
+          tags: filterTagIds.length ? filterTagIds : undefined
+        }
+      }
+
+      // For tasks view: showTodayOnly filter shows today's tasks OR unscheduled
+      return {
+        completed: showCompleted ? undefined : ('false' as const),
+        hasActiveTimer: 'false' as const,
+        scheduled: showTodayOnly ? ('false' as const) : undefined,
+        startAtFrom: showTodayOnly ? todayRange.startAt : undefined,
+        startAtTo: showTodayOnly ? todayRange.endAt : undefined,
+        sortBy,
+        order: 'asc' as const,
+        tags: filterTagIds.length ? filterTagIds : undefined
+      }
+    },
+    [showCompleted, showTodayOnly, sortBy, filterTagIds, currentView, todayRange]
   )
   const {
     data: inactiveTasksResponse,
@@ -245,9 +287,11 @@ function App(): React.JSX.Element {
   })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
-  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' | 'startAt' } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [editingTagsTaskId, setEditingTagsTaskId] = useState<string | null>(null)
+  const [scheduleEditingTask, setScheduleEditingTask] = useState<Task | null>(null)
+  const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false)
 
   const [currentTime, setCurrentTime] = useState(Date.now())
   const taskIds = useMemo(() => allTasks.map((task) => task.id), [allTasks])
@@ -590,7 +634,7 @@ function App(): React.JSX.Element {
     setIsAddingTask(false)
   }
 
-  function handleStartEditing(taskId: string, field: 'title' | 'description' | 'startAt', currentValue: string): void {
+  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
   }
@@ -606,14 +650,7 @@ function App(): React.JSX.Element {
     const task = allTasks.find(t => t.id === editingCell.taskId)
     if (!task) return
 
-    let updateValue: string | null | undefined
-    if (editingCell.field === 'startAt') {
-      // Use null to clear the field, undefined means "don't update"
-      updateValue = editingValue ? normalizeDateTime(editingValue) : null
-    } else {
-      updateValue = editingValue.trim()
-    }
-
+    const updateValue = editingValue.trim()
     const fieldToUpdate = editingCell.field
     const taskIdToUpdate = editingCell.taskId
 
@@ -630,6 +667,22 @@ function App(): React.JSX.Element {
         console.error('Failed to update task:', error)
         // Could show a toast notification here to inform user of failure
       })
+  }
+
+  async function handleSaveSchedule(taskId: string, startAt: string | null, endAt: string | null): Promise<void> {
+    try {
+      await putApiTasksId(taskId, {
+        startAt: startAt ? normalizeDateTime(startAt) : null,
+        endAt: endAt ? normalizeDateTime(endAt) : null
+      })
+      // Update the local task state to reflect the change immediately
+      if (scheduleEditingTask && scheduleEditingTask.id === taskId) {
+        setScheduleEditingTask({ ...scheduleEditingTask, startAt, endAt })
+      }
+      await mutateBothTaskLists()
+    } catch (error) {
+      console.error('Failed to update schedule:', error)
+    }
   }
 
   const handleCalendarMoveTask = async (
@@ -900,46 +953,95 @@ function App(): React.JSX.Element {
             </Button>
           </div>
         </TableCell>
-        <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
+        <TableCell
+          onClick={() => {
+            setSelectedTask(task)
+            setEditingTagsTaskId(null)
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
+          }}
+        >
           <span className="text-sm">
             {getTotalTimeDisplay(task.id)}
           </span>
         </TableCell>
         <TableCell
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'startAt', formatDateTimeInput(task.startAt))
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
-          {editingCell?.taskId === task.id && editingCell?.field === 'startAt' ? (
-            <Input
-              type="datetime-local"
-              value={editingValue}
-              onChange={(e) => setEditingValue(e.target.value)}
-              onBlur={handleSaveEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSaveEdit()
-                } else if (e.key === 'Escape') {
-                  handleCancelEditing()
-                }
-              }}
-              autoFocus
-              className="h-8"
-            />
+          {scheduleEditingTask?.id === task.id ? (
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-wrap items-center gap-1">
+                <Input
+                  type="datetime-local"
+                  value={formatDateTimeInput(scheduleEditingTask.startAt)}
+                  onChange={(e) => {
+                    const newStartAt = e.target.value || null
+                    setScheduleEditingTask({ ...scheduleEditingTask, startAt: newStartAt })
+                    handleSaveSchedule(task.id, newStartAt, scheduleEditingTask.endAt ?? null)
+                  }}
+                  className="h-7 text-xs w-[140px]"
+                />
+                <span className="text-muted-foreground">-</span>
+                <Input
+                  type="datetime-local"
+                  value={formatDateTimeInput(scheduleEditingTask.endAt)}
+                  onChange={(e) => {
+                    const newEndAt = e.target.value || null
+                    setScheduleEditingTask({ ...scheduleEditingTask, endAt: newEndAt })
+                    handleSaveSchedule(task.id, scheduleEditingTask.startAt ?? null, newEndAt)
+                  }}
+                  className="h-7 text-xs w-[140px]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsSchedulePickerOpen(true)}
+                  aria-label="Open schedule picker"
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setScheduleEditingTask(null)
+                    setIsSchedulePickerOpen(false)
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
           ) : (
-            <span className="cursor-text hover:underline">
-              {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
-            </span>
+            <div
+              className="cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 inline-block text-sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                setScheduleEditingTask(task)
+                setIsSchedulePickerOpen(false)
+              }}
+            >
+              {formatTimeRangeShort(task.startAt, task.endAt)}
+            </div>
           )}
         </TableCell>
         <TableCell
           className="font-medium"
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'title', task.title)
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
           {editingCell?.taskId === task.id && editingCell?.field === 'title' ? (
@@ -947,6 +1049,7 @@ function App(): React.JSX.Element {
               value={editingValue}
               onChange={(e) => setEditingValue(e.target.value)}
               onBlur={handleSaveEdit}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSaveEdit()
@@ -958,15 +1061,25 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
+            <div
+              className={`cursor-text hover:bg-muted/50 rounded px-1 -mx-1 inline-block ${isCompleted ? 'line-through' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                handleStartEditing(task.id, 'title', task.title)
+              }}
+            >
+              {task.title || 'Untitled'}
+            </div>
           )}
         </TableCell>
         <TableCell
           className="max-w-xs"
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'description', task.description || '')
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
           {editingCell?.taskId === task.id && editingCell?.field === 'description' ? (
@@ -974,6 +1087,7 @@ function App(): React.JSX.Element {
               value={editingValue}
               onChange={(e) => setEditingValue(e.target.value)}
               onBlur={handleSaveEdit}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSaveEdit()
@@ -985,7 +1099,16 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
+            <div
+              className="cursor-text hover:bg-muted/50 rounded px-1 -mx-1 truncate"
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                handleStartEditing(task.id, 'description', task.description || '')
+              }}
+            >
+              {task.description || '-'}
+            </div>
           )}
         </TableCell>
         <TableCell
@@ -1171,14 +1294,14 @@ function App(): React.JSX.Element {
                         />
                       </div>
 
-                      <div className="flex items-center justify-between w-[150px] h-8 rounded-md border border-input px-3">
-                        <Label htmlFor="show-unscheduled" className="text-sm cursor-pointer">
-                          Unscheduled
+                      <div className="flex items-center justify-between w-[130px] h-8 rounded-md border border-input px-3">
+                        <Label htmlFor="show-today-only" className="text-sm cursor-pointer">
+                          Today
                         </Label>
                         <Switch
-                          id="show-unscheduled"
-                          checked={showUnscheduled}
-                          onCheckedChange={setShowUnscheduled}
+                          id="show-today-only"
+                          checked={showTodayOnly}
+                          onCheckedChange={setShowTodayOnly}
                           className="scale-75"
                         />
                       </div>
@@ -1449,6 +1572,40 @@ function App(): React.JSX.Element {
               tasks={allTasks}
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isSchedulePickerOpen && Boolean(scheduleEditingTask)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsSchedulePickerOpen(false)
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl w-[95vw]">
+          {scheduleEditingTask && (
+            <div className="space-y-4">
+              <div className="text-lg font-semibold">Schedule</div>
+              <TaskTimeRangePicker
+                startAt={scheduleEditingTask.startAt}
+                endAt={scheduleEditingTask.endAt}
+                tasks={allTasks}
+                currentTaskId={scheduleEditingTask.id}
+                onChange={({ startAt, endAt }) => {
+                  setScheduleEditingTask({ ...scheduleEditingTask, startAt, endAt })
+                  handleSaveSchedule(scheduleEditingTask.id, startAt, endAt)
+                }}
+              />
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSchedulePickerOpen(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </SidebarProvider>

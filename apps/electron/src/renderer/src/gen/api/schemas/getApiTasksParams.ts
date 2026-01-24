@@ -21,9 +21,17 @@ export type GetApiTasksParams = {
    */
   hasActiveTimer?: GetApiTasksHasActiveTimer
   /**
-   * Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks
+   * Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks. When false is combined with startAtFrom/startAtTo, uses OR logic: shows tasks in the date range OR unscheduled tasks
    */
   scheduled?: GetApiTasksScheduled
+  /**
+   * Filter tasks with startAt >= this timestamp (inclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks
+   */
+  startAtFrom?: string
+  /**
+   * Filter tasks with startAt < this timestamp (exclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks
+   */
+  startAtTo?: string
   /**
    * Sort tasks by field (createdAt, startAt, or dueDate)
    */

@@ -78,3 +78,65 @@ export function normalizeDateTime(value?: string | null): string | undefined {
   if (Number.isNaN(parsed.getTime())) return undefined
   return parsed.toISOString()
 }
+
+/**
+ * Get today's date range in user's timezone
+ * @returns Object with startAt (start of today) and endAt (start of tomorrow) as ISO strings
+ */
+export function getTodayRange(): { startAt: string; endAt: string } {
+  const now = new Date()
+  // Start of today in local timezone
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  // Start of tomorrow in local timezone
+  const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+
+  return {
+    startAt: startOfToday.toISOString(),
+    endAt: startOfTomorrow.toISOString()
+  }
+}
+
+/**
+ * Format a time range in a short, compact format
+ * @param startAt Start time as ISO string
+ * @param endAt End time as ISO string
+ * @returns Formatted string like "Jan 15, 2:30-3:30 PM" or "Jan 15 2:30 PM - Jan 16 3:30 PM"
+ */
+export function formatTimeRangeShort(startAt?: string | null, endAt?: string | null): string {
+  if (!startAt) return 'No schedule'
+
+  const start = new Date(startAt)
+  if (Number.isNaN(start.getTime())) return 'Invalid date'
+
+  const formatTime = (date: Date): string => {
+    return date.toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+  }
+
+  const formatDateShort = (date: Date): string => {
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  if (!endAt) {
+    return `${formatDateShort(start)} ${formatTime(start)}`
+  }
+
+  const end = new Date(endAt)
+  if (Number.isNaN(end.getTime())) {
+    return `${formatDateShort(start)} ${formatTime(start)}`
+  }
+
+  // Check if same day
+  const sameDay = start.toDateString() === end.toDateString()
+
+  if (sameDay) {
+    return `${formatDateShort(start)} ${formatTime(start)}-${formatTime(end)}`
+  } else {
+    return `${formatDateShort(start)} ${formatTime(start)} - ${formatDateShort(end)} ${formatTime(end)}`
+  }
+}

@@ -139,8 +139,16 @@ export const TaskQueryParamsModel = z.object({
     example: true
   }),
   scheduled: BooleanQueryParam.optional().openapi({
-    description: 'Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks',
+    description: 'Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks. When false is combined with startAtFrom/startAtTo, uses OR logic: shows tasks in the date range OR unscheduled tasks',
     example: true
+  }),
+  startAtFrom: z.iso.datetime().optional().openapi({
+    description: 'Filter tasks with startAt >= this timestamp (inclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks',
+    example: '2024-01-01T00:00:00.000Z'
+  }),
+  startAtTo: z.iso.datetime().optional().openapi({
+    description: 'Filter tasks with startAt < this timestamp (exclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks',
+    example: '2024-01-02T00:00:00.000Z'
   }),
   sortBy: z.enum(['createdAt', 'startAt', 'dueDate']).optional().openapi({
     description: 'Sort tasks by field (createdAt, startAt, or dueDate)',

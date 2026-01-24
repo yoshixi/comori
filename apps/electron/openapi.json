@@ -718,12 +718,36 @@
                 "true",
                 "false"
               ],
-              "description": "Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks",
+              "description": "Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks. When false is combined with startAtFrom/startAtTo, uses OR logic: shows tasks in the date range OR unscheduled tasks",
               "example": true
             },
             "required": false,
-            "description": "Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks",
+            "description": "Filter tasks by whether they have a scheduled start time (startAt). true = only scheduled tasks, false = only unscheduled tasks. When false is combined with startAtFrom/startAtTo, uses OR logic: shows tasks in the date range OR unscheduled tasks",
             "name": "scheduled",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Filter tasks with startAt >= this timestamp (inclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks",
+              "example": "2024-01-01T00:00:00.000Z"
+            },
+            "required": false,
+            "description": "Filter tasks with startAt >= this timestamp (inclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks",
+            "name": "startAtFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Filter tasks with startAt < this timestamp (exclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks",
+              "example": "2024-01-02T00:00:00.000Z"
+            },
+            "required": false,
+            "description": "Filter tasks with startAt < this timestamp (exclusive). When combined with scheduled=false, uses OR logic to also include unscheduled tasks",
+            "name": "startAtTo",
             "in": "query"
           },
           {

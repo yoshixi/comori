@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, inArray, isNull, notInArray, exists, notExists, sql } from 'drizzle-orm'
+import { eq, and, desc, asc, inArray, isNull, notInArray, exists, notExists, sql, or, gte, lt, type SQL } from 'drizzle-orm'
 import { tasksTable, usersTable, taskTagsTable, tagsTable, taskTimersTable, type InsertTask, type SelectTask, type SelectUser, type InsertTaskTag } from '../db/schema/schema'
 import { createId, type DB } from './common.db'
 import { formatTimestamp, parseISOToUnixTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
@@ -160,6 +160,8 @@ type TaskFilterOptions = {
   completed?: boolean
   hasActiveTimer?: boolean
   scheduled?: boolean
+  startAtFrom?: string
+  startAtTo?: string
   sortBy?: 'createdAt' | 'startAt' | 'dueDate'
   order?: 'asc' | 'desc'
   tags?: string[]
@@ -233,13 +235,53 @@ export async function getAllTasks(db: DB, userId: string, filters?: TaskFilterOp
     }
   }
 
-  // Apply scheduled filter (whether task has a startAt time)
+  // Apply scheduled filter with OR condition support for date ranges
+  const hasDateFilters = filters?.startAtFrom || filters?.startAtTo
+
   if (filters?.scheduled === true) {
     // Only include tasks that have a scheduled start time
     baseConditions.push(sql`${tasksTable.startAt} IS NOT NULL`)
+
+    // Apply date filters as AND conditions
+    if (filters?.startAtFrom) {
+      baseConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+    }
+    if (filters?.startAtTo) {
+      baseConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+    }
   } else if (filters?.scheduled === false) {
-    // Only include tasks that do NOT have a scheduled start time
-    baseConditions.push(isNull(tasksTable.startAt))
+    // When combined with date filters, use OR condition:
+    // Show tasks in the date range OR unscheduled tasks
+    if (hasDateFilters) {
+      const orConditions: SQL[] = []
+
+      // Unscheduled condition
+      orConditions.push(isNull(tasksTable.startAt))
+
+      // Date range condition (for scheduled tasks)
+      const dateConditions: SQL[] = []
+      dateConditions.push(sql`${tasksTable.startAt} IS NOT NULL`)
+      if (filters.startAtFrom) {
+        dateConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+      }
+      if (filters.startAtTo) {
+        dateConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+      }
+      orConditions.push(and(...dateConditions)!)
+
+      baseConditions.push(or(...orConditions)!)
+    } else {
+      // No date filters, just show unscheduled tasks
+      baseConditions.push(isNull(tasksTable.startAt))
+    }
+  } else {
+    // No scheduled filter specified, apply date filters as AND conditions
+    if (filters?.startAtFrom) {
+      baseConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+    }
+    if (filters?.startAtTo) {
+      baseConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+    }
   }
 
   // Execute query with all conditions

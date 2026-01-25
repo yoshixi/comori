@@ -1,11 +1,60 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+// Timer state type (supports multiple timers)
+interface TimerState {
+  timerId: string
+  taskId: string
+  taskTitle: string
+  startTime: string
+}
+
+// Notification permission status type
+type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
+
 // Custom APIs for renderer
 const api = {
-  openFloatingTaskWindow: (payload: { taskId: string; title?: string }) =>
-    ipcRenderer.invoke('floating-task:open', payload),
-  closeFloatingTaskWindow: (taskId: string) => ipcRenderer.invoke('floating-task:close', taskId)
+  // Update all active timer states for tray display
+  updateTimerStates: (timers: TimerState[]): void => {
+    ipcRenderer.send('timer:states-change', timers)
+  },
+  // Listen for show task detail request from tray menu (receives taskId)
+  onShowTaskDetail: (callback: (taskId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+      callback(taskId)
+    }
+    ipcRenderer.on('tray:show-task-detail', handler)
+    return () => {
+      ipcRenderer.removeListener('tray:show-task-detail', handler)
+    }
+  },
+  // Listen for timer started from notification action
+  onNotificationTimerStarted: (callback: (taskId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+      callback(taskId)
+    }
+    ipcRenderer.on('notification:timer-started', handler)
+    return () => {
+      ipcRenderer.removeListener('notification:timer-started', handler)
+    }
+  },
+  // Listen for timer stopped from notification action
+  onNotificationTimerStopped: (callback: (taskId: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+      callback(taskId)
+    }
+    ipcRenderer.on('notification:timer-stopped', handler)
+    return () => {
+      ipcRenderer.removeListener('notification:timer-stopped', handler)
+    }
+  },
+  // Notification permission APIs
+  getNotificationPermission: (): Promise<NotificationPermissionStatus> =>
+    ipcRenderer.invoke('notification:get-permission'),
+  requestNotificationPermission: (): Promise<NotificationPermissionStatus> =>
+    ipcRenderer.invoke('notification:request-permission'),
+  openNotificationSettings: (): Promise<void> =>
+    ipcRenderer.invoke('notification:open-settings')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

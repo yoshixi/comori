@@ -21,6 +21,15 @@
       "Bash(gh api:*)",
       "Bash(tree:*)",
       "Bash(pnpm --filter mobile add:*)",
+      "Bash(grep:*)",
+      "Bash(sips:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git push:*)",
+      "Bash(pnpm --filter electron list:*)",
+      "Bash(pnpm --filter electron exec npm view:*)",
+      "Bash(git restore:*)",
       "WebSearch",
       "WebFetch(domain:github.com)"
     ]

@@ -1,8 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain, screen, session } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, session, Menu, globalShortcut } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/logo@2x.png?asset'
+import { TrayManager } from './tray'
+import { NotificationScheduler, type NotificationPermissionStatus } from './notificationScheduler'
 
 function setupContentSecurityPolicy(): void {
   const apiUrl = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
@@ -62,154 +64,110 @@ function resolvePreloadPath(): string {
 }
 
 let mainWindow: BrowserWindow | null = null
-const floatingWindows = new Map<string, BrowserWindow>()
+let trayManager: TrayManager | null = null
+let notificationScheduler: NotificationScheduler | null = null
 
-function resolveRendererUrl(query?: Record<string, string>): string | null {
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    const url = new URL(process.env['ELECTRON_RENDERER_URL'])
-    if (query) {
-      Object.entries(query).forEach(([key, value]) => url.searchParams.set(key, value))
+function createApplicationMenu(): void {
+  const isMac = process.platform === 'darwin'
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App menu (macOS only)
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
+      : []),
+    // Edit menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac
+          ? [
+              { role: 'pasteAndMatchStyle' as const },
+              { role: 'delete' as const },
+              { role: 'selectAll' as const }
+            ]
+          : [{ role: 'delete' as const }, { type: 'separator' as const }, { role: 'selectAll' as const }])
+      ]
+    },
+    // View menu with zoom controls
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        {
+          label: 'Actual Size',
+          accelerator: 'CmdOrCtrl+0',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              focusedWindow.webContents.setZoomLevel(0)
+            }
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+=',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const currentZoom = focusedWindow.webContents.getZoomLevel()
+              focusedWindow.webContents.setZoomLevel(currentZoom + 0.5)
+            }
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CommandOrControl+-',
+          click: (): void => {
+            const focusedWindow = BrowserWindow.getFocusedWindow()
+            if (focusedWindow) {
+              const currentZoom = focusedWindow.webContents.getZoomLevel()
+              focusedWindow.webContents.setZoomLevel(currentZoom - 0.5)
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    // Window menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac
+          ? [{ type: 'separator' as const }, { role: 'front' as const }, { type: 'separator' as const }, { role: 'window' as const }]
+          : [{ role: 'close' as const }])
+      ]
     }
-    return url.toString()
-  }
-  return null
-}
+  ]
 
-function createFloatingWindow(taskId: string, title?: string): void {
-  // WORKAROUND Layer 0: Pre-check before creating floating window
-  // Ensure main window is visible before we do anything that might hide it
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (!mainWindow.isVisible()) {
-      mainWindow.show()
-    }
-  }
-
-  const existing = floatingWindows.get(taskId)
-  const query: Record<string, string> = { floating: '1', taskId }
-  if (title) {
-    query.title = title
-  }
-
-  if (existing && !existing.isDestroyed()) {
-    const url = resolveRendererUrl(query)
-    if (url) {
-      existing.loadURL(url)
-    } else {
-      existing.loadFile(join(__dirname, '../renderer/index.html'), { query })
-    }
-    existing.showInactive()
-    return
-  }
-
-  const windowWidth = 360
-  const windowHeight = 120
-  const margin = 20
-  const verticalSpacing = 10
-
-  // Get the primary display dimensions
-  const primaryDisplay = screen.getPrimaryDisplay()
-  const { width: screenWidth } = primaryDisplay.workAreaSize
-
-  // Calculate top-right position
-  let x = screenWidth - windowWidth - margin
-  let y = margin
-
-  // Stack windows vertically if others exist
-  const existingWindows = Array.from(floatingWindows.values()).filter((w) => !w.isDestroyed())
-  if (existingWindows.length > 0) {
-    // Position below the last window
-    const lastWindow = existingWindows[existingWindows.length - 1]
-    const [, lastY] = lastWindow.getPosition()
-    const [, lastHeight] = lastWindow.getSize()
-    y = lastY + lastHeight + verticalSpacing
-  }
-
-  const floatingWindow = new BrowserWindow({
-    width: windowWidth,
-    height: windowHeight,
-    x,
-    y,
-    resizable: true,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    frame: false,
-    transparent: true,
-    webPreferences: {
-      preload: resolvePreloadPath(),
-      sandbox: false
-    }
-  })
-
-  floatingWindow.setAlwaysOnTop(true, 'floating', 1)
-  floatingWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-
-  // WORKAROUND: Event-based protection
-  // When floating window gains focus, ensure main window stays visible
-  // This catches cases where user interaction with floating window hides main window
-  floatingWindow.on('focus', () => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      mainWindow.show()
-    }
-  })
-
-  floatingWindow.on('closed', () => {
-    floatingWindows.delete(taskId)
-  })
-
-  floatingWindows.set(taskId, floatingWindow)
-
-  // Load content and show without stealing focus
-  const url = resolveRendererUrl(query)
-  if (url) {
-    floatingWindow.loadURL(url)
-  } else {
-    floatingWindow.loadFile(join(__dirname, '../renderer/index.html'), { query })
-  }
-
-  // Show window without activating it (prevents stealing focus from main window)
-  floatingWindow.showInactive()
-
-  // ===================================================================================
-  // WORKAROUND: Prevent main window from hiding when floating window opens
-  // ===================================================================================
-  // On macOS, showing a floating window with skipTaskbar:true and alwaysOnTop:true
-  // can cause the main window to hide unexpectedly, making the app disappear from
-  // Cmd+Tab. The exact cause is unclear but appears to be related to macOS window
-  // management and focus handling.
-  //
-  // We use a multi-layer approach to ensure the main window stays visible:
-  //
-  // Layer 1: Synchronous - Immediately after showInactive()
-  //   Catches cases where the hide happens synchronously
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.show()
-  }
-
-  // Layer 2: Next event loop tick - Using setImmediate()
-  //   Catches cases where the hide is triggered asynchronously
-  setImmediate(() => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      mainWindow.show()
-    }
-  })
-  // ===================================================================================
-}
-
-function closeFloatingWindow(taskId?: string): void {
-  if (!taskId) {
-    floatingWindows.forEach((window) => {
-      if (!window.isDestroyed()) window.close()
-    })
-    floatingWindows.clear()
-    return
-  }
-  const window = floatingWindows.get(taskId)
-  if (window && !window.isDestroyed()) {
-    window.close()
-  }
+  const menu = Menu.buildFromTemplate(template)
+  Menu.setApplicationMenu(menu)
 }
 
 function createWindow(): void {
@@ -230,23 +188,8 @@ function createWindow(): void {
     mainWindow?.show()
   })
 
-  // WORKAROUND: Main window hide event protection
-  // If main window receives a hide event while floating windows exist,
-  // immediately restore it. This is the last line of defense against
-  // unexpected hiding caused by macOS window management.
-  mainWindow.on('hide', () => {
-    if (floatingWindows.size > 0 && mainWindow && !mainWindow.isDestroyed()) {
-      setImmediate(() => {
-        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-          mainWindow.show()
-        }
-      })
-    }
-  })
-
   mainWindow.on('closed', () => {
     mainWindow = null
-    closeFloatingWindow()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -273,6 +216,9 @@ app.whenReady().then(() => {
   // Setup CSP based on environment configuration
   setupContentSecurityPolicy()
 
+  // Setup application menu with standard shortcuts (zoom, edit, etc.)
+  createApplicationMenu()
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -282,15 +228,67 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
-  ipcMain.handle('floating-task:open', (_event, payload: { taskId: string; title?: string }) => {
-    if (!payload?.taskId) return
-    createFloatingWindow(payload.taskId, payload.title)
+
+  // Notification permission handlers
+  ipcMain.handle('notification:get-permission', (): NotificationPermissionStatus => {
+    return NotificationScheduler.getPermissionStatus()
   })
-  ipcMain.handle('floating-task:close', (_event, taskId?: string) => {
-    closeFloatingWindow(taskId)
+  ipcMain.handle('notification:request-permission', async (): Promise<NotificationPermissionStatus> => {
+    return NotificationScheduler.requestPermission()
+  })
+  ipcMain.handle('notification:open-settings', () => {
+    NotificationScheduler.openNotificationSettings()
   })
 
+  // Timer states updates from renderer for tray display (supports multiple timers)
+  ipcMain.on(
+    'timer:states-change',
+    (
+      _event,
+      timers: { timerId: string; taskId: string; taskTitle: string; startTime: string }[]
+    ) => {
+      trayManager?.updateTimerStates(timers)
+    }
+  )
+
   createWindow()
+
+  // Register global shortcuts for zoom (fallback for keyboard layouts where menu accelerators don't work)
+  globalShortcut.register('CommandOrControl+-', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow()
+    if (focusedWindow) {
+      const currentZoom = focusedWindow.webContents.getZoomLevel()
+      focusedWindow.webContents.setZoomLevel(currentZoom - 0.5)
+    }
+  })
+
+  // Initialize tray after window is created
+  trayManager = new TrayManager(() => mainWindow)
+  trayManager.init()
+
+  // Wire up show task detail callback - opens task modal in renderer
+  trayManager.setOnShowTaskDetail((taskId: string) => {
+    mainWindow?.webContents.send('tray:show-task-detail', taskId)
+  })
+
+  // Initialize notification scheduler for task reminders
+  notificationScheduler = new NotificationScheduler()
+  notificationScheduler.setHandlers({
+    onStartTimer: (taskId: string) => {
+      // Notify renderer to refresh timers
+      mainWindow?.webContents.send('notification:timer-started', taskId)
+    },
+    onStopTimer: (taskId: string) => {
+      // Notify renderer to refresh timers
+      mainWindow?.webContents.send('notification:timer-stopped', taskId)
+    },
+    onShowTask: (taskId: string) => {
+      // Show the main window and open task detail
+      mainWindow?.show()
+      mainWindow?.webContents.send('tray:show-task-detail', taskId)
+    }
+  })
+  notificationScheduler.start()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -306,6 +304,15 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Cleanup tray, shortcuts, and notification scheduler before quitting
+app.on('before-quit', () => {
+  globalShortcut.unregisterAll()
+  notificationScheduler?.stop()
+  notificationScheduler = null
+  trayManager?.destroy()
+  trayManager = null
 })
 
 // In this file you can include the rest of your app's specific main process

@@ -18,6 +18,8 @@ interface TaskSideMenuProps {
   task: Task | null
   onClose: () => void
   onTaskUpdated?: (task: Task) => void
+  /** All tasks to display in the schedule picker */
+  tasks?: Task[]
 }
 
 // Helper to check if editable fields have changed
@@ -34,7 +36,8 @@ function hasEditableChanges(current: Task | null, saved: Task | null): boolean {
 export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
   task,
   onClose,
-  onTaskUpdated
+  onTaskUpdated,
+  tasks
 }) => {
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const scheduleContainerRef = useRef<HTMLDivElement | null>(null)
@@ -104,8 +107,9 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
       await putApiTasksId(taskToSave.id, {
         title: taskToSave.title?.trim(),
         description: taskToSave.description?.trim(),
-        startAt: normalizeDateTime(taskToSave.startAt ?? ''),
-        endAt: normalizeDateTime(taskToSave.endAt ?? '')
+        // Use null to clear the field when empty, undefined means "don't update"
+        startAt: taskToSave.startAt ? normalizeDateTime(taskToSave.startAt) : null,
+        endAt: taskToSave.endAt ? normalizeDateTime(taskToSave.endAt) : null
       })
       // Update the last saved reference after successful save
       lastSavedTaskRef.current = taskToSave
@@ -167,23 +171,20 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
 
   if (!task) return null
 
-  const handleTimerStarted = (): void => {
-    window.api?.openFloatingTaskWindow?.({ taskId: task.id, title: task.title })
-  }
-
-  const handleTimerStopped = (): void => {
-    window.api?.closeFloatingTaskWindow?.(task.id)
-  }
-
   const handleToggleCompletion = async (): Promise<void> => {
     if (!currentTask) return
     setIsCompleting(true)
     try {
+      const isCompletingTask = !currentTask.completedAt
       const response = await putApiTasksId(currentTask.id, {
         completedAt: currentTask.completedAt ? null : new Date().toISOString()
       })
       setLocalTask(response.task)
       onTaskUpdated?.(response.task)
+      // Close the detail view when completing a task
+      if (isCompletingTask) {
+        onClose()
+      }
     } catch (error) {
       console.error('Failed to update completion status:', error)
     } finally {
@@ -224,8 +225,6 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
               <TimerManager
                 taskId={task.id}
                 mode="compact"
-                onTimerStarted={handleTimerStarted}
-                onTimerStopped={handleTimerStopped}
                 onActivityRecorded={() => activitiesQuery.mutate?.()}
                 isCompleted={isCompleted}
                 onToggleCompletion={handleToggleCompletion}
@@ -281,11 +280,12 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
                     <TaskTimeRangePicker
                       startAt={localTask?.startAt}
                       endAt={localTask?.endAt}
+                      tasks={tasks}
+                      currentTaskId={task?.id}
                       onChange={({ startAt, endAt }) => {
                         setLocalTask((prev) =>
                           prev ? { ...prev, startAt, endAt } : prev
                         )
-                        setIsScheduleOpen(false)
                       }}
                     />
                   </div>
@@ -330,6 +330,7 @@ export const TaskSideMenu: React.FC<TaskSideMenuProps> = ({
             activities={activitiesQuery.data?.activities}
             isLoading={activitiesQuery.isLoading}
             error={activitiesQuery.error}
+            onTimerUpdated={() => activitiesQuery.mutate?.()}
           />
         </section>
 

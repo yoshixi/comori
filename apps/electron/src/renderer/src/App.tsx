@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clock4, Plus, Play, Square, CheckCircle, Maximize2 } from 'lucide-react'
+import { Plus, Play, Square, CheckCircle, Maximize2, ArrowUpDown, CalendarDays } from 'lucide-react'
 
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
@@ -16,6 +16,13 @@ import {
 } from './components/ui/table'
 import { Switch } from './components/ui/switch'
 import { Badge } from './components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from './components/ui/select'
 import { TagCombobox } from './components/TagCombobox'
 import {
   deleteApiTasksId,
@@ -33,8 +40,9 @@ import { AppSidebar } from './components/Sidebar'
 import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { Dialog, DialogContent } from './components/ui/dialog'
-import { formatDateTime, formatDateTimeInput, normalizeDueDate, normalizeDateTime } from './lib/time'
-import { CalendarView } from './components/CalendarView'
+import { formatDateTimeInput, normalizeDueDate, normalizeDateTime, getTodayRange, formatTimeRangeShort } from './lib/time'
+import { CalendarView, type ViewMode } from './components/CalendarView'
+import { TaskTimeRangePicker } from './components/TaskTimeRangePicker'
 
 type View = 'tasks' | 'calendar' | 'settings'
 
@@ -62,14 +70,18 @@ function matchesKeyBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
 
 // Keyboard shortcut handler component (must be inside SidebarProvider)
 function KeyboardShortcuts({
+  currentView,
   onNewTask,
+  onNewCalendarTask,
   onToggleTimer,
   onNavigateNext,
   onNavigatePrev,
   isAddingTask,
   isEditing
 }: {
+  currentView: View
   onNewTask: () => void
+  onNewCalendarTask: () => void
   onToggleTimer: () => void
   onNavigateNext: () => void
   onNavigatePrev: () => void
@@ -86,10 +98,12 @@ function KeyboardShortcuts({
         return
       }
 
-      // Command/Ctrl + N: New task
+      // Command/Ctrl + N: New task (behavior depends on current view)
       if (matchesKeyBinding(e, keyMaps.NEW_TASK)) {
         e.preventDefault()
-        if (!isAddingTask) {
+        if (currentView === 'calendar') {
+          onNewCalendarTask()
+        } else if (currentView === 'tasks' && !isAddingTask) {
           onNewTask()
         }
         return
@@ -128,16 +142,18 @@ function KeyboardShortcuts({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleSidebar, onNewTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
+  }, [toggleSidebar, currentView, onNewTask, onNewCalendarTask, onToggleTimer, onNavigateNext, onNavigatePrev, isAddingTask, isEditing])
 
   return null
 }
 
 function App(): React.JSX.Element {
-  const [currentView, setCurrentView] = useState<View>('tasks')
+  const [currentView, setCurrentView] = useState<View>('calendar')
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showTodayOnly, setShowTodayOnly] = useState(true)
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
+  const [calendarViewMode, setCalendarViewMode] = useState<ViewMode>('day')
   const [calendarDraft, setCalendarDraft] = useState<{
     title: string
     description: string
@@ -146,17 +162,41 @@ function App(): React.JSX.Element {
     tagIds: string[]
   } | null>(null)
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
+  const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
 
-  // Query for tasks with active timers (In Progress section)
+  // Calculate today's date range for "Today" filter
+  const todayRange = useMemo(() => getTodayRange(), [])
+
+  // Query for tasks with active timers (filtered by current view settings)
   const activeTaskQuery = useMemo(
-    () => ({
-      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
-      hasActiveTimer: 'true' as const,
-      sortBy,
-      order: 'asc' as const,
-      tags: filterTagIds.length ? filterTagIds : undefined
-    }),
-    [showCompleted, sortBy, filterTagIds, currentView]
+    () => {
+      // For calendar view, don't apply date/scheduled filters
+      if (currentView === 'calendar') {
+        return {
+          completed: undefined,
+          hasActiveTimer: 'true' as const,
+          scheduled: undefined,
+          startAtFrom: undefined,
+          startAtTo: undefined,
+          sortBy,
+          order: 'asc' as const,
+          tags: filterTagIds.length ? filterTagIds : undefined
+        }
+      }
+
+      // For tasks view: showTodayOnly filter shows today's tasks OR unscheduled
+      return {
+        completed: showCompleted ? undefined : ('false' as const),
+        hasActiveTimer: 'true' as const,
+        scheduled: showTodayOnly ? ('false' as const) : undefined,
+        startAtFrom: showTodayOnly ? todayRange.startAt : undefined,
+        startAtTo: showTodayOnly ? todayRange.endAt : undefined,
+        sortBy,
+        order: 'asc' as const,
+        tags: filterTagIds.length ? filterTagIds : undefined
+      }
+    },
+    [showCompleted, showTodayOnly, sortBy, filterTagIds, currentView, todayRange]
   )
   const {
     data: activeTasksResponse,
@@ -166,16 +206,51 @@ function App(): React.JSX.Element {
   } = useGetApiTasks(activeTaskQuery)
   const activeTasks = activeTasksResponse?.tasks ?? []
 
+  // Query for ALL tasks with active timers (for sidebar - no filters applied)
+  const sidebarActiveTaskQuery = useMemo(
+    () => ({
+      hasActiveTimer: 'true' as const,
+      sortBy: 'startAt' as const,
+      order: 'asc' as const
+    }),
+    []
+  )
+  const {
+    data: sidebarActiveTasksResponse,
+    mutate: mutateSidebarActiveTasks
+  } = useGetApiTasks(sidebarActiveTaskQuery)
+  const sidebarActiveTasks = sidebarActiveTasksResponse?.tasks ?? []
+
   // Query for tasks without active timers (Tasks section)
   const inactiveTaskQuery = useMemo(
-    () => ({
-      completed: currentView === 'calendar' ? undefined : (showCompleted ? undefined : ('false' as const)),
-      hasActiveTimer: 'false' as const,
-      sortBy,
-      order: 'asc' as const,
-      tags: filterTagIds.length ? filterTagIds : undefined
-    }),
-    [showCompleted, sortBy, filterTagIds, currentView]
+    () => {
+      // For calendar view, don't apply date/scheduled filters
+      if (currentView === 'calendar') {
+        return {
+          completed: undefined,
+          hasActiveTimer: 'false' as const,
+          scheduled: undefined,
+          startAtFrom: undefined,
+          startAtTo: undefined,
+          sortBy,
+          order: 'asc' as const,
+          tags: filterTagIds.length ? filterTagIds : undefined
+        }
+      }
+
+      // For tasks view: showTodayOnly filter shows today's tasks OR unscheduled
+      return {
+        completed: showCompleted ? undefined : ('false' as const),
+        hasActiveTimer: 'false' as const,
+        scheduled: showTodayOnly ? ('false' as const) : undefined,
+        startAtFrom: showTodayOnly ? todayRange.startAt : undefined,
+        startAtTo: showTodayOnly ? todayRange.endAt : undefined,
+        sortBy,
+        order: 'asc' as const,
+        tags: filterTagIds.length ? filterTagIds : undefined
+      }
+    },
+    [showCompleted, showTodayOnly, sortBy, filterTagIds, currentView, todayRange]
   )
   const {
     data: inactiveTasksResponse,
@@ -186,14 +261,21 @@ function App(): React.JSX.Element {
   const inactiveTasks = inactiveTasksResponse?.tasks ?? []
 
   // Combined tasks for operations that need to find a task
-  const allTasks = useMemo(() => [...activeTasks, ...inactiveTasks], [activeTasks, inactiveTasks])
+  const allTasks = useMemo(() => {
+    // Merge activeTasks, inactiveTasks, and sidebarActiveTasks, removing duplicates
+    const taskMap = new Map<string, Task>()
+    for (const task of [...activeTasks, ...inactiveTasks, ...sidebarActiveTasks]) {
+      taskMap.set(task.id, task)
+    }
+    return Array.from(taskMap.values())
+  }, [activeTasks, inactiveTasks, sidebarActiveTasks])
   const tasksLoading = activeTasksLoading || inactiveTasksLoading
   const tasksError = activeTasksError || inactiveTasksError
 
-  // Helper to mutate both task lists
+  // Helper to mutate all task lists
   const mutateBothTaskLists = useCallback(() => {
-    return Promise.all([mutateActiveTasks(), mutateInactiveTasks()])
-  }, [mutateActiveTasks, mutateInactiveTasks])
+    return Promise.all([mutateActiveTasks(), mutateInactiveTasks(), mutateSidebarActiveTasks()])
+  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks])
 
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [newTaskFields, setNewTaskFields] = useState({
@@ -205,9 +287,11 @@ function App(): React.JSX.Element {
   })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
-  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' | 'startAt' } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [editingTagsTaskId, setEditingTagsTaskId] = useState<string | null>(null)
+  const [scheduleEditingTask, setScheduleEditingTask] = useState<Task | null>(null)
+  const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false)
 
   const [currentTime, setCurrentTime] = useState(Date.now())
   const taskIds = useMemo(() => allTasks.map((task) => task.id), [allTasks])
@@ -278,14 +362,78 @@ function App(): React.JSX.Element {
     return () => clearInterval(interval)
   }, [])
 
+  // Sync all active timer states to main process for tray display
+  useEffect(() => {
+    const timerStates = Array.from(activeTimersByTaskId.entries()).map(([taskId, timer]) => {
+      const task = allTasks.find((t) => t.id === taskId)
+      return {
+        timerId: timer.id,
+        taskId,
+        taskTitle: task?.title || 'Task',
+        startTime: timer.startTime
+      }
+    })
+    window.api.updateTimerStates(timerStates)
+  }, [activeTimersByTaskId, allTasks])
+
+  // Cleanup timer states on unmount
+  useEffect(() => {
+    return () => {
+      window.api.updateTimerStates([])
+    }
+  }, [])
+
+  // Listen for show task detail request from tray menu
+  useEffect(() => {
+    const unsubscribe = window.api.onShowTaskDetail((taskId: string) => {
+      // Find the task and show the detail modal
+      const task = allTasks.find((t) => t.id === taskId)
+      if (task) {
+        setSelectedTask(task)
+      }
+    })
+    return unsubscribe
+  }, [allTasks])
+
+  // Listen for timer events from system notifications
+  useEffect(() => {
+    const unsubscribeStart = window.api.onNotificationTimerStarted(() => {
+      // Refresh both task lists and timers when timer is started from notification
+      mutateBothTaskLists()
+      mutateTimers()
+    })
+    const unsubscribeStop = window.api.onNotificationTimerStopped(() => {
+      // Refresh both task lists and timers when timer is stopped from notification
+      mutateBothTaskLists()
+      mutateTimers()
+    })
+    return () => {
+      unsubscribeStart()
+      unsubscribeStop()
+    }
+  }, [mutateBothTaskLists, mutateTimers])
+
   // Helper to start adding a new task
   const startAddingTask = useCallback(() => {
-    const now = new Date()
-    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16)
-    setNewTaskFields((prev) => ({ ...prev, startAt: localDateTime, tagIds: filterTagIds }))
+    // Keep startAt blank to allow creating unscheduled tasks
+    setNewTaskFields((prev) => ({ ...prev, startAt: '', tagIds: filterTagIds }))
     setIsAddingTask(true)
+  }, [filterTagIds])
+
+  // Helper to start adding a new task via calendar (opens dialog with current time)
+  const startAddingCalendarTask = useCallback(() => {
+    const now = new Date()
+    const endTime = new Date(now.getTime() + 60 * 60 * 1000) // 1 hour later
+    const formatLocal = (date: Date): string =>
+      new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+    setCalendarCreateError(null)
+    setCalendarDraft({
+      title: '',
+      description: '',
+      startAt: formatLocal(now),
+      endAt: formatLocal(endTime),
+      tagIds: filterTagIds
+    })
   }, [filterTagIds])
 
   // Helper to toggle timer for a task
@@ -294,7 +442,6 @@ function App(): React.JSX.Element {
     if (activeTimer) {
       // Stop the timer - move task from active to inactive list optimistically
       setCurrentTime(Date.now())
-      window.api.closeFloatingTaskWindow(task.id)
 
       // Optimistic update: move task from active to inactive list
       mutateActiveTasks(
@@ -334,7 +481,6 @@ function App(): React.JSX.Element {
     } else {
       // Start the timer - move task from inactive to active list optimistically
       setCurrentTime(Date.now())
-      window.api.openFloatingTaskWindow({ taskId: task.id, title: task.title })
 
       // Optimistic update: move task from inactive to active list
       mutateInactiveTasks(
@@ -488,12 +634,7 @@ function App(): React.JSX.Element {
     setIsAddingTask(false)
   }
 
-  function handleOpenFloatingWindow(taskId: string): void {
-    const task = allTasks.find(t => t.id === taskId)
-    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
-  }
-
-  function handleStartEditing(taskId: string, field: 'title' | 'description' | 'startAt', currentValue: string): void {
+  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
   }
@@ -509,13 +650,7 @@ function App(): React.JSX.Element {
     const task = allTasks.find(t => t.id === editingCell.taskId)
     if (!task) return
 
-    let updateValue: string | null | undefined
-    if (editingCell.field === 'startAt') {
-      updateValue = normalizeDateTime(editingValue)
-    } else {
-      updateValue = editingValue.trim()
-    }
-
+    const updateValue = editingValue.trim()
     const fieldToUpdate = editingCell.field
     const taskIdToUpdate = editingCell.taskId
 
@@ -532,6 +667,22 @@ function App(): React.JSX.Element {
         console.error('Failed to update task:', error)
         // Could show a toast notification here to inform user of failure
       })
+  }
+
+  async function handleSaveSchedule(taskId: string, startAt: string | null, endAt: string | null): Promise<void> {
+    try {
+      await putApiTasksId(taskId, {
+        startAt: startAt ? normalizeDateTime(startAt) : null,
+        endAt: endAt ? normalizeDateTime(endAt) : null
+      })
+      // Update the local task state to reflect the change immediately
+      if (scheduleEditingTask && scheduleEditingTask.id === taskId) {
+        setScheduleEditingTask({ ...scheduleEditingTask, startAt, endAt })
+      }
+      await mutateBothTaskLists()
+    } catch (error) {
+      console.error('Failed to update schedule:', error)
+    }
   }
 
   const handleCalendarMoveTask = async (
@@ -552,6 +703,7 @@ function App(): React.JSX.Element {
   const handleCalendarCreate = async (): Promise<void> => {
     if (!calendarDraft || !calendarDraft.title.trim()) return
     setIsCreatingCalendarTask(true)
+    setCalendarCreateError(null)
     const payload = {
       title: calendarDraft.title.trim(),
       description: calendarDraft.description.trim() || undefined,
@@ -563,9 +715,11 @@ function App(): React.JSX.Element {
     try {
       await postApiTasks(payload)
       setCalendarDraft(null)
+      setCalendarCreateError(null)
       await mutateBothTaskLists()
     } catch (error) {
       console.error('Failed to create task:', error)
+      setCalendarCreateError(getErrorMessage(error))
     } finally {
       setIsCreatingCalendarTask(false)
     }
@@ -599,7 +753,6 @@ function App(): React.JSX.Element {
 
     // UI first (optimistic) - move task from inactive to active
     setCurrentTime(Date.now())
-    window.api.openFloatingTaskWindow({ taskId, title: task?.title })
 
     // Optimistic update: move task from inactive to active list
     mutateInactiveTasks(
@@ -646,7 +799,6 @@ function App(): React.JSX.Element {
 
     // UI first (optimistic) - move task from active to inactive
     setCurrentTime(Date.now())
-    window.api.closeFloatingTaskWindow(taskId)
 
     // Optimistic update: move task from active to inactive list
     mutateActiveTasks(
@@ -704,10 +856,6 @@ function App(): React.JSX.Element {
     return activeTimersByTaskId.has(taskId)
   }
 
-  function hasTimers(taskId: string): boolean {
-    return timers.some(timer => timer.taskId === taskId)
-  }
-
   function handleToggleTaskCompletion(task: Task): void {
     const newCompletedAt = task.completedAt ? null : new Date().toISOString()
     const isInActiveList = activeTasks.some(t => t.id === task.id)
@@ -753,17 +901,7 @@ function App(): React.JSX.Element {
         }}
       >
         <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleOpenFloatingWindow(task.id)}
-              className="p-1 rounded hover:bg-muted transition-colors"
-              title="Open floating window"
-            >
-              <Clock4 className="h-4 w-4" />
-            </button>
-            <span className="text-sm min-w-[3rem]">
-              {getTotalTimeDisplay(task.id)}
-            </span>
+          <div className="flex items-center gap-1">
             {activeTimersByTaskId.has(task.id) ? (
               <Button
                 size="icon"
@@ -791,43 +929,119 @@ function App(): React.JSX.Element {
                 <Play className="h-4 w-4 text-green-600" />
               </Button>
             )}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => handleToggleTaskCompletion(task)}
+              title={task.completedAt ? 'Mark incomplete' : 'Mark complete'}
+              className={task.completedAt ? 'opacity-50' : 'hover:bg-green-100'}
+            >
+              <CheckCircle className={`h-4 w-4 ${task.completedAt ? 'text-gray-400' : 'text-green-600'}`} />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                setSelectedTask(task)
+                const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+                setFocusedTaskIndex(index)
+              }}
+              title="Open task details"
+              className="hover:bg-blue-100"
+            >
+              <Maximize2 className="h-4 w-4 text-blue-600" />
+            </Button>
           </div>
         </TableCell>
         <TableCell
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'startAt', formatDateTimeInput(task.startAt))
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
-          {editingCell?.taskId === task.id && editingCell?.field === 'startAt' ? (
-            <Input
-              type="datetime-local"
-              value={editingValue}
-              onChange={(e) => setEditingValue(e.target.value)}
-              onBlur={handleSaveEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSaveEdit()
-                } else if (e.key === 'Escape') {
-                  handleCancelEditing()
-                }
-              }}
-              autoFocus
-              className="h-8"
-            />
+          <span className="text-sm">
+            {getTotalTimeDisplay(task.id)}
+          </span>
+        </TableCell>
+        <TableCell
+          onClick={() => {
+            setSelectedTask(task)
+            setEditingTagsTaskId(null)
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
+          }}
+        >
+          {scheduleEditingTask?.id === task.id ? (
+            <div onClick={(e) => e.stopPropagation()}>
+              <div className="flex flex-wrap items-center gap-1">
+                <Input
+                  type="datetime-local"
+                  value={formatDateTimeInput(scheduleEditingTask.startAt)}
+                  onChange={(e) => {
+                    const newStartAt = e.target.value || null
+                    setScheduleEditingTask({ ...scheduleEditingTask, startAt: newStartAt })
+                    handleSaveSchedule(task.id, newStartAt, scheduleEditingTask.endAt ?? null)
+                  }}
+                  className="h-7 text-xs w-[140px]"
+                />
+                <span className="text-muted-foreground">-</span>
+                <Input
+                  type="datetime-local"
+                  value={formatDateTimeInput(scheduleEditingTask.endAt)}
+                  onChange={(e) => {
+                    const newEndAt = e.target.value || null
+                    setScheduleEditingTask({ ...scheduleEditingTask, endAt: newEndAt })
+                    handleSaveSchedule(task.id, scheduleEditingTask.startAt ?? null, newEndAt)
+                  }}
+                  className="h-7 text-xs w-[140px]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setIsSchedulePickerOpen(true)}
+                  aria-label="Open schedule picker"
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    setScheduleEditingTask(null)
+                    setIsSchedulePickerOpen(false)
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
           ) : (
-            <span className="cursor-text hover:underline">
-              {task.startAt ? formatDateTime(task.startAt) : 'No start time'}
-            </span>
+            <div
+              className="cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 inline-block text-sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                setScheduleEditingTask(task)
+                setIsSchedulePickerOpen(false)
+              }}
+            >
+              {formatTimeRangeShort(task.startAt, task.endAt)}
+            </div>
           )}
         </TableCell>
         <TableCell
           className="font-medium"
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'title', task.title)
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
           {editingCell?.taskId === task.id && editingCell?.field === 'title' ? (
@@ -835,6 +1049,7 @@ function App(): React.JSX.Element {
               value={editingValue}
               onChange={(e) => setEditingValue(e.target.value)}
               onBlur={handleSaveEdit}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSaveEdit()
@@ -846,15 +1061,25 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <span className={`cursor-text hover:underline ${isCompleted ? 'line-through' : ''}`}>{task.title}</span>
+            <div
+              className={`cursor-text hover:bg-muted/50 rounded px-1 -mx-1 inline-block ${isCompleted ? 'line-through' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                handleStartEditing(task.id, 'title', task.title)
+              }}
+            >
+              {task.title || 'Untitled'}
+            </div>
           )}
         </TableCell>
         <TableCell
           className="max-w-xs"
-          onClick={(e) => {
-            e.stopPropagation()
+          onClick={() => {
+            setSelectedTask(task)
             setEditingTagsTaskId(null)
-            handleStartEditing(task.id, 'description', task.description || '')
+            const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
+            setFocusedTaskIndex(index)
           }}
         >
           {editingCell?.taskId === task.id && editingCell?.field === 'description' ? (
@@ -862,6 +1087,7 @@ function App(): React.JSX.Element {
               value={editingValue}
               onChange={(e) => setEditingValue(e.target.value)}
               onBlur={handleSaveEdit}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSaveEdit()
@@ -873,7 +1099,16 @@ function App(): React.JSX.Element {
               className="h-8"
             />
           ) : (
-            <span className="cursor-text hover:underline truncate block">{task.description || '-'}</span>
+            <div
+              className="cursor-text hover:bg-muted/50 rounded px-1 -mx-1 truncate"
+              onClick={(e) => {
+                e.stopPropagation()
+                setEditingTagsTaskId(null)
+                handleStartEditing(task.id, 'description', task.description || '')
+              }}
+            >
+              {task.description || '-'}
+            </div>
           )}
         </TableCell>
         <TableCell
@@ -904,34 +1139,6 @@ function App(): React.JSX.Element {
             </div>
           )}
         </TableCell>
-        <TableCell onClick={(e) => { e.stopPropagation(); setEditingTagsTaskId(null) }}>
-          <div className="flex items-center gap-2">
-            {hasTimers(task.id) && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => handleToggleTaskCompletion(task)}
-                title={task.completedAt ? 'Mark incomplete' : 'Mark complete'}
-                className={task.completedAt ? 'opacity-50' : 'hover:bg-green-100'}
-              >
-                <CheckCircle className={`h-4 w-4 ${task.completedAt ? 'text-gray-400' : 'text-green-600'}`} />
-              </Button>
-            )}
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => {
-                setSelectedTask(task)
-                const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
-                setFocusedTaskIndex(index)
-              }}
-              title="Open task details"
-              className="hover:bg-blue-100"
-            >
-              <Maximize2 className="h-4 w-4 text-blue-600" />
-            </Button>
-          </div>
-        </TableCell>
       </TableRow>
     )
   }
@@ -940,28 +1147,37 @@ function App(): React.JSX.Element {
     return (
       <TableHeader>
         <TableRow>
+          <TableHead>Actions</TableHead>
           <TableHead>Time Tracked</TableHead>
           <TableHead>Start Date</TableHead>
           <TableHead>Title</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Tags</TableHead>
-          <TableHead>Actions</TableHead>
         </TableRow>
       </TableHeader>
     )
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <KeyboardShortcuts
+        currentView={currentView}
         onNewTask={startAddingTask}
+        onNewCalendarTask={startAddingCalendarTask}
         onToggleTimer={handleKeyboardToggleTimer}
         onNavigateNext={handleNavigateNext}
         onNavigatePrev={handleNavigatePrev}
         isAddingTask={isAddingTask}
         isEditing={!!editingCell}
       />
-      <AppSidebar currentView={currentView} onViewChange={setCurrentView} />
+      <AppSidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        activeTasks={sidebarActiveTasks}
+        activeTimersByTaskId={activeTimersByTaskId}
+        onStopTimer={handleStopTimer}
+        onOpenTaskDetail={setSelectedTask}
+      />
       <SidebarInset>
         {currentView === 'settings' ? (
           <SettingsView />
@@ -1002,6 +1218,8 @@ function App(): React.JSX.Element {
                 <CalendarView
                   className="flex-1 min-h-0"
                   tasks={allTasks}
+                  viewMode={calendarViewMode}
+                  onViewModeChange={setCalendarViewMode}
                   onTaskSelect={(task) => {
                     setSelectedTask(task)
                     const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
@@ -1018,6 +1236,7 @@ function App(): React.JSX.Element {
                   onTaskStartTimer={handleStartTimer}
                   onTaskStopTimer={handleStopTimer}
                   onCreateRange={({ startAt, endAt }) => {
+                    setCalendarCreateError(null)
                     setCalendarDraft({
                       title: '',
                       description: '',
@@ -1031,99 +1250,79 @@ function App(): React.JSX.Element {
             </main>
           </div>
         ) : (
-          <div className="p-8">
-            <main className="mx-auto max-w-6xl">
+          <div className="flex flex-1 min-h-0 flex-col p-8">
+            <main className="mx-auto max-w-6xl w-full flex flex-col min-h-0 flex-1 gap-6">
               {timersError && shouldFetchTimer && (
                 <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                   Failed to load timers.
                 </div>
               )}
 
-              {/* Controls */}
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Sort by:</span>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'startAt')}
-                      className="rounded px-2 py-1 text-sm bg-background"
-                    >
-                      <option value="startAt">Start Date</option>
-                      <option value="createdAt">Created Date</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Show completed</span>
-                    <Switch checked={showCompleted} onCheckedChange={setShowCompleted} />
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Tags:</span>
-                    <TagCombobox
-                      selectedTagIds={filterTagIds}
-                      onSelectionChange={setFilterTagIds}
-                      placeholder="All tags"
-                      className="w-48"
-                    />
-                  </div>
-                </div>
-                {!isAddingTask && (
-                  <Button onClick={startAddingTask}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Task
-                  </Button>
-                )}
-              </div>
+              {/* Tasks Section */}
+              <Card className="flex flex-col min-h-0 flex-1">
+                <CardHeader className="shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Tasks</CardTitle>
+                      <CardDescription>
+                        {tasksLoading
+                          ? 'Loading tasks...'
+                          : `${allTasks.length} task${allTasks.length === 1 ? '' : 's'}`}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Select value={sortBy} onValueChange={(value) => setSortBy(value as 'createdAt' | 'startAt')}>
+                        <SelectTrigger className="w-[140px] h-8">
+                          <ArrowUpDown className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                          <SelectValue placeholder="Sort by" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="startAt">Start Date</SelectItem>
+                          <SelectItem value="createdAt">Created Date</SelectItem>
+                        </SelectContent>
+                      </Select>
 
-              {/* In Progress Section */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    In Progress
-                  </CardTitle>
-                  <CardDescription>
-                    {activeTasks.length} task{activeTasks.length === 1 ? '' : 's'} with timer running
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    {renderTableHeader()}
-                    <TableBody>
-                      {tasksLoading && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            Loading tasks...
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {!tasksLoading && activeTasks.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground">
-                            No tasks in progress
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      {!tasksLoading && activeTasks.map(renderTaskRow)}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                      <div className="flex items-center justify-between w-[140px] h-8 rounded-md border border-input px-3">
+                        <Label htmlFor="show-completed" className="text-sm cursor-pointer">
+                          Completed
+                        </Label>
+                        <Switch
+                          id="show-completed"
+                          checked={showCompleted}
+                          onCheckedChange={setShowCompleted}
+                          className="scale-75"
+                        />
+                      </div>
 
-              {/* Upcoming Tasks Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tasks</CardTitle>
-                  <CardDescription>
-                    {tasksLoading
-                      ? 'Loading tasks...'
-                      : `${inactiveTasks.length} task${inactiveTasks.length === 1 ? '' : 's'}`}
-                  </CardDescription>
+                      <div className="flex items-center justify-between w-[130px] h-8 rounded-md border border-input px-3">
+                        <Label htmlFor="show-today-only" className="text-sm cursor-pointer">
+                          Today
+                        </Label>
+                        <Switch
+                          id="show-today-only"
+                          checked={showTodayOnly}
+                          onCheckedChange={setShowTodayOnly}
+                          className="scale-75"
+                        />
+                      </div>
+
+                      <TagCombobox
+                        selectedTagIds={filterTagIds}
+                        onSelectionChange={setFilterTagIds}
+                        placeholder="Tags"
+                        className="w-[140px] h-8"
+                      />
+
+                      {!isAddingTask && (
+                        <Button size="sm" onClick={startAddingTask}>
+                          <Plus className="mr-1.5 h-3.5 w-3.5" />
+                          Add Task
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 min-h-0 overflow-y-auto">
                   <Table>
                     {renderTableHeader()}
                     <TableBody>
@@ -1203,6 +1402,9 @@ function App(): React.JSX.Element {
                               <Button size="sm" variant="outline" onClick={handleCancelAdd}>
                                 Cancel
                               </Button>
+                              <span className="text-xs text-muted-foreground">
+                                Press Enter to save
+                              </span>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1228,7 +1430,7 @@ function App(): React.JSX.Element {
                           </TableCell>
                         </TableRow>
                       )}
-                      {!tasksLoading && !tasksError && inactiveTasks.map(renderTaskRow)}
+                      {!tasksLoading && !tasksError && allTasks.map(renderTaskRow)}
                     </TableBody>
                   </Table>
                 </CardContent>
@@ -1243,19 +1445,36 @@ function App(): React.JSX.Element {
         onOpenChange={(open) => {
           if (!open && !isCreatingCalendarTask) {
             setCalendarDraft(null)
+            setCalendarCreateError(null)
           }
         }}
       >
-        <DialogContent className="max-w-xl w-[95vw]">
+        <DialogContent
+          className="max-w-xl w-[95vw]"
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !event.metaKey) return
+            event.preventDefault()
+            if (isCreatingCalendarTask || !calendarDraft?.title.trim()) return
+            handleCalendarCreate()
+          }}
+        >
           <div className="space-y-4">
-            <div className="space-y-1">
-              <div className="text-lg font-semibold">New task</div>
-              {calendarDraft && (
-                <div className="text-sm text-muted-foreground">
-                  {`${formatDateTime(calendarDraft.startAt)} -> ${formatDateTime(calendarDraft.endAt)}`}
-                </div>
-              )}
-            </div>
+            <div className="text-lg font-semibold">New task</div>
+            {calendarCreateError && (
+              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                {calendarCreateError}
+              </div>
+            )}
+            <Input
+              placeholder="Title"
+              value={calendarDraft?.title ?? ''}
+              onChange={(event) =>
+                setCalendarDraft((prev) =>
+                  prev ? { ...prev, title: event.target.value } : prev
+                )
+              }
+              autoFocus
+            />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="calendar-start-at">Start time</Label>
@@ -1284,15 +1503,6 @@ function App(): React.JSX.Element {
                 />
               </div>
             </div>
-            <Input
-              placeholder="Title"
-              value={calendarDraft?.title ?? ''}
-              onChange={(event) =>
-                setCalendarDraft((prev) =>
-                  prev ? { ...prev, title: event.target.value } : prev
-                )
-              }
-            />
             <Textarea
               placeholder="Description"
               rows={3}
@@ -1320,7 +1530,16 @@ function App(): React.JSX.Element {
                 onClick={handleCalendarCreate}
                 disabled={isCreatingCalendarTask || !calendarDraft?.title.trim()}
               >
-                {isCreatingCalendarTask ? 'Creating...' : 'Create task'}
+                {isCreatingCalendarTask ? (
+                  'Creating...'
+                ) : (
+                  <>
+                    <span className="mr-1 text-sm text-primary-foreground/80">
+                      {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}⏎
+                    </span>
+                    Create
+                  </>
+                )}
               </Button>
               <Button
                 variant="ghost"
@@ -1350,8 +1569,43 @@ function App(): React.JSX.Element {
                 setSelectedTask(updated)
                 await mutateBothTaskLists()
               }}
+              tasks={allTasks}
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isSchedulePickerOpen && Boolean(scheduleEditingTask)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsSchedulePickerOpen(false)
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl w-[95vw]">
+          {scheduleEditingTask && (
+            <div className="space-y-4">
+              <div className="text-lg font-semibold">Schedule</div>
+              <TaskTimeRangePicker
+                startAt={scheduleEditingTask.startAt}
+                endAt={scheduleEditingTask.endAt}
+                tasks={allTasks}
+                currentTaskId={scheduleEditingTask.id}
+                onChange={({ startAt, endAt }) => {
+                  setScheduleEditingTask({ ...scheduleEditingTask, startAt, endAt })
+                  handleSaveSchedule(scheduleEditingTask.id, startAt, endAt)
+                }}
+              />
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsSchedulePickerOpen(false)}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </SidebarProvider>
@@ -1359,7 +1613,22 @@ function App(): React.JSX.Element {
 }
 
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message
+  if (error instanceof Error) {
+    const httpMatch = error.message.match(/^HTTP\s+\d+:\s*(.*)$/i)
+    if (httpMatch) {
+      const rawMessage = httpMatch[1].trim()
+      if (rawMessage) {
+        try {
+          const parsed = JSON.parse(rawMessage) as { error?: string; message?: string }
+          if (parsed.error) return parsed.error
+          if (parsed.message) return parsed.message
+        } catch {
+          return rawMessage
+        }
+      }
+    }
+    return error.message
+  }
   if (error && typeof error === 'object' && 'error' in error) {
     const message = (error as { error?: string }).error
     if (message) return message

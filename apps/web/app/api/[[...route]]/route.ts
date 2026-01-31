@@ -25,7 +25,30 @@ import {
   getTagRoute,
   createTagRoute,
   updateTagRoute,
-  deleteTagRoute
+  deleteTagRoute,
+  // Google OAuth routes
+  getGoogleAuthUrlRoute,
+  googleAuthCallbackRoute,
+  getGoogleAuthStatusRoute,
+  deleteGoogleAuthRoute,
+  // Calendar routes
+  listAvailableCalendarsRoute,
+  listCalendarsRoute,
+  createCalendarRoute,
+  getCalendarRoute,
+  updateCalendarRoute,
+  deleteCalendarRoute,
+  syncCalendarRoute,
+  syncAllCalendarsRoute,
+  // Calendar watch routes
+  watchCalendarRoute,
+  stopWatchingCalendarRoute,
+  getWatchStatusRoute,
+  // Event routes
+  listEventsRoute,
+  getEventRoute,
+  // Webhook routes
+  googleCalendarWebhookRoute
 } from './routes'
 
 // Import handlers from local handlers directory
@@ -52,7 +75,30 @@ import {
   getTagHandler,
   createTagHandler,
   updateTagHandler,
-  deleteTagHandler
+  deleteTagHandler,
+  // Google OAuth handlers
+  getGoogleAuthUrlHandler,
+  googleAuthCallbackHandler,
+  getGoogleAuthStatusHandler,
+  deleteGoogleAuthHandler,
+  // Calendar handlers
+  listAvailableCalendarsHandler,
+  listCalendarsHandler,
+  createCalendarHandler,
+  getCalendarHandler,
+  updateCalendarHandler,
+  deleteCalendarHandler,
+  syncCalendarHandler,
+  syncAllCalendarsHandler,
+  // Calendar watch handlers
+  watchCalendarHandler,
+  stopWatchingCalendarHandler,
+  getWatchStatusHandler,
+  // Event handlers
+  listEventsHandler,
+  getEventHandler,
+  // Webhook handlers
+  googleCalendarWebhookHandler
 } from './handlers'
 
 const app = new OpenAPIHono().basePath('/api')
@@ -104,6 +150,34 @@ app.openapi(getTagRoute, getTagHandler)
 app.openapi(createTagRoute, createTagHandler)
 app.openapi(updateTagRoute, updateTagHandler)
 app.openapi(deleteTagRoute, deleteTagHandler)
+
+// Register Google OAuth routes
+app.openapi(getGoogleAuthUrlRoute, getGoogleAuthUrlHandler)
+app.openapi(googleAuthCallbackRoute, googleAuthCallbackHandler)
+app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
+app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
+
+// Register calendar routes
+app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)
+app.openapi(listCalendarsRoute, listCalendarsHandler)
+app.openapi(createCalendarRoute, createCalendarHandler)
+app.openapi(getCalendarRoute, getCalendarHandler)
+app.openapi(updateCalendarRoute, updateCalendarHandler)
+app.openapi(deleteCalendarRoute, deleteCalendarHandler)
+app.openapi(syncCalendarRoute, syncCalendarHandler)
+app.openapi(syncAllCalendarsRoute, syncAllCalendarsHandler)
+
+// Register event routes
+app.openapi(listEventsRoute, listEventsHandler)
+app.openapi(getEventRoute, getEventHandler)
+
+// Register calendar watch routes
+app.openapi(watchCalendarRoute, watchCalendarHandler)
+app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
+app.openapi(getWatchStatusRoute, getWatchStatusHandler)
+
+// Register webhook routes
+app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)
 
 // The OpenAPI documentation will be available at /doc
 app.doc('/doc', {

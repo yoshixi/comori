@@ -1,7 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
-import { View, ScrollView, Dimensions } from 'react-native';
+import { View, Dimensions } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
-import { useGetApiTasks, useGetApiTimers } from '@/gen/api/endpoints/shuchuAPI.gen';
+import { useSWRConfig } from 'swr';
+import {
+  useGetApiTasks,
+  useGetApiTimers,
+  putApiTasksId,
+  getGetApiTasksKey,
+} from '@/gen/api/endpoints/shuchuAPI.gen';
 import type { Task } from '@/gen/api/schemas';
 import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,6 +26,7 @@ export type ViewMode = 'day' | 'week';
 
 export function CalendarView() {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [showCreateSheet, setShowCreateSheet] = useState(false);
@@ -93,6 +101,33 @@ export function CalendarView() {
     setCreateTimeRange(null);
   }, []);
 
+  const handleTaskMove = useCallback(
+    async (task: Task, deltaMinutes: number) => {
+      if (!task.startAt) return;
+
+      const currentStart = new Date(task.startAt);
+      const newStart = new Date(currentStart.getTime() + deltaMinutes * 60 * 1000);
+
+      // Also update endAt if it exists
+      let newEnd: Date | undefined;
+      if (task.endAt) {
+        const currentEnd = new Date(task.endAt);
+        newEnd = new Date(currentEnd.getTime() + deltaMinutes * 60 * 1000);
+      }
+
+      try {
+        await putApiTasksId(task.id, {
+          startAt: newStart.toISOString(),
+          endAt: newEnd?.toISOString(),
+        });
+        await mutate(getGetApiTasksKey());
+      } catch (error) {
+        console.error('Failed to move task:', error);
+      }
+    },
+    [mutate]
+  );
+
   if (tasksLoading) {
     return (
       <View className="flex-1 p-4">
@@ -155,6 +190,7 @@ export function CalendarView() {
                   columnWidth={columnWidth}
                   onTaskPress={handleTaskPress}
                   onCreateRange={handleCreateRange}
+                  onTaskMove={handleTaskMove}
                   showDayLabel={viewMode === 'week'}
                 />
               );

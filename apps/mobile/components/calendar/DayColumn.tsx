@@ -25,6 +25,7 @@ export interface DayColumnProps {
   columnWidth: number;
   onTaskPress: (task: Task) => void;
   onCreateRange?: (range: TimeRange) => void;
+  onTaskMove?: (task: Task, deltaMinutes: number) => void;
   showDayLabel?: boolean;
 }
 
@@ -38,6 +39,7 @@ export function DayColumn({
   hourHeight,
   columnWidth,
   onTaskPress,
+  onTaskMove,
   onCreateRange,
   showDayLabel = false,
 }: DayColumnProps) {
@@ -77,6 +79,14 @@ export function DayColumn({
     [date]
   );
 
+  // Convert Y position to minutes (worklet-compatible version)
+  const yToMinutesWorklet = (y: number) => {
+    'worklet';
+    const minutesPerPixel = 60 / hourHeight;
+    const totalMinutes = y * minutesPerPixel;
+    return Math.round(totalMinutes / SLOT_MINUTES) * SLOT_MINUTES;
+  };
+
   const handleCreateRange = useCallback(
     (startMinutes: number, endMinutes: number) => {
       if (!onCreateRange) return;
@@ -84,8 +94,8 @@ export function DayColumn({
       const minMinutes = Math.min(startMinutes, endMinutes);
       const maxMinutes = Math.max(startMinutes, endMinutes);
 
-      // Ensure minimum duration of 15 minutes
-      const actualEnd = maxMinutes <= minMinutes ? minMinutes + SLOT_MINUTES : maxMinutes;
+      // Ensure minimum duration of 30 minutes for better usability
+      const actualEnd = maxMinutes <= minMinutes ? minMinutes + 30 : maxMinutes;
 
       onCreateRange({
         startAt: minutesToDate(minMinutes),
@@ -95,30 +105,39 @@ export function DayColumn({
     [onCreateRange, minutesToDate]
   );
 
+  // Long press initiates drag selection for custom time range
   const longPressGesture = Gesture.LongPress()
     .minDuration(300)
     .onStart((event) => {
+      'worklet';
       isDragging.value = true;
       startY.value = event.y;
       currentY.value = event.y;
-      const startMinutes = yToMinutes(event.y);
+      const startMinutes = yToMinutesWorklet(event.y);
       selectionTop.value = (startMinutes / 60) * hourHeight;
       selectionHeight.value = (SLOT_MINUTES / 60) * hourHeight;
+    })
+    .onEnd((event, success) => {
+      'worklet';
+      // If long press completed without dragging, create a 30-min task
+      if (success && isDragging.value && Math.abs(startY.value - currentY.value) < 5) {
+        const startMinutes = yToMinutesWorklet(event.y);
+        runOnJS(handleCreateRange)(startMinutes, startMinutes + 30);
+      }
+      isDragging.value = false;
+      selectionHeight.value = 0;
     });
 
+  // Pan gesture for drag selection (only active after long press)
   const panGesture = Gesture.Pan()
-    .manualActivation(true)
-    .onTouchesMove((event, stateManager) => {
-      if (isDragging.value) {
-        stateManager.activate();
-      }
-    })
+    .activateAfterLongPress(300)
     .onUpdate((event) => {
+      'worklet';
       if (!isDragging.value) return;
       currentY.value = event.y;
 
-      const startMinutes = yToMinutes(startY.value);
-      const currentMinutes = yToMinutes(event.y);
+      const startMinutes = yToMinutesWorklet(startY.value);
+      const currentMinutes = yToMinutesWorklet(event.y);
 
       const minMinutes = Math.min(startMinutes, currentMinutes);
       const maxMinutes = Math.max(startMinutes, currentMinutes);
@@ -130,15 +149,23 @@ export function DayColumn({
       );
     })
     .onEnd(() => {
+      'worklet';
       if (isDragging.value) {
-        const startMinutes = yToMinutes(startY.value);
-        const endMinutes = yToMinutes(currentY.value);
+        const startMinutes = yToMinutesWorklet(startY.value);
+        const endMinutes = yToMinutesWorklet(currentY.value);
         runOnJS(handleCreateRange)(startMinutes, endMinutes);
       }
       isDragging.value = false;
       selectionHeight.value = 0;
+    })
+    .onFinalize(() => {
+      'worklet';
+      isDragging.value = false;
+      selectionHeight.value = 0;
     });
 
+  // Long press + optional drag for task creation
+  // Tapping on tasks will work normally since we're not using a Tap gesture
   const composed = Gesture.Simultaneous(longPressGesture, panGesture);
 
   const selectionAnimatedStyle = useAnimatedStyle(() => ({
@@ -158,9 +185,8 @@ export function DayColumn({
     <View style={{ width: columnWidth }} className="border-l border-border">
       {showDayLabel && (
         <View
-          className={`h-10 items-center justify-center border-b border-border ${
-            today ? 'bg-primary/10' : ''
-          }`}
+          className={`h-10 items-center justify-center border-b border-border ${today ? 'bg-primary/10' : ''
+            }`}
         >
           <Text className={`text-xs ${today ? 'font-bold text-primary' : 'text-muted-foreground'}`}>
             {dayNames[date.getDay()]}
@@ -208,9 +234,11 @@ export function DayColumn({
                 height={Math.max(height, 30)}
                 width={laneWidth - 2} // 2px gap between lanes
                 left={left}
+                hourHeight={hourHeight}
                 isActive={isActive}
                 isCompleted={isCompleted}
                 onPress={() => onTaskPress(task)}
+                onMove={onTaskMove}
               />
             );
           })}

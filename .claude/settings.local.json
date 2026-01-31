@@ -28,7 +28,9 @@
       "Bash(git push:*)",
       "Bash(pnpm --filter electron list:*)",
       "Bash(pnpm --filter electron exec npm view:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "WebFetch(domain:clerk.com)",
+      "Bash(pnpm --filter web add:*)"
     ]
   }
 }

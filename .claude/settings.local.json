@@ -31,7 +31,8 @@
       "Bash(pnpm --filter electron exec npm view:*)",
       "Bash(git restore:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(/opt/homebrew/bin/pnpm --filter mobile run check-types)"
     ]
   }
 }

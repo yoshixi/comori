@@ -7,7 +7,6 @@ import {
   deleteTaskCommentRoute
 } from '../routes/comments'
 import { getDb } from '../../../core/common.db'
-import { ensureDefaultUser } from '../../../core/tasks.db'
 import {
   getCommentsByTaskId,
   createComment,
@@ -15,11 +14,17 @@ import {
   updateComment,
   deleteComment
 } from '../../../core/comments.db'
+import { findOrCreateUserByProvider } from '../../../core/auth.db'
 
 export const listTaskCommentsHandler: RouteHandler<typeof listTaskCommentsRoute> = async (c) => {
   try {
     const db = getDb()
-    const user = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId } = c.req.valid('param')
 
     const comments = await getCommentsByTaskId(db, user.id.toString(), taskId)
@@ -55,7 +60,12 @@ export const listTaskCommentsHandler: RouteHandler<typeof listTaskCommentsRoute>
 export const createTaskCommentHandler: RouteHandler<typeof createTaskCommentRoute> = async (c) => {
   try {
     const db = getDb()
-    const user = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId } = c.req.valid('param')
     const data = c.req.valid('json')
 
@@ -86,7 +96,12 @@ export const createTaskCommentHandler: RouteHandler<typeof createTaskCommentRout
 export const getTaskCommentHandler: RouteHandler<typeof getTaskCommentRoute> = async (c) => {
   try {
     const db = getDb()
-    const user = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId, commentId } = c.req.valid('param')
 
     const comment = await getCommentById(db, user.id.toString(), taskId, commentId)
@@ -116,7 +131,12 @@ export const getTaskCommentHandler: RouteHandler<typeof getTaskCommentRoute> = a
 export const updateTaskCommentHandler: RouteHandler<typeof updateTaskCommentRoute> = async (c) => {
   try {
     const db = getDb()
-    const user = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId, commentId } = c.req.valid('param')
     const data = c.req.valid('json')
 
@@ -147,7 +167,12 @@ export const updateTaskCommentHandler: RouteHandler<typeof updateTaskCommentRout
 export const deleteTaskCommentHandler: RouteHandler<typeof deleteTaskCommentRoute> = async (c) => {
   try {
     const db = getDb()
-    const user = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId, commentId } = c.req.valid('param')
 
     const comment = await deleteComment(db, user.id.toString(), taskId, commentId)

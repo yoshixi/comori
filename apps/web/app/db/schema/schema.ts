@@ -5,7 +5,23 @@ import { sql } from 'drizzle-orm';
 export const usersTable = sqliteTable('users', {
   id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
   name: text('name').notNull(),
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 });
+
+// User Auth Providers table - links external auth providers to users
+export const userAuthProvidersTable = sqliteTable('user_auth_providers', {
+  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
+  userId: blob('user_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }).$type<string>(),
+  provider: text('provider').notNull(),         // 'clerk', 'google', etc.
+  providerId: text('provider_id').notNull(),    // External ID from provider
+  email: text('email'),                         // Email from provider
+  providerData: text('provider_data'),          // JSON blob for additional data (imageUrl, etc.)
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+  uniqueProviderUser: unique().on(table.provider, table.providerId),
+}));
 
 // Tasks table
 export const tasksTable = sqliteTable('tasks', {
@@ -63,6 +79,7 @@ export const taskTagsTable = sqliteTable('task_tags', {
 }));
 
 // Indexes
+export const userAuthProvidersUserIdIdx = index('user_auth_providers_user_id_idx').on(userAuthProvidersTable.userId);
 export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
 export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
 export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_created_at_idx').on(taskCommentsTable.taskId, taskCommentsTable.createdAt);
@@ -73,6 +90,8 @@ export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.t
 // Type exports
 export type InsertUser = typeof usersTable.$inferInsert;
 export type SelectUser = typeof usersTable.$inferSelect;
+export type InsertUserAuthProvider = typeof userAuthProvidersTable.$inferInsert;
+export type SelectUserAuthProvider = typeof userAuthProvidersTable.$inferSelect;
 export type InsertTask = typeof tasksTable.$inferInsert;
 export type SelectTask = typeof tasksTable.$inferSelect;
 export type InsertTaskTimer = typeof taskTimersTable.$inferInsert;

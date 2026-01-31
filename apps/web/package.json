@@ -24,6 +24,7 @@
   },
   "types": "./app/api/[[...route]]/route.ts",
   "dependencies": {
+    "@clerk/backend": "^2.29.7",
     "@hono/zod-openapi": "catalog:",
     "@libsql/client": "^0.15.15",
     "@repo/ui": "workspace:*",

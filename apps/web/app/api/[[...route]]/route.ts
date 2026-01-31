@@ -1,5 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { handle } from 'hono/vercel'
+import { authMiddleware } from './middleware/auth'
 
 // Import route definitions from local routes directory
 import {
@@ -70,8 +71,11 @@ app.use('/*', async (c, next) => {
   await next()
 })
 
-// Register health check route
+// Register health check route (public - no auth required)
 app.openapi(healthRoute, healthHandler)
+
+// Apply auth middleware to all routes below this point
+app.use('/*', authMiddleware)
 
 // Register task routes
 app.openapi(listTasksRoute, listTasksHandler)
@@ -111,7 +115,7 @@ app.doc('/doc', {
   info: {
     version: '1.0.0',
     title: 'Shuchu API',
-    description: 'API for the Shuchu task management application with OpenAPI documentation'
+    description: 'API for the Shuchu task management application with OpenAPI documentation. All endpoints except /health require Bearer token authentication.'
   }
 })
 

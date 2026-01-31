@@ -7,16 +7,21 @@ import {
   deleteTagRoute
 } from '../routes/tags'
 import { getDb } from '../../../core/common.db'
-import { ensureDefaultUser } from '../../../core/tasks.db'
 import { getAllTags, getTagById, createTag, updateTag, deleteTag } from '../../../core/tags.db'
+import { findOrCreateUserByProvider } from '../../../core/auth.db'
 
 // Tag handlers
 export const listTagsHandler: RouteHandler<typeof listTagsRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
 
-    const tags = await getAllTags(db, defaultUser.id.toString())
+    const tags = await getAllTags(db, user.id.toString())
 
     return c.json(
       {
@@ -40,10 +45,15 @@ export const listTagsHandler: RouteHandler<typeof listTagsRoute> = async (c) => 
 export const getTagHandler: RouteHandler<typeof getTagRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
 
-    const tag = await getTagById(db, defaultUser.id.toString(), id)
+    const tag = await getTagById(db, user.id.toString(), id)
 
     if (!tag) {
       return c.json(
@@ -71,10 +81,15 @@ export const getTagHandler: RouteHandler<typeof getTagRoute> = async (c) => {
 export const createTagHandler: RouteHandler<typeof createTagRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const data = c.req.valid('json')
 
-    const tag = await createTag(db, defaultUser.id.toString(), data)
+    const tag = await createTag(db, user.id.toString(), data)
 
     return c.json({ tag }, 201)
   } catch (error) {
@@ -124,11 +139,16 @@ export const createTagHandler: RouteHandler<typeof createTagRoute> = async (c) =
 export const updateTagHandler: RouteHandler<typeof updateTagRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
 
-    const tag = await updateTag(db, defaultUser.id.toString(), id, data)
+    const tag = await updateTag(db, user.id.toString(), id, data)
 
     if (!tag) {
       return c.json(
@@ -188,10 +208,15 @@ export const updateTagHandler: RouteHandler<typeof updateTagRoute> = async (c) =
 export const deleteTagHandler: RouteHandler<typeof deleteTagRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
 
-    const tag = await deleteTag(db, defaultUser.id.toString(), id)
+    const tag = await deleteTag(db, user.id.toString(), id)
 
     if (!tag) {
       return c.json(

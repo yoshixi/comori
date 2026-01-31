@@ -5,6 +5,18 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/logo@2x.png?asset'
 import { TrayManager } from './tray'
 import { NotificationScheduler, type NotificationPermissionStatus } from './notificationScheduler'
+import {
+  registerProtocolHandler,
+  handleOAuthCallback,
+  login,
+  logout,
+  getAccessToken,
+  isAuthenticated,
+  setAuthStateChangeCallback
+} from './auth/authFlow'
+
+// Register protocol handler before app is ready
+registerProtocolHandler()
 
 function setupContentSecurityPolicy(): void {
   const apiUrl = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
@@ -229,6 +241,36 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  // Auth IPC handlers
+  ipcMain.handle('auth:login', async () => {
+    try {
+      await login()
+      return { success: true }
+    } catch (error) {
+      console.error('Login failed:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Login failed' }
+    }
+  })
+
+  ipcMain.handle('auth:logout', () => {
+    logout()
+    return { success: true }
+  })
+
+  ipcMain.handle('auth:get-token', async () => {
+    const token = await getAccessToken()
+    return token
+  })
+
+  ipcMain.handle('auth:is-authenticated', () => {
+    return isAuthenticated()
+  })
+
+  // Set up auth state change callback to notify renderer
+  setAuthStateChangeCallback((authenticated: boolean) => {
+    mainWindow?.webContents.send('auth:state-changed', authenticated)
+  })
+
   // Notification permission handlers
   ipcMain.handle('notification:get-permission', (): NotificationPermissionStatus => {
     return NotificationScheduler.getPermissionStatus()
@@ -305,6 +347,41 @@ app.on('window-all-closed', () => {
     app.quit()
   }
 })
+
+// Handle OAuth callback via deep link (macOS)
+app.on('open-url', async (event, url) => {
+  event.preventDefault()
+  const handled = await handleOAuthCallback(url)
+  if (handled) {
+    // Focus the main window after successful OAuth
+    mainWindow?.show()
+    mainWindow?.focus()
+  }
+})
+
+// Handle OAuth callback via deep link (Windows/Linux - second instance)
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', async (_event, argv) => {
+    // Find the URL in argv (Windows passes it as last argument)
+    const url = argv.find(arg => arg.startsWith('shuchu://'))
+    if (url) {
+      const handled = await handleOAuthCallback(url)
+      if (handled) {
+        mainWindow?.show()
+        mainWindow?.focus()
+      }
+    } else {
+      // No URL, just focus the window
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
+      }
+    }
+  })
+}
 
 // Cleanup tray, shortcuts, and notification scheduler before quitting
 app.on('before-quit', () => {

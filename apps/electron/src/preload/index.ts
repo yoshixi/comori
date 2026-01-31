@@ -12,8 +12,30 @@ interface TimerState {
 // Notification permission status type
 type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
+// Auth result type
+interface AuthResult {
+  success: boolean
+  error?: string
+}
+
 // Custom APIs for renderer
 const api = {
+  // Auth APIs
+  auth: {
+    login: (): Promise<AuthResult> => ipcRenderer.invoke('auth:login'),
+    logout: (): Promise<AuthResult> => ipcRenderer.invoke('auth:logout'),
+    getToken: (): Promise<string | null> => ipcRenderer.invoke('auth:get-token'),
+    isAuthenticated: (): Promise<boolean> => ipcRenderer.invoke('auth:is-authenticated'),
+    onAuthStateChange: (callback: (authenticated: boolean) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, authenticated: boolean): void => {
+        callback(authenticated)
+      }
+      ipcRenderer.on('auth:state-changed', handler)
+      return () => {
+        ipcRenderer.removeListener('auth:state-changed', handler)
+      }
+    }
+  },
   // Update all active timer states for tray display
   updateTimerStates: (timers: TimerState[]): void => {
     ipcRenderer.send('timer:states-change', timers)

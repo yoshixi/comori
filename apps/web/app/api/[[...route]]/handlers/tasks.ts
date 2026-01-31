@@ -7,17 +7,23 @@ import {
   deleteTaskRoute
 } from '../routes/tasks'
 import { getDb } from '../../../core/common.db'
-import { ensureDefaultUser, getAllTasks, getTaskById, createTask, updateTask, deleteTask } from '../../../core/tasks.db'
+import { getAllTasks, getTaskById, createTask, updateTask, deleteTask } from '../../../core/tasks.db'
+import { findOrCreateUserByProvider } from '../../../core/auth.db'
 
 // Task handlers
 export const listTasksHandler: RouteHandler<typeof listTasksRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     // Validate and extract query parameters using the TaskQueryParamsModel schema
     const { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags } = c.req.valid('query')
 
-    const tasks = await getAllTasks(db, defaultUser.id.toString(), { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
+    const tasks = await getAllTasks(db, user.id.toString(), { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
 
     return c.json(
       {
@@ -41,10 +47,15 @@ export const listTasksHandler: RouteHandler<typeof listTasksRoute> = async (c) =
 export const getTaskHandler: RouteHandler<typeof getTaskRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
-    
-    const task = await getTaskById(db, defaultUser.id.toString(), id)
+
+    const task = await getTaskById(db, user.id.toString(), id)
     
     if (!task) {
       return c.json(
@@ -72,10 +83,15 @@ export const getTaskHandler: RouteHandler<typeof getTaskRoute> = async (c) => {
 export const createTaskHandler: RouteHandler<typeof createTaskRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const data = c.req.valid('json')
-    
-    const task = await createTask(db, defaultUser.id.toString(), data)
+
+    const task = await createTask(db, user.id.toString(), data)
     
     return c.json({ task }, 201)
   } catch (error) {
@@ -93,11 +109,16 @@ export const createTaskHandler: RouteHandler<typeof createTaskRoute> = async (c)
 export const updateTaskHandler: RouteHandler<typeof updateTaskRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
-    
-    const task = await updateTask(db, defaultUser.id.toString(), id, data)
+
+    const task = await updateTask(db, user.id.toString(), id, data)
     
     if (!task) {
       return c.json(
@@ -125,10 +146,15 @@ export const updateTaskHandler: RouteHandler<typeof updateTaskRoute> = async (c)
 export const deleteTaskHandler: RouteHandler<typeof deleteTaskRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { id } = c.req.valid('param')
-    
-    const task = await deleteTask(db, defaultUser.id.toString(), id)
+
+    const task = await deleteTask(db, user.id.toString(), id)
     
     if (!task) {
       return c.json(

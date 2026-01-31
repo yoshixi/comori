@@ -8,7 +8,6 @@ import {
   deleteTimerRoute
 } from '../routes/timers'
 import { getDb } from '../../../core/common.db'
-import { ensureDefaultUser } from '../../../core/tasks.db'
 import {
   getAllTimers,
   getAllTimersByTaskIds,
@@ -18,6 +17,7 @@ import {
   updateTimer,
   deleteTimer
 } from '../../../core/timers.db'
+import { findOrCreateUserByProvider } from '../../../core/auth.db'
 
 // Timer handlers
 export const listTimersHandler: RouteHandler<typeof listTimersRoute> = async (c) => {
@@ -60,10 +60,15 @@ export const listTimersHandler: RouteHandler<typeof listTimersRoute> = async (c)
 export const getTaskTimersHandler: RouteHandler<typeof getTaskTimersRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const { taskId } = c.req.valid('param')
-    
-    const timers = await getTimersByTaskId(db, defaultUser.id.toString(), taskId)
+
+    const timers = await getTimersByTaskId(db, user.id.toString(), taskId)
     
     if (timers === null) {
       return c.json(
@@ -127,10 +132,15 @@ export const getTimerHandler: RouteHandler<typeof getTimerRoute> = async (c) => 
 export const createTimerHandler: RouteHandler<typeof createTimerRoute> = async (c) => {
   try {
     const db = getDb()
-    const defaultUser = await ensureDefaultUser(db)
+    const auth = c.get('auth')
+    const user = await findOrCreateUserByProvider(db, {
+      provider: 'clerk',
+      providerId: auth.userId,
+      email: auth.email
+    })
     const data = c.req.valid('json')
-    
-    const timer = await createTimer(db, defaultUser.id.toString(), data)
+
+    const timer = await createTimer(db, user.id.toString(), data)
     
     if (!timer) {
       return c.json(

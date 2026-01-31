@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
-import { Keyboard, Info, Bell, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Keyboard, Info, Bell, CheckCircle, XCircle, AlertCircle, LogOut, User } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
@@ -40,13 +41,24 @@ function NotificationStatusBadge({ status }: { status: NotificationPermissionSta
 }
 
 export function SettingsView(): React.JSX.Element {
+  const { logout } = useAuth()
   const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>('not-determined')
   const [isRequesting, setIsRequesting] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   useEffect(() => {
     // Check notification permission on mount
     window.api.getNotificationPermission().then(setNotificationStatus)
   }, [])
+
+  const handleLogout = async (): Promise<void> => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   const handleRequestPermission = async (): Promise<void> => {
     setIsRequesting(true)
@@ -70,6 +82,39 @@ export function SettingsView(): React.JSX.Element {
       </p>
 
       <div className="mt-8 space-y-6">
+        {/* Account */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Account
+            </CardTitle>
+            <CardDescription>
+              Manage your account settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Sign Out</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sign out of your account on this device
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="text-destructive hover:text-destructive"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {isLoggingOut ? 'Signing out...' : 'Sign Out'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Notifications */}
         <Card>
           <CardHeader>

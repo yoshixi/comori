@@ -10,11 +10,25 @@ export interface CustomRequestConfig {
   responseType?: 'json' | 'text'
 }
 
+// Event for handling 401 responses (auth required)
+const authRequiredListeners: Set<() => void> = new Set()
+
+export function onAuthRequired(callback: () => void): () => void {
+  authRequiredListeners.add(callback)
+  return () => {
+    authRequiredListeners.delete(callback)
+  }
+}
+
+function notifyAuthRequired(): void {
+  authRequiredListeners.forEach((callback) => callback())
+}
+
 /**
  * Custom HTTP client for Electron renderer process
  * This function will be used by the generated API client
  */
-export const customInstance = <T>(config: CustomRequestConfig): Promise<T> => {
+export const customInstance = async <T>(config: CustomRequestConfig): Promise<T> => {
   const url = new URL(config.url, API_BASE_URL)
   if (config.params) {
     Object.entries(config.params).forEach(([key, value]) => {
@@ -29,28 +43,43 @@ export const customInstance = <T>(config: CustomRequestConfig): Promise<T> => {
     })
   }
 
+  // Get auth token from main process
+  const token = await window.api.auth.getToken()
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json'
+  }
+
+  // Add Authorization header if token is available
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const requestConfig: RequestInit = {
     method: config.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
+    headers,
     body: config.data ? JSON.stringify(config.data) : undefined
   }
 
-  return fetch(url.toString(), requestConfig).then(async (response) => {
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+  const response = await fetch(url.toString(), requestConfig)
+
+  if (!response.ok) {
+    // Handle 401 Unauthorized - notify listeners to trigger re-authentication
+    if (response.status === 401) {
+      notifyAuthRequired()
     }
 
-    const contentType = response.headers.get('content-type')
-    if (contentType?.includes('application/json')) {
-      return response.json()
-    }
+    const errorText = await response.text()
+    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+  }
 
-    return (await response.text()) as unknown as T
-  })
+  const contentType = response.headers.get('content-type')
+  if (contentType?.includes('application/json')) {
+    return response.json()
+  }
+
+  return (await response.text()) as unknown as T
 }
 
 export default customInstance

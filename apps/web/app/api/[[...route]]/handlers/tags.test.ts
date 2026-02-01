@@ -25,9 +25,21 @@ import {
   createTaskHandler,
   updateTaskHandler
 } from './tasks';
+import { authMiddleware } from '../middleware/auth';
+import { clearUserCache } from '../../../core/auth.db';
 import { createSqliteLibsqlTestContext, type SqliteLibsqlTestContext } from '../../../db/tests/sqliteLibsqlTestUtils';
 
 type TestGlobal = typeof globalThis & { testDb?: SqliteLibsqlTestContext['db'] };
+
+// Mock Clerk's verifyToken to return a test user
+// Note: vi.mock is hoisted, so we use literal values here
+vi.mock('@clerk/backend', () => ({
+  verifyToken: vi.fn().mockResolvedValue({
+    sub: 'test-clerk-user-id',
+    sid: 'test-session-id',
+    email: 'test@example.com'
+  })
+}));
 
 // Mock the database connection
 vi.mock('../../../core/common.db', () => ({
@@ -36,6 +48,16 @@ vi.mock('../../../core/common.db', () => ({
     return uuidv7();
   }
 }));
+
+// Set CLERK_SECRET_KEY for tests so auth middleware runs normally
+process.env.CLERK_SECRET_KEY = 'test-secret-key';
+
+// Helper to create request with auth header
+const createAuthRequest = (url: string, options: RequestInit = {}) => {
+  const headers = new Headers(options.headers);
+  headers.set('Authorization', 'Bearer test-token');
+  return new Request(url, { ...options, headers });
+};
 
 // Create a test app with tag and task routes
 const createTestApp = () => {
@@ -53,6 +75,9 @@ const createTestApp = () => {
 
     await next();
   });
+
+  // Add auth middleware
+  app.use('/*', authMiddleware);
 
   // Register tag routes
   app.openapi(listTagsRoute, listTagsHandler);
@@ -81,6 +106,7 @@ describe('Tag Handlers', () => {
   });
 
   beforeEach(async () => {
+    clearUserCache();
     await testContext.reset();
   });
 
@@ -92,7 +118,7 @@ describe('Tag Handlers', () => {
 
   describe('POST /tags - Create Tag', () => {
     it('should create a new tag', async () => {
-      const req = new Request('http://localhost/tags', {
+      const req = createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -110,14 +136,14 @@ describe('Tag Handlers', () => {
 
     it('should reject duplicate tag names', async () => {
       // Create first tag
-      await app.request(new Request('http://localhost/tags', {
+      await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
 
       // Try to create duplicate
-      const res = await app.request(new Request('http://localhost/tags', {
+      const res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -130,7 +156,7 @@ describe('Tag Handlers', () => {
     });
 
     it('should reject empty tag names', async () => {
-      const res = await app.request(new Request('http://localhost/tags', {
+      const res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: '' })
@@ -141,7 +167,7 @@ describe('Tag Handlers', () => {
 
     it('should reject tag names longer than 50 characters', async () => {
       const longName = 'a'.repeat(51);
-      const res = await app.request(new Request('http://localhost/tags', {
+      const res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: longName })
@@ -153,7 +179,7 @@ describe('Tag Handlers', () => {
 
   describe('GET /tags - List Tags', () => {
     it('should return empty tags list initially', async () => {
-      const req = new Request('http://localhost/tags');
+      const req = createAuthRequest('http://localhost/tags');
       const res = await app.request(req);
 
       expect(res.status).toBe(200);
@@ -168,14 +194,14 @@ describe('Tag Handlers', () => {
       // Create multiple tags
       const tagNames = ['urgent', 'work', 'personal'];
       for (const name of tagNames) {
-        await app.request(new Request('http://localhost/tags', {
+        await app.request(createAuthRequest('http://localhost/tags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name })
         }));
       }
 
-      const res = await app.request(new Request('http://localhost/tags'));
+      const res = await app.request(createAuthRequest('http://localhost/tags'));
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -188,7 +214,7 @@ describe('Tag Handlers', () => {
   describe('GET /tags/{id} - Get Tag', () => {
     it('should return a specific tag', async () => {
       // Create a tag
-      const createRes = await app.request(new Request('http://localhost/tags', {
+      const createRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -196,7 +222,7 @@ describe('Tag Handlers', () => {
       const { tag: createdTag } = await createRes.json();
 
       // Get the tag
-      const res = await app.request(new Request(`http://localhost/tags/${createdTag.id}`));
+      const res = await app.request(createAuthRequest(`http://localhost/tags/${createdTag.id}`));
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -206,7 +232,7 @@ describe('Tag Handlers', () => {
 
     it('should return 404 for non-existent tag', async () => {
       const fakeId = uuidv7();
-      const res = await app.request(new Request(`http://localhost/tags/${fakeId}`));
+      const res = await app.request(createAuthRequest(`http://localhost/tags/${fakeId}`));
 
       expect(res.status).toBe(404);
       const data = await res.json();
@@ -217,7 +243,7 @@ describe('Tag Handlers', () => {
   describe('PUT /tags/{id} - Update Tag', () => {
     it('should update a tag name', async () => {
       // Create a tag
-      const createRes = await app.request(new Request('http://localhost/tags', {
+      const createRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -225,7 +251,7 @@ describe('Tag Handlers', () => {
       const { tag: createdTag } = await createRes.json();
 
       // Update the tag
-      const updateRes = await app.request(new Request(`http://localhost/tags/${createdTag.id}`, {
+      const updateRes = await app.request(createAuthRequest(`http://localhost/tags/${createdTag.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'high-priority' })
@@ -239,13 +265,13 @@ describe('Tag Handlers', () => {
 
     it('should reject update to duplicate name', async () => {
       // Create two tags
-      await app.request(new Request('http://localhost/tags', {
+      await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
 
-      const createRes2 = await app.request(new Request('http://localhost/tags', {
+      const createRes2 = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'work' })
@@ -253,7 +279,7 @@ describe('Tag Handlers', () => {
       const { tag: tag2 } = await createRes2.json();
 
       // Try to update tag2 to have same name as tag1
-      const res = await app.request(new Request(`http://localhost/tags/${tag2.id}`, {
+      const res = await app.request(createAuthRequest(`http://localhost/tags/${tag2.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -266,7 +292,7 @@ describe('Tag Handlers', () => {
 
     it('should return 404 for non-existent tag', async () => {
       const fakeId = uuidv7();
-      const res = await app.request(new Request(`http://localhost/tags/${fakeId}`, {
+      const res = await app.request(createAuthRequest(`http://localhost/tags/${fakeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'updated' })
@@ -279,7 +305,7 @@ describe('Tag Handlers', () => {
   describe('DELETE /tags/{id} - Delete Tag', () => {
     it('should delete a tag', async () => {
       // Create a tag
-      const createRes = await app.request(new Request('http://localhost/tags', {
+      const createRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -287,7 +313,7 @@ describe('Tag Handlers', () => {
       const { tag: createdTag } = await createRes.json();
 
       // Delete the tag
-      const deleteRes = await app.request(new Request(`http://localhost/tags/${createdTag.id}`, {
+      const deleteRes = await app.request(createAuthRequest(`http://localhost/tags/${createdTag.id}`, {
         method: 'DELETE'
       }));
 
@@ -296,13 +322,13 @@ describe('Tag Handlers', () => {
       expect(data.tag.id).toBe(createdTag.id);
 
       // Verify it's gone
-      const getRes = await app.request(new Request(`http://localhost/tags/${createdTag.id}`));
+      const getRes = await app.request(createAuthRequest(`http://localhost/tags/${createdTag.id}`));
       expect(getRes.status).toBe(404);
     });
 
     it('should return 404 for non-existent tag', async () => {
       const fakeId = uuidv7();
-      const res = await app.request(new Request(`http://localhost/tags/${fakeId}`, {
+      const res = await app.request(createAuthRequest(`http://localhost/tags/${fakeId}`, {
         method: 'DELETE'
       }));
 
@@ -311,7 +337,7 @@ describe('Tag Handlers', () => {
 
     it('should remove tag from all associated tasks', async () => {
       // Create a tag
-      const tagRes = await app.request(new Request('http://localhost/tags', {
+      const tagRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -319,7 +345,7 @@ describe('Tag Handlers', () => {
       const { tag } = await tagRes.json();
 
       // Create a task with the tag
-      const taskRes = await app.request(new Request('http://localhost/tasks', {
+      const taskRes = await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Test task', tagIds: [tag.id] })
@@ -328,12 +354,12 @@ describe('Tag Handlers', () => {
       expect(task.tags).toHaveLength(1);
 
       // Delete the tag
-      await app.request(new Request(`http://localhost/tags/${tag.id}`, {
+      await app.request(createAuthRequest(`http://localhost/tags/${tag.id}`, {
         method: 'DELETE'
       }));
 
       // Verify task has no tags
-      const tasksRes = await app.request(new Request('http://localhost/tasks'));
+      const tasksRes = await app.request(createAuthRequest('http://localhost/tasks'));
       const { tasks } = await tasksRes.json();
       expect(tasks[0].tags).toHaveLength(0);
     });
@@ -342,14 +368,14 @@ describe('Tag Handlers', () => {
   describe('Task-Tag Integration', () => {
     it('should create task with tags', async () => {
       // Create tags
-      const tag1Res = await app.request(new Request('http://localhost/tags', {
+      const tag1Res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
       const { tag: tag1 } = await tag1Res.json();
 
-      const tag2Res = await app.request(new Request('http://localhost/tags', {
+      const tag2Res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'work' })
@@ -357,7 +383,7 @@ describe('Tag Handlers', () => {
       const { tag: tag2 } = await tag2Res.json();
 
       // Create task with tags
-      const taskRes = await app.request(new Request('http://localhost/tasks', {
+      const taskRes = await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -374,14 +400,14 @@ describe('Tag Handlers', () => {
 
     it('should filter tasks by tag ID', async () => {
       // Create tags
-      const urgentRes = await app.request(new Request('http://localhost/tags', {
+      const urgentRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
       const { tag: urgentTag } = await urgentRes.json();
 
-      const workRes = await app.request(new Request('http://localhost/tags', {
+      const workRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'work' })
@@ -389,32 +415,32 @@ describe('Tag Handlers', () => {
       const { tag: workTag } = await workRes.json();
 
       // Create tasks with different tags
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Urgent task', tagIds: [urgentTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Work task', tagIds: [workTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Both tags', tagIds: [urgentTag.id, workTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'No tags' })
       }));
 
       // Filter by urgent tag
-      const res = await app.request(new Request(`http://localhost/tasks?tags=${urgentTag.id}`));
+      const res = await app.request(createAuthRequest(`http://localhost/tasks?tags=${urgentTag.id}`));
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -424,7 +450,7 @@ describe('Tag Handlers', () => {
 
     it('should return empty array when filtering with non-UUID tag values', async () => {
       // Create tags
-      const urgentRes = await app.request(new Request('http://localhost/tags', {
+      const urgentRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -432,20 +458,20 @@ describe('Tag Handlers', () => {
       const { tag: urgentTag } = await urgentRes.json();
 
       // Create tasks
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Urgent task', tagIds: [urgentTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'No tags' })
       }));
 
       // Filter by tag name (should return empty since we only accept UUIDs now)
-      const res = await app.request(new Request('http://localhost/tasks?tags=urgent'));
+      const res = await app.request(createAuthRequest('http://localhost/tasks?tags=urgent'));
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -455,14 +481,14 @@ describe('Tag Handlers', () => {
 
     it('should filter tasks by multiple tags (OR logic)', async () => {
       // Create tags
-      const urgentRes = await app.request(new Request('http://localhost/tags', {
+      const urgentRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
       const { tag: urgentTag } = await urgentRes.json();
 
-      const workRes = await app.request(new Request('http://localhost/tags', {
+      const workRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'work' })
@@ -470,26 +496,26 @@ describe('Tag Handlers', () => {
       const { tag: workTag } = await workRes.json();
 
       // Create tasks
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Urgent only', tagIds: [urgentTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Work only', tagIds: [workTag.id] })
       }));
 
-      await app.request(new Request('http://localhost/tasks', {
+      await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'No tags' })
       }));
 
       // Filter by multiple tags (comma-separated IDs)
-      const res = await app.request(new Request(`http://localhost/tasks?tags=${urgentTag.id},${workTag.id}`));
+      const res = await app.request(createAuthRequest(`http://localhost/tasks?tags=${urgentTag.id},${workTag.id}`));
       expect(res.status).toBe(200);
 
       const data = await res.json();
@@ -499,7 +525,7 @@ describe('Tag Handlers', () => {
 
     it('should reject creating task with invalid tag IDs', async () => {
       const fakeTagId = uuidv7();
-      const res = await app.request(new Request('http://localhost/tasks', {
+      const res = await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -513,21 +539,21 @@ describe('Tag Handlers', () => {
 
     it('should update task tags by replacing all existing tags', async () => {
       // Create tags
-      const tag1Res = await app.request(new Request('http://localhost/tags', {
+      const tag1Res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
       }));
       const { tag: tag1 } = await tag1Res.json();
 
-      const tag2Res = await app.request(new Request('http://localhost/tags', {
+      const tag2Res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'work' })
       }));
       const { tag: tag2 } = await tag2Res.json();
 
-      const tag3Res = await app.request(new Request('http://localhost/tags', {
+      const tag3Res = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'personal' })
@@ -535,7 +561,7 @@ describe('Tag Handlers', () => {
       const { tag: tag3 } = await tag3Res.json();
 
       // Create task with tag1
-      const createRes = await app.request(new Request('http://localhost/tasks', {
+      const createRes = await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Test task', tagIds: [tag1.id] })
@@ -543,7 +569,7 @@ describe('Tag Handlers', () => {
       const { task } = await createRes.json();
 
       // Update task to have tag2 and tag3 (replacing tag1)
-      const updateRes = await app.request(new Request(`http://localhost/tasks/${task.id}`, {
+      const updateRes = await app.request(createAuthRequest(`http://localhost/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tagIds: [tag2.id, tag3.id] })
@@ -557,7 +583,7 @@ describe('Tag Handlers', () => {
 
     it('should remove all tags when updating task with empty tagIds array', async () => {
       // Create a tag
-      const tagRes = await app.request(new Request('http://localhost/tags', {
+      const tagRes = await app.request(createAuthRequest('http://localhost/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'urgent' })
@@ -565,7 +591,7 @@ describe('Tag Handlers', () => {
       const { tag } = await tagRes.json();
 
       // Create task with tag
-      const createRes = await app.request(new Request('http://localhost/tasks', {
+      const createRes = await app.request(createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Test task', tagIds: [tag.id] })
@@ -574,7 +600,7 @@ describe('Tag Handlers', () => {
       expect(task.tags).toHaveLength(1);
 
       // Update task to remove all tags
-      const updateRes = await app.request(new Request(`http://localhost/tasks/${task.id}`, {
+      const updateRes = await app.request(createAuthRequest(`http://localhost/tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tagIds: [] })

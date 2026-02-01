@@ -27,14 +27,36 @@ import { getTaskActivitiesRoute } from '../routes/activities'
 import { getTaskActivitiesHandler } from './activities'
 import { createTimerRoute } from '../routes/timers'
 import { createTimerHandler } from './timers'
+import { authMiddleware } from '../middleware/auth'
+import { clearUserCache } from '../../../core/auth.db'
 import { createSqliteLibsqlTestContext, type SqliteLibsqlTestContext } from '../../../db/tests/sqliteLibsqlTestUtils'
 
 type TestGlobal = typeof globalThis & { testDb?: SqliteLibsqlTestContext['db'] }
+
+// Mock Clerk's verifyToken to return a test user
+// Note: vi.mock is hoisted, so we use literal values here
+vi.mock('@clerk/backend', () => ({
+  verifyToken: vi.fn().mockResolvedValue({
+    sub: 'test-clerk-user-id',
+    sid: 'test-session-id',
+    email: 'test@example.com'
+  })
+}))
 
 vi.mock('../../../core/common.db', () => ({
   getDb: () => (globalThis as TestGlobal).testDb!,
   createId: () => uuidv7()
 }))
+
+// Set CLERK_SECRET_KEY for tests so auth middleware runs normally
+process.env.CLERK_SECRET_KEY = 'test-secret-key'
+
+// Helper to create request with auth header
+const createAuthRequest = (url: string, options: RequestInit = {}) => {
+  const headers = new Headers(options.headers)
+  headers.set('Authorization', 'Bearer test-token')
+  return new Request(url, { ...options, headers })
+}
 
 const createTestApp = () => {
   const app = new OpenAPIHono()
@@ -50,6 +72,9 @@ const createTestApp = () => {
 
     await next()
   })
+
+  // Add auth middleware
+  app.use('/*', authMiddleware)
 
   app.openapi(createTaskRoute, createTaskHandler)
   app.openapi(listTasksRoute, listTasksHandler)
@@ -76,10 +101,11 @@ describe('Task comment handlers', () => {
   })
 
   beforeEach(async () => {
+    clearUserCache()
     await testContext.reset()
     // create base task for nested comment routes
     const res = await app.request(
-      new Request('http://localhost/tasks', {
+      createAuthRequest('http://localhost/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: 'Task with comments' })
@@ -96,7 +122,7 @@ describe('Task comment handlers', () => {
 
   const createComment = async (content: string) => {
     const res = await app.request(
-      new Request(`http://localhost/tasks/${taskId}/comments`, {
+      createAuthRequest(`http://localhost/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: content })
@@ -111,7 +137,7 @@ describe('Task comment handlers', () => {
     await createComment('First note')
     await createComment('Second note')
 
-    const res = await app.request(new Request(`http://localhost/tasks/${taskId}/comments`))
+    const res = await app.request(createAuthRequest(`http://localhost/tasks/${taskId}/comments`))
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.total).toBe(2)
@@ -122,7 +148,7 @@ describe('Task comment handlers', () => {
     const created = await createComment('Draft note')
 
     const updateRes = await app.request(
-      new Request(`http://localhost/tasks/${taskId}/comments/${created.id}`, {
+      createAuthRequest(`http://localhost/tasks/${taskId}/comments/${created.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: 'Edited note' })
@@ -133,13 +159,13 @@ describe('Task comment handlers', () => {
     expect(updated.comment.body).toBe('Edited note')
 
     const deleteRes = await app.request(
-      new Request(`http://localhost/tasks/${taskId}/comments/${created.id}`, {
+      createAuthRequest(`http://localhost/tasks/${taskId}/comments/${created.id}`, {
         method: 'DELETE'
       })
     )
     expect(deleteRes.status).toBe(200)
 
-    const getRes = await app.request(new Request(`http://localhost/tasks/${taskId}/comments/${created.id}`))
+    const getRes = await app.request(createAuthRequest(`http://localhost/tasks/${taskId}/comments/${created.id}`))
     expect(getRes.status).toBe(404)
   })
 
@@ -148,7 +174,7 @@ describe('Task comment handlers', () => {
     await createComment('Earlier comment')
     // create timer entry
     const timerRes = await app.request(
-      new Request('http://localhost/timers', {
+      createAuthRequest('http://localhost/timers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +187,7 @@ describe('Task comment handlers', () => {
 
     await createComment('Latest comment')
 
-    const activitiesRes = await app.request(new Request(`http://localhost/tasks/${taskId}/activities`))
+    const activitiesRes = await app.request(createAuthRequest(`http://localhost/tasks/${taskId}/activities`))
     expect(activitiesRes.status).toBe(200)
     const data = await activitiesRes.json()
     expect(data.activities).toHaveLength(3)

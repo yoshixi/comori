@@ -178,6 +178,14 @@ export function invalidateUserCache(provider: string, providerId: string): void 
 }
 
 /**
+ * Clear the entire user cache.
+ * Useful for testing when the database is reset between tests.
+ */
+export function clearUserCache(): void {
+  userCache.clear()
+}
+
+/**
  * Get user by auth provider credentials.
  * Returns null if no matching user is found.
  */

@@ -106,6 +106,9 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
       if (oauthFactor.externalVerificationRedirectURL) {
         // Open the URL in system browser via main process
         await window.api.auth.openAuthUrl(oauthFactor.externalVerificationRedirectURL.toString())
+        // Reset loading state after opening browser so user can retry if they abandon the flow
+        // The callback handler will set loading to true again when callback URL is received
+        setIsLoading(false)
       } else {
         throw new Error('No OAuth redirect URL available')
       }

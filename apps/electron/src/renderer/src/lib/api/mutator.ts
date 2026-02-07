@@ -50,7 +50,9 @@ export const customInstance = async <T>(config: CustomRequestConfig): Promise<T>
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Accept: 'application/json'
+    Accept: 'application/json',
+    // Merge caller-supplied headers
+    ...config.headers
   }
 
   // Add Authorization header if token is available

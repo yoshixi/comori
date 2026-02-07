@@ -1,3 +1,5 @@
+import { getSessionToken } from '../clerk'
+
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -43,8 +45,8 @@ export const customInstance = async <T>(config: CustomRequestConfig): Promise<T>
     })
   }
 
-  // Get auth token from main process
-  const token = await window.api.auth.getToken()
+  // Get auth token from Clerk session
+  const token = await getSessionToken()
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

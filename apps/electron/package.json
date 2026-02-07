@@ -33,6 +33,7 @@
     "test": "echo 'No tests for electron yet'"
   },
   "dependencies": {
+    "@clerk/clerk-js": "^5.122.1",
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@radix-ui/react-dialog": "^1.1.15",

@@ -1,4 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import {
+  clerk,
+  initClerk,
+  isAuthenticated as checkClerkAuth,
+  signOut as clerkSignOut,
+  onSessionChange
+} from '../lib/clerk'
 import { onAuthRequired } from '../lib/api/mutator'
 
 interface AuthContextValue {
@@ -18,28 +25,49 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Check initial auth state
+  // Initialize Clerk and check auth state
   useEffect(() => {
-    const checkAuth = async (): Promise<void> => {
+    const init = async (): Promise<void> => {
       try {
-        const authenticated = await window.api.auth.isAuthenticated()
-        setIsAuthenticated(authenticated)
+        await initClerk()
+        setIsAuthenticated(checkClerkAuth())
       } catch (error) {
-        console.error('Failed to check auth status:', error)
+        console.error('Failed to initialize Clerk:', error)
         setIsAuthenticated(false)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAuth()
+    init()
   }, [])
 
-  // Listen for auth state changes from main process
+  // Listen for session changes from Clerk
   useEffect(() => {
-    const unsubscribe = window.api.auth.onAuthStateChange((authenticated) => {
-      setIsAuthenticated(authenticated)
+    const unsubscribe = onSessionChange((session) => {
+      setIsAuthenticated(session !== null && session !== undefined)
       setIsLoading(false)
+    })
+
+    return unsubscribe
+  }, [])
+
+  // Listen for OAuth callback URL from main process
+  useEffect(() => {
+    const unsubscribe = window.api.auth.onCallbackUrl(async (url) => {
+      setIsLoading(true)
+      try {
+        // Clerk handles the callback internally
+        await clerk.handleRedirectCallback({
+          redirectUrl: url
+        })
+        setIsAuthenticated(checkClerkAuth())
+      } catch (error) {
+        console.error('Failed to handle OAuth callback:', error)
+        setIsAuthenticated(false)
+      } finally {
+        setIsLoading(false)
+      }
     })
 
     return unsubscribe
@@ -57,11 +85,30 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
   const login = useCallback(async (): Promise<void> => {
     setIsLoading(true)
     try {
-      const result = await window.api.auth.login()
-      if (!result.success) {
-        throw new Error(result.error || 'Login failed')
+      // Build the OAuth URL using Clerk
+      const redirectUrl = 'shuchu://auth/callback'
+
+      // Create a sign-in attempt with OAuth
+      const signIn = clerk.client?.signIn
+      if (!signIn) {
+        throw new Error('Clerk client not available')
       }
-      // Auth state will be updated via onAuthStateChange callback
+
+      // Start OAuth flow - this returns the authorization URL
+      const result = await signIn.create({
+        strategy: 'oauth_google',
+        redirectUrl,
+        actionCompleteRedirectUrl: redirectUrl
+      })
+
+      // Get the authorization URL from the first factor
+      const oauthFactor = result.firstFactorVerification
+      if (oauthFactor.externalVerificationRedirectURL) {
+        // Open the URL in system browser via main process
+        await window.api.auth.openAuthUrl(oauthFactor.externalVerificationRedirectURL.toString())
+      } else {
+        throw new Error('No OAuth redirect URL available')
+      }
     } catch (error) {
       setIsLoading(false)
       throw error
@@ -70,7 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
 
   const logout = useCallback(async (): Promise<void> => {
     try {
-      await window.api.auth.logout()
+      await clerkSignOut()
       setIsAuthenticated(false)
     } catch (error) {
       console.error('Logout failed:', error)

@@ -9,17 +9,9 @@ interface TimerState {
 
 type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
-interface AuthResult {
-  success: boolean
-  error?: string
-}
-
 interface AuthAPI {
-  login: () => Promise<AuthResult>
-  logout: () => Promise<AuthResult>
-  getToken: () => Promise<string | null>
-  isAuthenticated: () => Promise<boolean>
-  onAuthStateChange: (callback: (authenticated: boolean) => void) => () => void
+  openAuthUrl: (url: string) => Promise<void>
+  onCallbackUrl: (callback: (url: string) => void) => () => void
 }
 
 declare global {

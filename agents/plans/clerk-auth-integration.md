@@ -2,69 +2,81 @@
 
 ## Overview
 
-Integrate Clerk authentication into Shuchu using **Clerk as an OIDC Identity Provider**. This approach uses standard OAuth 2.0 / OpenID Connect protocols, which are well-documented and supported for desktop applications.
+Integrate Clerk authentication into Shuchu using **Clerk JS SDK directly in the Electron renderer**. This approach uses Clerk's official JavaScript SDK for authentication, with the main process only handling deep link forwarding.
 
-**Key Insight**: Clerk doesn't have an official Electron SDK, but it can act as a standard OIDC Identity Provider. We use the Authorization Code flow with PKCE, which is the recommended approach for public clients (desktop apps).
-
-**Architecture Decision**: All OAuth URL generation and token exchange happens on the backend. This keeps Clerk credentials secure on the server and simplifies the Electron client.
+**Architecture Decision**: OAuth is handled entirely in the renderer using `@clerk/clerk-js`. The main process only registers the custom protocol and forwards callback URLs to the renderer via IPC. Token management is handled by Clerk SDK internally.
 
 ## Implementation Status
 
-- [x] Phase 1: Backend Authentication
-- [x] Phase 2: Backend OAuth Endpoints
-- [x] Phase 3: Electron OAuth Flow
-- [x] Phase 4: Renderer Integration
+- [x] Phase 1: Backend Authentication (JWT verification)
+- [x] Phase 2: Electron Clerk SDK Integration
+- [x] Phase 3: Renderer OAuth Flow
+- [x] Phase 4: API Integration
 
 ## Authentication Architecture
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Electron   │────>│   Backend   │────>│   Clerk     │
-│    App      │     │    API      │     │   (IdP)     │
-└─────────────┘     └─────────────┘     └─────────────┘
-       │                   │                   │
-       │ GET /auth/url     │                   │
-       │──────────────────>│                   │
-       │<── authUrl +      │                   │
-       │    sessionId      │                   │
-       │                   │                   │
-       │── Opens browser ──────────────────────>│
-       │                                        │
-       │<────── shuchu://auth/callback ─────────│
-       │        (auth code + state)             │
-       │                   │                   │
-       │ POST /auth/token  │                   │
-       │──────────────────>│── exchange code ──>│
-       │                   │<── tokens ─────────│
-       │<── tokens ────────│                   │
-       │                   │                   │
-       ▼                   │                   │
-┌─────────────┐            │                   │
-│   Secure    │            │                   │
-│   Storage   │            │                   │
-└─────────────┘            │                   │
-       │                   │                   │
-       │ API calls with    │                   │
-       │ Bearer token      │                   │
-       │──────────────────>│                   │
-       │                   │── Verify token ───>│
-       │<── response ──────│                   │
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ELECTRON APP                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐                      ┌─────────────────┐       │
+│  │   Main Process  │                      │    Renderer     │       │
+│  │                 │                      │                 │       │
+│  │ • Protocol      │  IPC: callback URL   │ • Clerk JS SDK  │       │
+│  │   registration  │─────────────────────>│ • Auth state    │       │
+│  │ • URL forwarding│                      │ • Token mgmt    │       │
+│  │                 │  IPC: open browser   │                 │       │
+│  │ • Open external │<─────────────────────│                 │       │
+│  └─────────────────┘                      └─────────────────┘       │
+└─────────────────────────────────────────────────────────────────────┘
+         │                                          │
+         │ Opens system browser                     │ API calls with
+         ▼                                          │ Bearer token
+┌─────────────────┐                                 ▼
+│      Clerk      │                        ┌─────────────────┐
+│   (OAuth IdP)   │                        │    Backend API  │
+│                 │                        │                 │
+│ • Google OAuth  │                        │ • JWT verify    │
+│ • Session mgmt  │                        │ • User sync     │
+└─────────────────┘                        │ • CRUD ops      │
+         │                                 └─────────────────┘
+         │ shuchu://auth/callback
+         ▼
+┌─────────────────┐
+│  Main Process   │
+│  (deep link)    │
+└─────────────────┘
 ```
 
-## Token Types (from Clerk OIDC)
+## OAuth Flow (Renderer-Centric)
 
-| Token | Lifetime | Purpose |
-|-------|----------|---------|
-| Authorization Code | 10 minutes | Exchange for tokens (one-time use) |
-| ID Token | Short-lived | JWT for backend verification (contains user info) |
-| Access Token | 2 hours | Access Clerk's userinfo endpoint |
-| Refresh Token | 3 days | Get new access/ID tokens |
+```
+1. User clicks "Login"
+   └─> Renderer: clerk.client.signIn.create({ strategy: 'oauth_google' })
 
-Reference: [Clerk as Identity Provider](https://clerk.com/docs/advanced-usage/clerk-idp)
+2. Clerk SDK returns authorization URL
+   └─> Renderer: window.api.auth.openAuthUrl(url)
+   └─> Main: shell.openExternal(url)
+
+3. User authenticates in browser
+   └─> Clerk redirects to shuchu://auth/callback
+
+4. OS launches app with deep link
+   └─> Main: handleOAuthCallback(url)
+   └─> Main: mainWindow.webContents.send('auth:callback-url', url)
+
+5. Renderer receives callback
+   └─> Renderer: clerk.handleRedirectCallback({ redirectUrl: url })
+   └─> Clerk SDK establishes session
+
+6. API calls use Clerk session token
+   └─> Renderer: await clerk.session.getToken()
+   └─> Backend: verifyToken() with @clerk/backend
+```
 
 ---
 
-## Phase 1: Backend Authentication (Completed)
+## Phase 1: Backend Authentication
 
 ### 1.1 Database Schema
 
@@ -88,7 +100,7 @@ export const userAuthProvidersTable = sqliteTable('user_auth_providers', {
   provider: text('provider').notNull(),       // 'clerk', 'google', etc.
   providerId: text('provider_id').notNull(),  // External ID from provider
   email: text('email'),
-  providerData: text('provider_data'),        // JSON with additional data (e.g., imageUrl)
+  providerData: text('provider_data'),        // JSON with additional data
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
@@ -102,7 +114,7 @@ export const userAuthProvidersTable = sqliteTable('user_auth_providers', {
 pnpm --filter web add @clerk/backend
 ```
 
-Using `@clerk/backend` for JWT verification - provides `verifyToken()` function that handles JWKS fetching and token validation automatically.
+Using `@clerk/backend` for JWT verification - provides `verifyToken()` function.
 
 ### 1.3 Auth Middleware
 
@@ -122,7 +134,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   const authHeader = c.req.header('Authorization')
 
   if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized', message: 'Missing authorization' }, 401)
+    return c.json({ error: 'Unauthorized' }, 401)
   }
 
   const token = authHeader.substring(7)
@@ -140,7 +152,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
     await next()
   } catch (error) {
-    return c.json({ error: 'Unauthorized', message: 'Invalid token' }, 401)
+    return c.json({ error: 'Unauthorized' }, 401)
   }
 })
 ```
@@ -149,300 +161,235 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
 **File**: `apps/web/app/core/auth.db.ts`
 
-Features:
-- Provider-agnostic design supporting multiple auth providers
-- Race condition handling for concurrent user creation
-- No in-memory caching (not effective in serverless environments)
-
 ```typescript
 export async function findOrCreateUserByProvider(
   db: DB,
   providerInfo: AuthProviderInfo
 ): Promise<SelectUser> {
-  // 1. Look up user_auth_providers table by (provider, providerId)
-  // 2. If found, return linked user (update if needed)
-  // 3. If not found, create user + auth provider with race condition handling
-}
-```
-
-### 1.5 Handler Pattern
-
-All handlers use auth context:
-
-```typescript
-export const listTasksHandler: RouteHandler<typeof listTasksRoute> = async (c) => {
-  const db = getDb()
-  const auth = c.get('auth')
-
-  const user = await findOrCreateUserByProvider(db, {
-    provider: 'clerk',
-    providerId: auth.userId,
-    email: auth.email,
-  })
-
-  const tasks = await getAllTasks(db, user.id.toString(), filters)
-  return c.json({ tasks, total: tasks.length }, 200)
+  // 1. Look up user_auth_providers by (provider, providerId)
+  // 2. If found, return linked user
+  // 3. If not found, create user + auth provider link
 }
 ```
 
 ---
 
-## Phase 2: Backend OAuth Endpoints (Completed)
+## Phase 2: Electron Clerk SDK Integration
 
-### 2.1 OAuth Sessions Table
-
-**File**: `apps/web/app/db/schema/schema.ts`
-
-Stores PKCE sessions for OAuth flow:
-
-```typescript
-export const oauthSessionsTable = sqliteTable('oauth_sessions', {
-  id: blob('id').primaryKey().$type<string>(),
-  state: text('state').notNull().unique(),      // Random string for CSRF protection
-  codeVerifier: text('code_verifier').notNull(), // PKCE code_verifier
-  redirectUri: text('redirect_uri').notNull(),  // Client's callback URL
-  expiresAt: integer('expires_at', { mode: 'number' }).notNull(), // Unix timestamp, 10 min TTL
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-});
-```
-
-### 2.2 OAuth Endpoints
-
-**Files**:
-- `apps/web/app/api/[[...route]]/routes/oauth.ts`
-- `apps/web/app/api/[[...route]]/handlers/oauth.ts`
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/auth/url` | GET | Public | Generate OAuth URL with PKCE |
-| `/auth/token` | POST | Public | Exchange code for tokens |
-
-#### GET /auth/url
-
-```typescript
-// Request
-GET /api/auth/url?redirect_uri=shuchu://auth/callback
-
-// Response
-{
-  "authUrl": "https://your-app.clerk.accounts.dev/oauth/authorize?...",
-  "sessionId": "019414a7-cd12-7000-8000-000000000001"
-}
-```
-
-Handler:
-1. Generates PKCE values (state, code_verifier, code_challenge)
-2. Stores session in SQLite with 10-minute TTL
-3. Builds Clerk authorization URL
-4. Returns authUrl and sessionId
-
-#### POST /auth/token
-
-```typescript
-// Request
-POST /api/auth/token
-{
-  "code": "auth_code_from_callback",
-  "state": "state_from_callback",
-  "sessionId": "session_id_from_auth_url"
-}
-
-// Response
-{
-  "accessToken": "...",
-  "idToken": "...",
-  "refreshToken": "...",
-  "expiresIn": 3600
-}
-```
-
-Handler:
-1. Validates session by ID and state
-2. Checks session hasn't expired
-3. Exchanges code with Clerk using stored code_verifier
-4. Deletes session (one-time use)
-5. Returns tokens
-
-### 2.3 Route Registration
-
-**File**: `apps/web/app/api/[[...route]]/route.ts`
-
-OAuth routes registered BEFORE auth middleware (public endpoints):
-
-```typescript
-// PUBLIC ROUTES (no auth required)
-app.openapi(healthRoute, healthHandler)
-app.openapi(getAuthUrlRoute, getAuthUrlHandler)
-app.openapi(exchangeTokenRoute, exchangeTokenHandler)
-
-// Apply auth middleware to all routes below
-app.use('/*', authMiddleware)
-
-// PROTECTED ROUTES
-app.openapi(listTasksRoute, listTasksHandler)
-// ... other protected routes
-```
-
----
-
-## Phase 3: Electron OAuth Flow (Completed)
-
-### 3.1 Dependencies
+### 2.1 Dependencies
 
 ```bash
-pnpm --filter electron add electron-store
+pnpm --filter electron add @clerk/clerk-js
 ```
 
-Using `electron-store` + Electron's `safeStorage` for secure token storage.
+### 2.2 Clerk Initialization
 
-### 3.2 Token Storage
-
-**File**: `apps/electron/src/main/auth/tokenStorage.ts`
+**File**: `apps/electron/src/renderer/src/lib/clerk.ts`
 
 ```typescript
-export interface TokenData {
-  accessToken: string
-  idToken?: string      // OIDC ID token for backend verification
-  refreshToken?: string
-  expiresAt: number     // Unix timestamp in milliseconds
+import { Clerk } from '@clerk/clerk-js'
+
+const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+if (!publishableKey) {
+  throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required')
+}
+
+export const clerk = new Clerk(publishableKey)
+
+let initialized = false
+let initPromise: Promise<void> | null = null
+
+export async function initClerk(): Promise<void> {
+  if (initialized) return
+  if (initPromise) return initPromise
+
+  initPromise = clerk.load().then(() => {
+    initialized = true
+  })
+
+  return initPromise
+}
+
+export function isAuthenticated(): boolean {
+  return initialized && clerk.session !== null && clerk.session !== undefined
+}
+
+export async function getSessionToken(): Promise<string | null> {
+  if (!initialized || !clerk.session) return null
+  return await clerk.session.getToken()
+}
+
+export async function signOut(): Promise<void> {
+  if (!initialized || !clerk.session) return
+  await clerk.signOut()
+}
+
+export function onSessionChange(callback: (session: typeof clerk.session) => void): () => void {
+  return clerk.addListener((resources) => {
+    callback(resources.session)
+  })
 }
 ```
 
-Features:
-- Uses `safeStorage.encryptString()` when available
-- Falls back to basic storage with warning if encryption unavailable
-- 5-minute buffer before token expiry
+### 2.3 Preload Script
 
-### 3.3 OAuth Flow Manager
+**File**: `apps/electron/src/preload/index.ts`
+
+```typescript
+const api = {
+  auth: {
+    // Open OAuth URL in system browser
+    openAuthUrl: (url: string): Promise<void> => ipcRenderer.invoke('auth:open-url', url),
+    // Listen for OAuth callback URL from main process
+    onCallbackUrl: (callback: (url: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, url: string): void => {
+        callback(url)
+      }
+      ipcRenderer.on('auth:callback-url', handler)
+      return () => ipcRenderer.removeListener('auth:callback-url', handler)
+    }
+  },
+  // ... other APIs
+}
+```
+
+### 2.4 Main Process Auth
 
 **File**: `apps/electron/src/main/auth/authFlow.ts`
 
-Simplified to use backend endpoints:
+Simplified to only forward URLs:
 
 ```typescript
-const API_URL = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
-const REDIRECT_URI = 'shuchu://auth/callback'
+import { shell, app, BrowserWindow } from 'electron'
 
-let pendingSessionId: string | null = null
+const PROTOCOL = 'shuchu'
+const CALLBACK_PATH = 'auth/callback'
 
-export async function login(): Promise<void> {
-  // Get auth URL from backend
-  const response = await fetch(`${API_URL}/api/auth/url?redirect_uri=${encodeURIComponent(REDIRECT_URI)}`)
-  const { authUrl, sessionId } = await response.json()
+let mainWindow: BrowserWindow | null = null
 
-  // Store session ID for callback
-  pendingSessionId = sessionId
+export function setMainWindow(window: BrowserWindow | null): void {
+  mainWindow = window
+}
 
-  // Open in system browser
-  await shell.openExternal(authUrl)
+export function registerProtocolHandler(): void {
+  if (process.defaultApp) {
+    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [process.argv[1]])
+  } else {
+    app.setAsDefaultProtocolClient(PROTOCOL)
+  }
 }
 
 export async function handleOAuthCallback(url: string): Promise<boolean> {
-  const urlObj = new URL(url)
-  const code = urlObj.searchParams.get('code')
-  const state = urlObj.searchParams.get('state')
+  if (!url.startsWith(`${PROTOCOL}://${CALLBACK_PATH}`)) {
+    return false
+  }
 
-  // Exchange code for tokens via backend
-  const response = await fetch(`${API_URL}/api/auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code, state, sessionId: pendingSessionId })
-  })
-
-  const tokens = await response.json()
-  setTokens(tokens)
-  pendingSessionId = null
+  // Forward callback URL to renderer for Clerk SDK to process
+  mainWindow?.webContents.send('auth:callback-url', url)
   return true
+}
+
+export async function openAuthUrl(url: string): Promise<void> {
+  await shell.openExternal(url)
 }
 ```
 
-### 3.4 Protocol Registration
+### 2.5 Main Process IPC
 
 **File**: `apps/electron/src/main/index.ts`
 
 ```typescript
+import { registerProtocolHandler, handleOAuthCallback, setMainWindow, openAuthUrl } from './auth/authFlow'
+
 // Register protocol before app is ready
-app.setAsDefaultProtocolClient('shuchu')
+registerProtocolHandler()
 
-// macOS: Handle protocol URL when app is running
-app.on('open-url', (event, url) => {
+app.whenReady().then(() => {
+  // IPC handler for opening OAuth URL
+  ipcMain.handle('auth:open-url', async (_event, url: string) => {
+    await openAuthUrl(url)
+  })
+
+  createWindow()
+  setMainWindow(mainWindow)
+
+  // ... other initialization
+})
+
+// Handle OAuth callback via deep link (macOS)
+app.on('open-url', async (event, url) => {
   event.preventDefault()
-  handleOAuthCallback(url)
+  await handleOAuthCallback(url)
 })
 
-// Windows: Handle via second-instance
-app.on('second-instance', (_event, commandLine) => {
-  const url = commandLine.find(arg => arg.startsWith('shuchu://'))
-  if (url) handleOAuthCallback(url)
-})
-```
-
-### 3.5 IPC Handlers
-
-```typescript
-ipcMain.handle('auth:login', async () => {
-  await login()
-  return { success: true }
-})
-
-ipcMain.handle('auth:logout', async () => {
-  logout()
-})
-
-ipcMain.handle('auth:get-token', async () => {
-  return getAccessToken()
-})
-
-ipcMain.handle('auth:is-authenticated', async () => {
-  return isAuthenticated()
+// Handle OAuth callback via deep link (Windows/Linux)
+app.on('second-instance', async (_event, argv) => {
+  const url = argv.find(arg => arg.startsWith('shuchu://'))
+  if (url) await handleOAuthCallback(url)
 })
 ```
 
 ---
 
-## Phase 4: Renderer Integration (Completed)
+## Phase 3: Renderer OAuth Flow
 
-### 4.1 HTTP Client
-
-**File**: `apps/electron/src/renderer/src/lib/api/mutator.ts`
-
-```typescript
-export const customInstance = async <T>(config: CustomRequestConfig): Promise<T> => {
-  const accessToken = await window.api.auth.getToken()
-
-  const response = await fetch(url.toString(), {
-    method: config.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-      ...config.headers,
-    },
-    body: config.data ? JSON.stringify(config.data) : undefined,
-  })
-
-  if (response.status === 401) {
-    authRequiredCallbacks.forEach(cb => cb())
-    throw new Error('Unauthorized')
-  }
-
-  return response.json()
-}
-```
-
-### 4.2 Auth Context
+### 3.1 Auth Context
 
 **File**: `apps/electron/src/renderer/src/contexts/AuthContext.tsx`
 
 ```typescript
-export function AuthProvider({ children }: AuthProviderProps) {
+import { clerk, initClerk, isAuthenticated as checkClerkAuth, signOut as clerkSignOut, onSessionChange } from '../lib/clerk'
+
+export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Initialize Clerk on mount
   useEffect(() => {
-    window.api.auth.isAuthenticated().then(setIsAuthenticated)
-    const unsubscribe = window.api.auth.onAuthStateChange(setIsAuthenticated)
-    const unsubscribe401 = onAuthRequired(() => setIsAuthenticated(false))
-    return () => { unsubscribe(); unsubscribe401() }
+    initClerk()
+      .then(() => setIsAuthenticated(checkClerkAuth()))
+      .finally(() => setIsLoading(false))
+  }, [])
+
+  // Listen for session changes
+  useEffect(() => {
+    return onSessionChange((session) => {
+      setIsAuthenticated(session !== null && session !== undefined)
+    })
+  }, [])
+
+  // Listen for OAuth callback from main process
+  useEffect(() => {
+    return window.api.auth.onCallbackUrl(async (url) => {
+      setIsLoading(true)
+      await clerk.handleRedirectCallback({ redirectUrl: url })
+      setIsAuthenticated(checkClerkAuth())
+      setIsLoading(false)
+    })
+  }, [])
+
+  const login = useCallback(async () => {
+    setIsLoading(true)
+    const signIn = clerk.client?.signIn
+    if (!signIn) throw new Error('Clerk client not available')
+
+    const result = await signIn.create({
+      strategy: 'oauth_google',
+      redirectUrl: 'shuchu://auth/callback',
+      actionCompleteRedirectUrl: 'shuchu://auth/callback'
+    })
+
+    if (result.firstFactorVerification.externalVerificationRedirectURL) {
+      await window.api.auth.openAuthUrl(
+        result.firstFactorVerification.externalVerificationRedirectURL.toString()
+      )
+    }
+  }, [])
+
+  const logout = useCallback(async () => {
+    await clerkSignOut()
+    setIsAuthenticated(false)
   }, [])
 
   return (
@@ -453,11 +400,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
 }
 ```
 
-### 4.3 Login Screen
+---
 
-**File**: `apps/electron/src/renderer/src/components/LoginScreen.tsx`
+## Phase 4: API Integration
 
-Simple login UI with "Sign in with Clerk" button.
+### 4.1 HTTP Client
+
+**File**: `apps/electron/src/renderer/src/lib/api/mutator.ts`
+
+```typescript
+import { getSessionToken } from '../clerk'
+
+export const customInstance = async <T>(config: CustomRequestConfig): Promise<T> => {
+  // Get token from Clerk session (not IPC)
+  const token = await getSessionToken()
+
+  const response = await fetch(url.toString(), {
+    method: config.method || 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': token ? `Bearer ${token}` : '',
+      ...config.headers,
+    },
+    body: config.data ? JSON.stringify(config.data) : undefined,
+  })
+
+  if (response.status === 401) {
+    notifyAuthRequired()
+  }
+
+  return response.json()
+}
+```
 
 ---
 
@@ -466,17 +440,17 @@ Simple login UI with "Sign in with Clerk" button.
 ### Web App (`apps/web/.env.local`)
 ```bash
 CLERK_SECRET_KEY=sk_test_xxx
-CLERK_PUBLISHABLE_KEY=pk_test_xxx
-CLERK_FRONTEND_API=your-app.clerk.accounts.dev
 ```
 
 ### Electron App (`apps/electron/.env`)
 ```bash
 VITE_API_URL=http://localhost:3000/api
 MAIN_VITE_API_URL=http://localhost:3000
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxx
 ```
 
-**Note**: Electron no longer needs Clerk credentials - all OAuth is handled by the backend.
+### Clerk Dashboard Configuration
+- Add `shuchu://auth/callback` to allowed redirect URLs
 
 ---
 
@@ -484,46 +458,38 @@ MAIN_VITE_API_URL=http://localhost:3000
 
 | File | Description |
 |------|-------------|
-| `apps/web/app/db/schema/schema.ts` | User, auth provider, and OAuth session tables |
-| `apps/web/app/api/[[...route]]/route.ts` | Route registration with public OAuth endpoints |
+| `apps/web/app/db/schema/schema.ts` | User and auth provider tables |
 | `apps/web/app/api/[[...route]]/middleware/auth.ts` | JWT verification with @clerk/backend |
-| `apps/web/app/api/[[...route]]/routes/oauth.ts` | OAuth route definitions |
-| `apps/web/app/api/[[...route]]/handlers/oauth.ts` | OAuth handlers (URL generation, token exchange) |
 | `apps/web/app/core/auth.db.ts` | User sync with race condition handling |
-| `apps/web/app/core/oauth.db.ts` | OAuth session CRUD operations |
-| `apps/electron/src/main/auth/authFlow.ts` | Simplified OAuth flow using backend |
-| `apps/electron/src/main/auth/tokenStorage.ts` | Secure token storage |
-| `apps/electron/src/preload/index.ts` | Expose auth API to renderer |
-| `apps/electron/src/renderer/src/contexts/AuthContext.tsx` | Auth state management |
+| `apps/electron/src/renderer/src/lib/clerk.ts` | Clerk SDK initialization and helpers |
+| `apps/electron/src/renderer/src/contexts/AuthContext.tsx` | Auth state management with Clerk |
+| `apps/electron/src/main/auth/authFlow.ts` | Protocol registration and URL forwarding |
+| `apps/electron/src/preload/index.ts` | IPC bridge for auth |
+| `apps/electron/src/renderer/src/lib/api/mutator.ts` | HTTP client with Clerk tokens |
 
 ---
 
 ## Verification Steps
 
-1. **Backend OAuth endpoints**:
-   ```bash
-   pnpm --filter web run dev:local
+1. **Clerk initialization**:
+   - App starts without errors
+   - Clerk loads with publishableKey
 
-   # Get auth URL
-   curl "http://localhost:3000/api/auth/url?redirect_uri=shuchu://auth/callback"
-   # Should return: { "authUrl": "https://...", "sessionId": "..." }
-
-   # Protected endpoint without auth
-   curl http://localhost:3000/api/tasks
-   # Should return 401
+2. **Login flow**:
+   ```
+   Click login → opens browser → authenticate → redirects to shuchu://auth/callback
+   → App receives callback → Clerk processes → session established
    ```
 
-2. **Electron OAuth Flow**:
-   - Start app: `pnpm --filter electron run dev`
-   - Should show login screen
-   - Click login → opens browser → auth → redirects back
-   - App should show main UI with user's tasks
+3. **API calls**:
+   - Authenticated API calls work
+   - Token automatically retrieved from Clerk session
 
-3. **Multi-user**:
-   - Login as different users
-   - Verify each user sees only their own data
+4. **Logout**:
+   - Session cleared properly
+   - Redirected to login screen
 
-4. **Type safety**:
+5. **Type safety**:
    ```bash
    pnpm run check-types
    ```
@@ -532,63 +498,63 @@ MAIN_VITE_API_URL=http://localhost:3000
 
 ## Security Considerations
 
-- **PKCE on backend**: Code verifier never leaves the server
-- **Session TTL**: 10-minute expiry prevents session theft
-- **One-time use**: Sessions deleted after token exchange
-- **CSRF protection**: State parameter validated on callback
-- **Protocol validation**: Only allowed protocols (shuchu://, http://, https://)
-- **Credentials on server**: Clerk credentials only on backend, not exposed to clients
+- **Publishable key**: Safe to expose in client (public key)
+- **PKCE**: Handled internally by Clerk SDK
+- **Token storage**: Managed by Clerk SDK (uses secure browser storage)
+- **JWT verification**: Backend verifies tokens with `@clerk/backend`
+- **Protocol validation**: Main process only handles `shuchu://auth/callback`
 
 ---
 
-## Implementation Decisions
+## Architecture Comparison
 
-### Why backend-generated OAuth URLs?
+### Previous (Backend-Centric)
 
-- Clerk credentials stay on the server (more secure)
-- Simpler Electron client (no crypto operations)
-- Centralized configuration
-- Works well with serverless (PKCE stored in database)
+```
+Electron → GET /api/auth/url → Backend generates URL → Browser → Callback
+        → POST /api/auth/token → Backend exchanges code → Returns tokens
+        → Electron stores tokens in safeStorage
+```
 
-### Why SQLite for OAuth sessions?
+### Current (Renderer-Centric)
 
-- Persistent across serverless function invocations
-- Simple cleanup of expired sessions
-- No external dependencies (Redis, etc.)
+```
+Electron Renderer → Clerk SDK creates sign-in → Browser → Callback
+                 → Main forwards URL via IPC → Renderer handles with Clerk SDK
+                 → Clerk SDK manages session internally
+```
 
-### Why no in-memory user cache?
+### Benefits of Renderer-Centric
 
-- Not effective in serverless environments (each instance has separate cache)
-- Added complexity without benefit
-- Database queries are fast with indexed lookups
-
-### Why `@clerk/backend` instead of `jose`?
-
-- `verifyToken()` handles JWKS fetching automatically
-- Less boilerplate code
-- Clerk-specific optimizations
-
-### Why separate `userAuthProvidersTable`?
-
-- Keeps `usersTable` provider-agnostic
-- Supports multiple auth providers per user
-- Easy to add new providers without schema changes
+| Aspect | Backend-Centric | Renderer-Centric |
+|--------|-----------------|------------------|
+| Token management | Custom (safeStorage) | Clerk SDK (automatic) |
+| Token refresh | Manual implementation | Automatic by Clerk |
+| Session state | Manual sync | Clerk SDK listeners |
+| Backend code | OAuth endpoints needed | Just JWT verification |
+| Error handling | Manual | Clerk SDK handles |
 
 ---
 
-## Future Considerations
+## User Creation Flow
 
-- **Token refresh endpoint**: Add `POST /auth/refresh` for backend-managed refresh
-- **Mobile (React Native)**: Use `@clerk/clerk-expo` with `expo-secure-store`
-- **Web**: Use `@clerk/nextjs` middleware + `@clerk/clerk-react`
-- **Additional providers**: Can easily add Google, GitHub direct OAuth
+User creation happens on the **backend** during the first authenticated API call:
+
+```
+1. User authenticates with Clerk (via SDK in renderer)
+2. Clerk SDK returns session token
+3. First API call sends token in Authorization header
+4. Backend middleware verifies token with @clerk/backend
+5. Handler calls findOrCreateUserByProvider():
+   - Looks up by (provider='clerk', providerId=clerkUserId)
+   - If not found → creates new user + auth provider link
+   - If found → returns existing user
+```
 
 ---
 
 ## References
 
-- [Clerk as Identity Provider](https://clerk.com/docs/advanced-usage/clerk-idp)
-- [OAuth 2.0 PKCE (RFC 7636)](https://datatracker.ietf.org/doc/html/rfc7636)
+- [Clerk JavaScript SDK](https://clerk.com/docs/references/javascript/clerk/clerk)
 - [@clerk/backend](https://clerk.com/docs/references/backend/overview)
 - [Electron Deep Links](https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app)
-- [electron-store](https://github.com/sindresorhus/electron-store)

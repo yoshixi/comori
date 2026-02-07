@@ -8,11 +8,8 @@ import { NotificationScheduler, type NotificationPermissionStatus } from './noti
 import {
   registerProtocolHandler,
   handleOAuthCallback,
-  login,
-  logout,
-  getAccessToken,
-  isAuthenticated,
-  setAuthStateChangeCallback
+  setMainWindow,
+  openAuthUrl
 } from './auth/authFlow'
 
 // Register protocol handler before app is ready
@@ -202,6 +199,7 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+    setMainWindow(null)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -241,34 +239,9 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  // Auth IPC handlers
-  ipcMain.handle('auth:login', async () => {
-    try {
-      await login()
-      return { success: true }
-    } catch (error) {
-      console.error('Login failed:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Login failed' }
-    }
-  })
-
-  ipcMain.handle('auth:logout', () => {
-    logout()
-    return { success: true }
-  })
-
-  ipcMain.handle('auth:get-token', async () => {
-    const token = await getAccessToken()
-    return token
-  })
-
-  ipcMain.handle('auth:is-authenticated', () => {
-    return isAuthenticated()
-  })
-
-  // Set up auth state change callback to notify renderer
-  setAuthStateChangeCallback((authenticated: boolean) => {
-    mainWindow?.webContents.send('auth:state-changed', authenticated)
+  // Auth IPC handler - open OAuth URL in system browser
+  ipcMain.handle('auth:open-url', async (_event, url: string) => {
+    await openAuthUrl(url)
   })
 
   // Notification permission handlers
@@ -294,6 +267,9 @@ app.whenReady().then(() => {
   )
 
   createWindow()
+
+  // Set main window reference for auth flow IPC
+  setMainWindow(mainWindow)
 
   // Register global shortcuts for zoom (fallback for keyboard layouts where menu accelerators don't work)
   globalShortcut.register('CommandOrControl+-', () => {
@@ -335,7 +311,10 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+      setMainWindow(mainWindow)
+    }
   })
 })
 

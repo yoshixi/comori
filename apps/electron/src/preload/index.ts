@@ -12,27 +12,20 @@ interface TimerState {
 // Notification permission status type
 type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
-// Auth result type
-interface AuthResult {
-  success: boolean
-  error?: string
-}
-
 // Custom APIs for renderer
 const api = {
   // Auth APIs
   auth: {
-    login: (): Promise<AuthResult> => ipcRenderer.invoke('auth:login'),
-    logout: (): Promise<AuthResult> => ipcRenderer.invoke('auth:logout'),
-    getToken: (): Promise<string | null> => ipcRenderer.invoke('auth:get-token'),
-    isAuthenticated: (): Promise<boolean> => ipcRenderer.invoke('auth:is-authenticated'),
-    onAuthStateChange: (callback: (authenticated: boolean) => void): (() => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, authenticated: boolean): void => {
-        callback(authenticated)
+    // Open OAuth URL in system browser
+    openAuthUrl: (url: string): Promise<void> => ipcRenderer.invoke('auth:open-url', url),
+    // Listen for OAuth callback URL from main process
+    onCallbackUrl: (callback: (url: string) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, url: string): void => {
+        callback(url)
       }
-      ipcRenderer.on('auth:state-changed', handler)
+      ipcRenderer.on('auth:callback-url', handler)
       return () => {
-        ipcRenderer.removeListener('auth:state-changed', handler)
+        ipcRenderer.removeListener('auth:callback-url', handler)
       }
     }
   },

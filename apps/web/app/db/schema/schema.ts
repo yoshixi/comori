@@ -1,16 +1,16 @@
-import { sqliteTable, text, integer, blob, index, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, unique } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 // Users table
 export const usersTable = sqliteTable('users', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
 });
 
 // Tasks table
 export const tasksTable = sqliteTable('tasks', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
-  userId: blob('user_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
   dueAt: integer('due_at', { mode: 'number' }), // Unix timestamp
@@ -23,8 +23,8 @@ export const tasksTable = sqliteTable('tasks', {
 
 // TaskTimers table
 export const taskTimersTable = sqliteTable('task_timers', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
-  taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
   startTime: integer('start_time', { mode: 'number' }).notNull(), // Unix timestamp (seconds)
   endTime: integer('end_time', { mode: 'number' }), // Unix timestamp (seconds, optional)
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
@@ -33,9 +33,9 @@ export const taskTimersTable = sqliteTable('task_timers', {
 
 // TaskComments table
 export const taskCommentsTable = sqliteTable('task_comments', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
-  taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
-  authorId: blob('author_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }).$type<string>(),
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
+  authorId: integer('author_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
@@ -43,8 +43,8 @@ export const taskCommentsTable = sqliteTable('task_comments', {
 
 // Tags table (user-scoped tags)
 export const tagsTable = sqliteTable('tags', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
-  userId: blob('user_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
@@ -54,9 +54,9 @@ export const tagsTable = sqliteTable('tags', {
 
 // TaskTags junction table (many-to-many relationship between tasks and tags)
 export const taskTagsTable = sqliteTable('task_tags', {
-  id: blob('id').primaryKey().$type<string>(), // UUID v7 (16 bytes)
-  taskId: blob('task_id').notNull().references(() => tasksTable.id, { onDelete: 'cascade' }).$type<string>(),
-  tagId: blob('tag_id').notNull().references(() => tagsTable.id, { onDelete: 'cascade' }).$type<string>(),
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
+  tagId: integer('tag_id', { mode: 'number' }).notNull().references(() => tagsTable.id, { onDelete: 'cascade' }),
   createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueTaskTag: unique().on(table.taskId, table.tagId),

@@ -17,7 +17,7 @@ export const listTasksHandler: RouteHandler<typeof listTasksRoute> = async (c) =
     // Validate and extract query parameters using the TaskQueryParamsModel schema
     const { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags } = c.req.valid('query')
 
-    const tasks = await getAllTasks(db, defaultUser.id.toString(), { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
+    const tasks = await getAllTasks(db, defaultUser.id, { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
 
     return c.json(
       {
@@ -44,7 +44,7 @@ export const getTaskHandler: RouteHandler<typeof getTaskRoute> = async (c) => {
     const defaultUser = await ensureDefaultUser(db)
     const { id } = c.req.valid('param')
     
-    const task = await getTaskById(db, defaultUser.id.toString(), id)
+    const task = await getTaskById(db, defaultUser.id, id)
     
     if (!task) {
       return c.json(
@@ -75,7 +75,7 @@ export const createTaskHandler: RouteHandler<typeof createTaskRoute> = async (c)
     const defaultUser = await ensureDefaultUser(db)
     const data = c.req.valid('json')
     
-    const task = await createTask(db, defaultUser.id.toString(), data)
+    const task = await createTask(db, defaultUser.id, data)
     
     return c.json({ task }, 201)
   } catch (error) {
@@ -97,7 +97,7 @@ export const updateTaskHandler: RouteHandler<typeof updateTaskRoute> = async (c)
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
     
-    const task = await updateTask(db, defaultUser.id.toString(), id, data)
+    const task = await updateTask(db, defaultUser.id, id, data)
     
     if (!task) {
       return c.json(
@@ -128,7 +128,7 @@ export const deleteTaskHandler: RouteHandler<typeof deleteTaskRoute> = async (c)
     const defaultUser = await ensureDefaultUser(db)
     const { id } = c.req.valid('param')
     
-    const task = await deleteTask(db, defaultUser.id.toString(), id)
+    const task = await deleteTask(db, defaultUser.id, id)
     
     if (!task) {
       return c.json(

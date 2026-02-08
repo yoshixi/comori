@@ -1,5 +1,5 @@
 import { usersTable } from '../db/schema/schema';
-import { createId, type DB } from './common.db';
+import { type DB } from './common.db';
 import { validateRequiredString } from './common.core';
 
 /**
@@ -11,11 +11,9 @@ import { validateRequiredString } from './common.core';
 export async function createUser(db: DB, name: string) {
   const validatedName = validateRequiredString(name, 'Name');
   
-  const userId = createId();
   const [createdUser] = await db
     .insert(usersTable)
     .values({
-      id: userId,
       name: validatedName,
     })
     .returning();

@@ -164,7 +164,7 @@ function App(): React.JSX.Element {
   // | OFF   | ON          | All tasks (scheduled first, then unscheduled) |
   // | OFF   | OFF         | Only scheduled tasks |
   const [showUnscheduled, setShowUnscheduled] = useState(true)
-  const [filterTagIds, setFilterTagIds] = useState<string[]>([])
+  const [filterTagIds, setFilterTagIds] = useState<number[]>([])
   const [sortBy, setSortBy] = useState<'createdAt' | 'startAt'>('startAt')
   const [calendarViewMode, setCalendarViewMode] = useState<ViewMode>('day')
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -173,7 +173,7 @@ function App(): React.JSX.Element {
     description: string
     startAt: string
     endAt: string
-    tagIds: string[]
+    tagIds: number[]
   } | null>(null)
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
@@ -306,7 +306,7 @@ function App(): React.JSX.Element {
   // Combined tasks for operations that need to find a task
   const allTasks = useMemo(() => {
     // Merge activeTasks, inactiveTasks, and sidebarActiveTasks, removing duplicates
-    const taskMap = new Map<string, Task>()
+    const taskMap = new Map<number, Task>()
     for (const task of [...activeTasks, ...inactiveTasks, ...sidebarActiveTasks]) {
       taskMap.set(task.id, task)
     }
@@ -326,16 +326,16 @@ function App(): React.JSX.Element {
     description: '',
     dueDate: '',
     startAt: '',
-    tagIds: [] as string[]
+    tagIds: [] as number[]
   })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
-  const [editingCell, setEditingCell] = useState<{ taskId: string; field: 'title' | 'description' } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ taskId: number; field: 'title' | 'description' } | null>(null)
   const [editingValue, setEditingValue] = useState('')
-  const [editingTagsTaskId, setEditingTagsTaskId] = useState<string | null>(null)
+  const [editingTagsTaskId, setEditingTagsTaskId] = useState<number | null>(null)
   const [scheduleEditingTask, setScheduleEditingTask] = useState<Task | null>(null)
   const [isSchedulePickerOpen, setIsSchedulePickerOpen] = useState(false)
-  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set())
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<number>>(new Set())
 
   const taskIds = useMemo(() => allTasks.map((task) => task.id), [allTasks])
 
@@ -350,7 +350,7 @@ function App(): React.JSX.Element {
   })
   const timers = timersResponse?.timers ?? []
   const activeTimersByTaskId = useMemo(() => {
-    const map = new Map<string, TaskTimer>()
+    const map = new Map<number, TaskTimer>()
     timers.forEach((timer) => {
       if (!timer.endTime) {
         const existing = map.get(timer.taskId)
@@ -370,7 +370,7 @@ function App(): React.JSX.Element {
 
   // Group timers by task ID for nested timer rows
   const timersByTaskId = useMemo(() => {
-    const map = new Map<string, TaskTimer[]>()
+    const map = new Map<number, TaskTimer[]>()
     timers.forEach((timer) => {
       const existing = map.get(timer.taskId) || []
       map.set(timer.taskId, [...existing, timer])
@@ -388,7 +388,7 @@ function App(): React.JSX.Element {
   }, [timers])
 
   // Toggle expand/collapse for timer rows
-  const toggleTaskExpansion = useCallback((taskId: string) => {
+  const toggleTaskExpansion = useCallback((taskId: number) => {
     setExpandedTaskIds((prev) => {
       const next = new Set(prev)
       if (next.has(taskId)) {
@@ -448,7 +448,7 @@ function App(): React.JSX.Element {
 
   // Listen for show task detail request from tray menu
   useEffect(() => {
-    const unsubscribe = window.api.onShowTaskDetail((taskId: string) => {
+    const unsubscribe = window.api.onShowTaskDetail((taskId: number) => {
       // Find the task and show the detail modal
       const task = allTasks.find((t) => t.id === taskId)
       if (task) {
@@ -623,7 +623,7 @@ function App(): React.JSX.Element {
     if (!newTaskFields.title.trim()) return
 
     const now = new Date().toISOString()
-    const tempId = `temp-${Date.now()}`
+    const tempId = -Date.now()
 
     // Create optimistic task object
     const optimisticTask: Task = {
@@ -700,7 +700,7 @@ function App(): React.JSX.Element {
     setIsAddingTask(false)
   }
 
-  function handleStartEditing(taskId: string, field: 'title' | 'description', currentValue: string): void {
+  function handleStartEditing(taskId: number, field: 'title' | 'description', currentValue: string): void {
     setEditingCell({ taskId, field })
     setEditingValue(currentValue || '')
   }
@@ -735,7 +735,7 @@ function App(): React.JSX.Element {
       })
   }
 
-  async function handleSaveSchedule(taskId: string, startAt: string | null, endAt: string | null): Promise<void> {
+  async function handleSaveSchedule(taskId: number, startAt: string | null, endAt: string | null): Promise<void> {
     try {
       await putApiTasksId(taskId, {
         startAt: startAt ? normalizeDateTime(startAt) : null,
@@ -791,7 +791,7 @@ function App(): React.JSX.Element {
     }
   }
 
-  function handleUpdateTaskTags(taskId: string, tagIds: string[]): void {
+  function handleUpdateTaskTags(taskId: number, tagIds: number[]): void {
     putApiTasksId(taskId, { tagIds })
       .then(() => mutateBothTaskLists())
       .catch((error) => {
@@ -799,7 +799,7 @@ function App(): React.JSX.Element {
       })
   }
 
-  const handleDeleteTask = async (taskId: string): Promise<void> => {
+  const handleDeleteTask = async (taskId: number): Promise<void> => {
     if (!confirm('Are you sure you want to delete this task?')) return
 
     try {
@@ -813,7 +813,7 @@ function App(): React.JSX.Element {
     }
   }
 
-  function handleStartTimer(taskId: string): void {
+  function handleStartTimer(taskId: number): void {
     const task = allTasks.find(t => t.id === taskId)
     if (!task) return
 
@@ -862,7 +862,7 @@ function App(): React.JSX.Element {
       })
   }
 
-  function handleStopTimer(taskId: string, timerId: string): void {
+  function handleStopTimer(taskId: number, timerId: number): void {
     const task = allTasks.find(t => t.id === taskId)
     if (!task) return
 
@@ -907,7 +907,7 @@ function App(): React.JSX.Element {
       })
   }
 
-  function isTaskActive(taskId: string): boolean {
+  function isTaskActive(taskId: number): boolean {
     return activeTimersByTaskId.has(taskId)
   }
 

@@ -3,8 +3,8 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 // Timer state type (supports multiple timers)
 interface TimerState {
-  timerId: string
-  taskId: string
+  timerId: number
+  taskId: number
   taskTitle: string
   startTime: string
 }
@@ -19,8 +19,8 @@ const api = {
     ipcRenderer.send('timer:states-change', timers)
   },
   // Listen for show task detail request from tray menu (receives taskId)
-  onShowTaskDetail: (callback: (taskId: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+  onShowTaskDetail: (callback: (taskId: number) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: number): void => {
       callback(taskId)
     }
     ipcRenderer.on('tray:show-task-detail', handler)
@@ -29,8 +29,8 @@ const api = {
     }
   },
   // Listen for timer started from notification action
-  onNotificationTimerStarted: (callback: (taskId: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+  onNotificationTimerStarted: (callback: (taskId: number) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: number): void => {
       callback(taskId)
     }
     ipcRenderer.on('notification:timer-started', handler)
@@ -39,8 +39,8 @@ const api = {
     }
   },
   // Listen for timer stopped from notification action
-  onNotificationTimerStopped: (callback: (taskId: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, taskId: string): void => {
+  onNotificationTimerStopped: (callback: (taskId: number) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, taskId: number): void => {
       callback(taskId)
     }
     ipcRenderer.on('notification:timer-stopped', handler)

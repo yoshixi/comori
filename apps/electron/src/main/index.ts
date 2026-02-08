@@ -245,7 +245,7 @@ app.whenReady().then(() => {
     'timer:states-change',
     (
       _event,
-      timers: { timerId: string; taskId: string; taskTitle: string; startTime: string }[]
+      timers: { timerId: number; taskId: number; taskTitle: string; startTime: string }[]
     ) => {
       trayManager?.updateTimerStates(timers)
     }
@@ -267,22 +267,22 @@ app.whenReady().then(() => {
   trayManager.init()
 
   // Wire up show task detail callback - opens task modal in renderer
-  trayManager.setOnShowTaskDetail((taskId: string) => {
+  trayManager.setOnShowTaskDetail((taskId: number) => {
     mainWindow?.webContents.send('tray:show-task-detail', taskId)
   })
 
   // Initialize notification scheduler for task reminders
   notificationScheduler = new NotificationScheduler()
   notificationScheduler.setHandlers({
-    onStartTimer: (taskId: string) => {
+    onStartTimer: (taskId: number) => {
       // Notify renderer to refresh timers
       mainWindow?.webContents.send('notification:timer-started', taskId)
     },
-    onStopTimer: (taskId: string) => {
+    onStopTimer: (taskId: number, _timerId: number) => {
       // Notify renderer to refresh timers
       mainWindow?.webContents.send('notification:timer-stopped', taskId)
     },
-    onShowTask: (taskId: string) => {
+    onShowTask: (taskId: number) => {
       // Show the main window and open task detail
       mainWindow?.show()
       mainWindow?.webContents.send('tray:show-task-detail', taskId)

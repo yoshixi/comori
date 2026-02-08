@@ -16,7 +16,7 @@ export const listTagsHandler: RouteHandler<typeof listTagsRoute> = async (c) => 
     const db = getDb()
     const defaultUser = await ensureDefaultUser(db)
 
-    const tags = await getAllTags(db, defaultUser.id.toString())
+    const tags = await getAllTags(db, defaultUser.id)
 
     return c.json(
       {
@@ -43,7 +43,7 @@ export const getTagHandler: RouteHandler<typeof getTagRoute> = async (c) => {
     const defaultUser = await ensureDefaultUser(db)
     const { id } = c.req.valid('param')
 
-    const tag = await getTagById(db, defaultUser.id.toString(), id)
+    const tag = await getTagById(db, defaultUser.id, id)
 
     if (!tag) {
       return c.json(
@@ -74,7 +74,7 @@ export const createTagHandler: RouteHandler<typeof createTagRoute> = async (c) =
     const defaultUser = await ensureDefaultUser(db)
     const data = c.req.valid('json')
 
-    const tag = await createTag(db, defaultUser.id.toString(), data)
+    const tag = await createTag(db, defaultUser.id, data)
 
     return c.json({ tag }, 201)
   } catch (error) {
@@ -128,7 +128,7 @@ export const updateTagHandler: RouteHandler<typeof updateTagRoute> = async (c) =
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
 
-    const tag = await updateTag(db, defaultUser.id.toString(), id, data)
+    const tag = await updateTag(db, defaultUser.id, id, data)
 
     if (!tag) {
       return c.json(
@@ -191,7 +191,7 @@ export const deleteTagHandler: RouteHandler<typeof deleteTagRoute> = async (c) =
     const defaultUser = await ensureDefaultUser(db)
     const { id } = c.req.valid('param')
 
-    const tag = await deleteTag(db, defaultUser.id.toString(), id)
+    const tag = await deleteTag(db, defaultUser.id, id)
 
     if (!tag) {
       return c.json(

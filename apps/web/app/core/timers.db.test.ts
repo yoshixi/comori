@@ -24,22 +24,22 @@ describe('timers.db', () => {
     const db = testContext.db
     const user = await ensureDefaultUser(db)
 
-    const taskA = await createTask(db, user.id.toString(), {
+    const taskA = await createTask(db, user.id, {
       title: 'Task A'
     })
-    const taskB = await createTask(db, user.id.toString(), {
+    const taskB = await createTask(db, user.id, {
       title: 'Task B'
     })
 
-    await createTimer(db, user.id.toString(), {
+    await createTimer(db, user.id, {
       taskId: taskA.id,
       startTime: new Date('2024-01-01T10:00:00.000Z').toISOString()
     })
-    await createTimer(db, user.id.toString(), {
+    await createTimer(db, user.id, {
       taskId: taskB.id,
       startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
     })
-    await createTimer(db, user.id.toString(), {
+    await createTimer(db, user.id, {
       taskId: taskA.id,
       startTime: new Date('2024-01-01T12:00:00.000Z').toISOString()
     })
@@ -53,18 +53,18 @@ describe('timers.db', () => {
     const db = testContext.db
     const user = await ensureDefaultUser(db)
 
-    const taskA = await createTask(db, user.id.toString(), {
+    const taskA = await createTask(db, user.id, {
       title: 'Task A'
     })
-    const taskB = await createTask(db, user.id.toString(), {
+    const taskB = await createTask(db, user.id, {
       title: 'Task B'
     })
 
-    await createTimer(db, user.id.toString(), {
+    await createTimer(db, user.id, {
       taskId: taskA.id,
       startTime: new Date('2024-01-01T10:00:00.000Z').toISOString()
     })
-    await createTimer(db, user.id.toString(), {
+    await createTimer(db, user.id, {
       taskId: taskB.id,
       startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
     })
@@ -81,22 +81,22 @@ describe('timers.db', () => {
       const db = testContext.db
       const user = await ensureDefaultUser(db)
 
-      const task = await createTask(db, user.id.toString(), {
+      const task = await createTask(db, user.id, {
         title: 'Task with active timers'
       })
 
       // Create two active timers (no endTime)
-      await createTimer(db, user.id.toString(), {
+      await createTimer(db, user.id, {
         taskId: task.id,
         startTime: new Date('2024-01-01T10:00:00.000Z').toISOString()
       })
-      await createTimer(db, user.id.toString(), {
+      await createTimer(db, user.id, {
         taskId: task.id,
         startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
       })
 
       // Verify both timers are active (endTime is null)
-      const timersBefore = await getTimersByTaskId(db, user.id.toString(), task.id)
+      const timersBefore = await getTimersByTaskId(db, user.id, task.id)
       expect(timersBefore).toHaveLength(2)
       expect(timersBefore!.every((t) => t.endTime === null)).toBe(true)
 
@@ -105,7 +105,7 @@ describe('timers.db', () => {
       expect(stoppedCount).toBe(2)
 
       // Verify all timers are now stopped (endTime is not null)
-      const timersAfter = await getTimersByTaskId(db, user.id.toString(), task.id)
+      const timersAfter = await getTimersByTaskId(db, user.id, task.id)
       expect(timersAfter).toHaveLength(2)
       expect(timersAfter!.every((t) => t.endTime !== null)).toBe(true)
     })
@@ -114,18 +114,18 @@ describe('timers.db', () => {
       const db = testContext.db
       const user = await ensureDefaultUser(db)
 
-      const task = await createTask(db, user.id.toString(), {
+      const task = await createTask(db, user.id, {
         title: 'Task with mixed timers'
       })
 
       // Create one active timer
-      await createTimer(db, user.id.toString(), {
+      await createTimer(db, user.id, {
         taskId: task.id,
         startTime: new Date('2024-01-01T10:00:00.000Z').toISOString()
       })
 
       // Create one stopped timer
-      const stoppedTimer = await createTimer(db, user.id.toString(), {
+      const stoppedTimer = await createTimer(db, user.id, {
         taskId: task.id,
         startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
       })
@@ -138,7 +138,7 @@ describe('timers.db', () => {
       expect(stoppedCount).toBe(1)
 
       // Verify all timers are now stopped
-      const timersAfter = await getTimersByTaskId(db, user.id.toString(), task.id)
+      const timersAfter = await getTimersByTaskId(db, user.id, task.id)
       expect(timersAfter).toHaveLength(2)
       expect(timersAfter!.every((t) => t.endTime !== null)).toBe(true)
     })
@@ -147,7 +147,7 @@ describe('timers.db', () => {
       const db = testContext.db
       const user = await ensureDefaultUser(db)
 
-      const task = await createTask(db, user.id.toString(), {
+      const task = await createTask(db, user.id, {
         title: 'Task with no timers'
       })
 
@@ -159,19 +159,19 @@ describe('timers.db', () => {
       const db = testContext.db
       const user = await ensureDefaultUser(db)
 
-      const taskA = await createTask(db, user.id.toString(), {
+      const taskA = await createTask(db, user.id, {
         title: 'Task A'
       })
-      const taskB = await createTask(db, user.id.toString(), {
+      const taskB = await createTask(db, user.id, {
         title: 'Task B'
       })
 
       // Create active timer for each task
-      await createTimer(db, user.id.toString(), {
+      await createTimer(db, user.id, {
         taskId: taskA.id,
         startTime: new Date('2024-01-01T10:00:00.000Z').toISOString()
       })
-      await createTimer(db, user.id.toString(), {
+      await createTimer(db, user.id, {
         taskId: taskB.id,
         startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
       })
@@ -181,13 +181,13 @@ describe('timers.db', () => {
       expect(stoppedCount).toBe(1)
 
       // Task A's timer should be stopped
-      const taskATimers = await getTimersByTaskId(db, user.id.toString(), taskA.id)
+      const taskATimers = await getTimersByTaskId(db, user.id, taskA.id)
       expect(taskATimers).not.toBeNull()
       expect(taskATimers!.length).toBeGreaterThan(0)
       expect(taskATimers![0]!.endTime).not.toBeNull()
 
       // Task B's timer should still be active
-      const taskBTimers = await getTimersByTaskId(db, user.id.toString(), taskB.id)
+      const taskBTimers = await getTimersByTaskId(db, user.id, taskB.id)
       expect(taskBTimers).not.toBeNull()
       expect(taskBTimers!.length).toBeGreaterThan(0)
       expect(taskBTimers![0]!.endTime).toBeNull()

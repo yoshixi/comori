@@ -267,7 +267,7 @@ export class NotificationScheduler {
     type: 'start' | 'end',
     task: Task,
     delayMinutes: number,
-    timerId?: string,
+    timerId?: number,
     nextTask?: Task
   ): void {
     const key = `snooze-${type}-${task.id}-${Date.now()}`

@@ -23,10 +23,11 @@ import {
 export const listTimersHandler: RouteHandler<typeof listTimersRoute, AppBindings> = async (c) => {
   try {
     const db = getDb()
+    const user = c.get('user')
 
     const { taskIds } = c.req.valid('query')
     if (taskIds) {
-      const timers = await getAllTimersByTaskIds(db, taskIds)
+      const timers = await getAllTimersByTaskIds(db, user.id, taskIds)
       return c.json(
         {
           timers: timers,
@@ -36,7 +37,7 @@ export const listTimersHandler: RouteHandler<typeof listTimersRoute, AppBindings
       )
     }
 
-    const timers = await getAllTimers(db)
+    const timers = await getAllTimers(db, user.id)
 
     return c.json(
       {
@@ -97,9 +98,10 @@ export const getTaskTimersHandler: RouteHandler<typeof getTaskTimersRoute, AppBi
 export const getTimerHandler: RouteHandler<typeof getTimerRoute, AppBindings> = async (c) => {
   try {
     const db = getDb()
+    const user = c.get('user')
     const { id } = c.req.valid('param')
 
-    const timer = await getTimerById(db, id)
+    const timer = await getTimerById(db, user.id, id)
 
     if (!timer) {
       return c.json(
@@ -158,10 +160,11 @@ export const createTimerHandler: RouteHandler<typeof createTimerRoute, AppBindin
 export const updateTimerHandler: RouteHandler<typeof updateTimerRoute, AppBindings> = async (c) => {
   try {
     const db = getDb()
+    const user = c.get('user')
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
 
-    const timer = await updateTimer(db, id, data)
+    const timer = await updateTimer(db, user.id, id, data)
 
     if (!timer) {
       return c.json(
@@ -189,9 +192,10 @@ export const updateTimerHandler: RouteHandler<typeof updateTimerRoute, AppBindin
 export const deleteTimerHandler: RouteHandler<typeof deleteTimerRoute, AppBindings> = async (c) => {
   try {
     const db = getDb()
+    const user = c.get('user')
     const { id } = c.req.valid('param')
 
-    const timer = await deleteTimer(db, id)
+    const timer = await deleteTimer(db, user.id, id)
 
     if (!timer) {
       return c.json(

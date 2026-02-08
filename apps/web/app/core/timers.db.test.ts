@@ -44,7 +44,7 @@ describe('timers.db', () => {
       startTime: new Date('2024-01-01T12:00:00.000Z').toISOString()
     })
 
-    const result = await getAllTimersByTaskIds(db, [taskA.id])
+    const result = await getAllTimersByTaskIds(db, user.id, [taskA.id])
     expect(result).toHaveLength(2)
     expect(result.every((timer) => timer.taskId === taskA.id)).toBe(true)
   })
@@ -69,7 +69,7 @@ describe('timers.db', () => {
       startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
     })
 
-    const result = await getAllTimersByTaskIds(db, [taskA.id, taskB.id])
+    const result = await getAllTimersByTaskIds(db, user.id, [taskA.id, taskB.id])
     expect(result).toHaveLength(2)
     const taskIds = new Set(result.map((timer) => timer.taskId))
     expect(taskIds.has(taskA.id)).toBe(true)
@@ -129,7 +129,7 @@ describe('timers.db', () => {
         taskId: task.id,
         startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
       })
-      await updateTimer(db, stoppedTimer!.id, {
+      await updateTimer(db, user.id, stoppedTimer!.id, {
         endTime: new Date('2024-01-01T12:00:00.000Z').toISOString()
       })
 

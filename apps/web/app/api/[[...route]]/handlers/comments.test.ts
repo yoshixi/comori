@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest'
 import { OpenAPIHono } from '@hono/zod-openapi'
-import { v7 as uuidv7 } from 'uuid'
 import {
   createTaskRoute,
   listTasksRoute
@@ -32,8 +31,7 @@ import { createSqliteLibsqlTestContext, type SqliteLibsqlTestContext } from '../
 type TestGlobal = typeof globalThis & { testDb?: SqliteLibsqlTestContext['db'] }
 
 vi.mock('../../../core/common.db', () => ({
-  getDb: () => (globalThis as TestGlobal).testDb!,
-  createId: () => uuidv7()
+  getDb: () => (globalThis as TestGlobal).testDb!
 }))
 
 const createTestApp = () => {
@@ -67,7 +65,7 @@ const createTestApp = () => {
 describe('Task comment handlers', () => {
   let testContext: SqliteLibsqlTestContext
   let app: OpenAPIHono
-  let taskId: string
+  let taskId: number
 
   beforeAll(async () => {
     testContext = await createSqliteLibsqlTestContext()

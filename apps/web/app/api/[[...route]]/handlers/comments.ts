@@ -22,7 +22,7 @@ export const listTaskCommentsHandler: RouteHandler<typeof listTaskCommentsRoute>
     const user = await ensureDefaultUser(db)
     const { taskId } = c.req.valid('param')
 
-    const comments = await getCommentsByTaskId(db, user.id.toString(), taskId)
+    const comments = await getCommentsByTaskId(db, user.id, taskId)
     if (!comments) {
       return c.json(
         {
@@ -59,7 +59,7 @@ export const createTaskCommentHandler: RouteHandler<typeof createTaskCommentRout
     const { taskId } = c.req.valid('param')
     const data = c.req.valid('json')
 
-    const comment = await createComment(db, user.id.toString(), { taskId, body: data.body })
+    const comment = await createComment(db, user.id, { taskId, body: data.body })
     if (!comment) {
       return c.json(
         {
@@ -89,7 +89,7 @@ export const getTaskCommentHandler: RouteHandler<typeof getTaskCommentRoute> = a
     const user = await ensureDefaultUser(db)
     const { taskId, commentId } = c.req.valid('param')
 
-    const comment = await getCommentById(db, user.id.toString(), taskId, commentId)
+    const comment = await getCommentById(db, user.id, taskId, commentId)
     if (!comment) {
       return c.json(
         {
@@ -120,7 +120,7 @@ export const updateTaskCommentHandler: RouteHandler<typeof updateTaskCommentRout
     const { taskId, commentId } = c.req.valid('param')
     const data = c.req.valid('json')
 
-    const comment = await updateComment(db, user.id.toString(), taskId, commentId, data)
+    const comment = await updateComment(db, user.id, taskId, commentId, data)
     if (!comment) {
       return c.json(
         {
@@ -150,7 +150,7 @@ export const deleteTaskCommentHandler: RouteHandler<typeof deleteTaskCommentRout
     const user = await ensureDefaultUser(db)
     const { taskId, commentId } = c.req.valid('param')
 
-    const comment = await deleteComment(db, user.id.toString(), taskId, commentId)
+    const comment = await deleteComment(db, user.id, taskId, commentId)
     if (!comment) {
       return c.json(
         {

@@ -7,7 +7,7 @@ const NOTIFY_BEFORE_MS = 60 * 1000 // Notify 1 minute before
 const NEXT_TASK_WINDOW_MS = 30 * 60 * 1000 // 30 minutes window for next task
 
 interface Task {
-  id: string
+  id: number
   title: string
   startAt: string | null
   endAt: string | null
@@ -15,31 +15,31 @@ interface Task {
 }
 
 interface TaskTimer {
-  id: string
-  taskId: string
+  id: number
+  taskId: number
   startTime: string
   endTime: string | null
 }
 
 interface NotificationRecord {
   type: 'start' | 'end'
-  taskId: string
+  taskId: number
   timestamp: number
 }
 
 interface SnoozeRecord {
   type: 'start' | 'end'
-  taskId: string
+  taskId: number
   task: Task
-  timerId?: string
+  timerId?: number
   nextTask?: Task
   notifyAt: number
 }
 
 type NotificationHandler = {
-  onStartTimer: (taskId: string) => void
-  onStopTimer: (taskId: string, timerId: string) => void
-  onShowTask: (taskId: string) => void
+  onStartTimer: (taskId: number) => void
+  onStopTimer: (taskId: number, timerId: number) => void
+  onShowTask: (taskId: number) => void
 }
 
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
@@ -202,7 +202,7 @@ export class NotificationScheduler {
     }
   }
 
-  private async startTimer(taskId: string): Promise<void> {
+  private async startTimer(taskId: number): Promise<void> {
     try {
       await fetch(`${API_URL}/api/timers`, {
         method: 'POST',
@@ -219,7 +219,7 @@ export class NotificationScheduler {
     }
   }
 
-  private async stopTimer(taskId: string, timerId: string): Promise<void> {
+  private async stopTimer(taskId: number, timerId: number): Promise<void> {
     try {
       await fetch(`${API_URL}/api/timers/${timerId}`, {
         method: 'PUT',
@@ -235,18 +235,18 @@ export class NotificationScheduler {
     }
   }
 
-  private getNotificationKey(type: 'start' | 'end', taskId: string): string {
+  private getNotificationKey(type: 'start' | 'end', taskId: number): string {
     // Use date to allow same notification next day
     const dateKey = new Date().toISOString().split('T')[0]
     return `${type}-${taskId}-${dateKey}`
   }
 
-  private hasNotified(type: 'start' | 'end', taskId: string): boolean {
+  private hasNotified(type: 'start' | 'end', taskId: number): boolean {
     const key = this.getNotificationKey(type, taskId)
     return this.sentNotifications.has(key)
   }
 
-  private markNotified(type: 'start' | 'end', taskId: string): void {
+  private markNotified(type: 'start' | 'end', taskId: number): void {
     const key = this.getNotificationKey(type, taskId)
     this.sentNotifications.set(key, {
       type,
@@ -267,7 +267,7 @@ export class NotificationScheduler {
     type: 'start' | 'end',
     task: Task,
     delayMinutes: number,
-    timerId?: string,
+    timerId?: number,
     nextTask?: Task
   ): void {
     const key = `snooze-${type}-${task.id}-${Date.now()}`
@@ -418,7 +418,7 @@ export class NotificationScheduler {
     notification.show()
   }
 
-  private showEndNotification(task: Task, timerId: string): void {
+  private showEndNotification(task: Task, timerId: number): void {
     const notification = new Notification({
       title: 'Task Ending Soon',
       body: `"${task.title}" is about to end`,
@@ -463,7 +463,7 @@ export class NotificationScheduler {
   private showEndWithNextNotification(
     currentTask: Task,
     nextTask: Task,
-    currentTimerId: string
+    currentTimerId: number
   ): void {
     const notification = new Notification({
       title: 'Task Ending Soon',

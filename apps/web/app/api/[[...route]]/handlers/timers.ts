@@ -63,7 +63,7 @@ export const getTaskTimersHandler: RouteHandler<typeof getTaskTimersRoute> = asy
     const defaultUser = await ensureDefaultUser(db)
     const { taskId } = c.req.valid('param')
     
-    const timers = await getTimersByTaskId(db, defaultUser.id.toString(), taskId)
+    const timers = await getTimersByTaskId(db, defaultUser.id, taskId)
     
     if (timers === null) {
       return c.json(
@@ -130,7 +130,7 @@ export const createTimerHandler: RouteHandler<typeof createTimerRoute> = async (
     const defaultUser = await ensureDefaultUser(db)
     const data = c.req.valid('json')
     
-    const timer = await createTimer(db, defaultUser.id.toString(), data)
+    const timer = await createTimer(db, defaultUser.id, data)
     
     if (!timer) {
       return c.json(

@@ -1,8 +1,8 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
 interface TimerState {
-  timerId: string
-  taskId: string
+  timerId: number
+  taskId: number
   taskTitle: string
   startTime: string
 }
@@ -14,9 +14,9 @@ declare global {
     electron: ElectronAPI
     api: {
       updateTimerStates: (timers: TimerState[]) => void
-      onShowTaskDetail: (callback: (taskId: string) => void) => () => void
-      onNotificationTimerStarted: (callback: (taskId: string) => void) => () => void
-      onNotificationTimerStopped: (callback: (taskId: string) => void) => () => void
+      onShowTaskDetail: (callback: (taskId: number) => void) => () => void
+      onNotificationTimerStarted: (callback: (taskId: number) => void) => () => void
+      onNotificationTimerStopped: (callback: (taskId: number) => void) => () => void
       getNotificationPermission: () => Promise<NotificationPermissionStatus>
       requestNotificationPermission: () => Promise<NotificationPermissionStatus>
       openNotificationSettings: () => Promise<void>

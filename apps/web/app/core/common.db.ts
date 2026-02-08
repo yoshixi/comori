@@ -1,6 +1,5 @@
 import { drizzle as drizzleLibsql } from "drizzle-orm/libsql"
 import { createClient } from "@libsql/client"
-import { v7 as uuidv7 } from "uuid"
 import path from "path"
 import fs from "fs"
 import * as schema from '../db/schema/schema';
@@ -64,11 +63,6 @@ export function getDb() {
       return createLibsqlDrizzle('file::memory:')
     }
   }
-}
-
-// Helper function to create consistent UUIDs across all database operations
-export function createId(): string {
-  return uuidv7()
 }
 
 // Type alias for database instance to ensure consistency

@@ -10,7 +10,7 @@ export const getTaskActivitiesHandler: RouteHandler<typeof getTaskActivitiesRout
     const user = await ensureDefaultUser(db)
     const { id } = c.req.valid('param')
 
-    const activities = await getTaskActivities(db, user.id.toString(), id)
+    const activities = await getTaskActivities(db, user.id, id)
     if (!activities) {
       return c.json(
         {

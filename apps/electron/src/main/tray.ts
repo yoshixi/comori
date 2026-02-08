@@ -4,14 +4,14 @@ import { join } from 'path'
 const API_URL = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
 
 interface TimerState {
-  timerId: string
-  taskId: string
+  timerId: number
+  taskId: number
   taskTitle: string
   startTime: string
 }
 
 interface ScheduledTask {
-  id: string
+  id: number
   title: string
   startAt: string
 }
@@ -22,7 +22,7 @@ export class TrayManager {
   private nextTaskInterval: NodeJS.Timeout | null = null
   private activeTimers: TimerState[] = []
   private nextTask: ScheduledTask | null = null
-  private onShowTaskDetail: ((taskId: string) => void) | null = null
+  private onShowTaskDetail: ((taskId: number) => void) | null = null
 
   constructor(private getMainWindow: () => BrowserWindow | null) {}
 
@@ -84,7 +84,7 @@ export class TrayManager {
     }
   }
 
-  setOnShowTaskDetail(callback: (taskId: string) => void): void {
+  setOnShowTaskDetail(callback: (taskId: number) => void): void {
     this.onShowTaskDetail = callback
   }
 

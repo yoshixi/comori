@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 export interface CustomRequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
   url: string
-  params?: Record<string, string | number | boolean | null | undefined | string[]>
+  params?: Record<string, string | number | boolean | null | undefined | Array<string | number>>
   data?: unknown
   headers?: Record<string, string>
   responseType?: 'json' | 'text'

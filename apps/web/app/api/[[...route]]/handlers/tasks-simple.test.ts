@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { v7 as uuidv7 } from 'uuid';
 import {
   listTasksRoute,
   getTaskRoute,
@@ -29,10 +28,7 @@ type TestGlobal = typeof globalThis & { testDb?: SqliteLibsqlTestContext['db'] }
 
 // Mock the database connection
 vi.mock('../../../core/common.db', () => ({
-  getDb: () => (globalThis as TestGlobal).testDb!,
-  createId: () => {
-    return uuidv7();
-  }
+  getDb: () => (globalThis as TestGlobal).testDb!
 }));
 
 // Create a test app with task routes
@@ -109,7 +105,7 @@ describe('Task Handlers (Simplified)', () => {
         }));
         expect(res.status).toBe(201);
         const { task } = await res.json();
-        return task.id as string;
+        return task.id as number;
       };
 
       const incompleteTaskId = await createTask('Incomplete Task');
@@ -128,7 +124,7 @@ describe('Task Handlers (Simplified)', () => {
       const completedData = await completedRes.json();
       expect(completedData.tasks).toHaveLength(1);
       expect(completedData.tasks.every((task: { completedAt: string | null }) => task.completedAt !== null)).toBe(true);
-      const completedIds = completedData.tasks.map((task: { id: string }) => task.id);
+      const completedIds = completedData.tasks.map((task: { id: number }) => task.id);
       expect(completedIds).toContain(completedTaskId);
       expect(completedIds).not.toContain(incompleteTaskId);
 
@@ -137,7 +133,7 @@ describe('Task Handlers (Simplified)', () => {
       const incompleteData = await incompleteRes.json();
       expect(incompleteData.tasks).toHaveLength(1);
       expect(incompleteData.tasks.every((task: { completedAt: string | null }) => task.completedAt === null)).toBe(true);
-      const incompleteIds = incompleteData.tasks.map((task: { id: string }) => task.id);
+      const incompleteIds = incompleteData.tasks.map((task: { id: number }) => task.id);
       expect(incompleteIds).toContain(incompleteTaskId);
       expect(incompleteIds).not.toContain(completedTaskId);
     });

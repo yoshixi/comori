@@ -78,8 +78,16 @@ app.use('/*', async (c, next) => {
 })
 
 // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
-app.on(['POST', 'GET'], '/auth/**', (c) => {
-  return auth.handler(c.req.raw)
+// auth.handler returns a raw Response that bypasses Hono's response building,
+// so CORS headers from the middleware above are not applied. We copy them onto
+// the response manually.
+app.on(['POST', 'GET'], '/auth/**', async (c) => {
+  const response = await auth.handler(c.req.raw)
+  const origin = c.req.header('Origin')
+  response.headers.set('Access-Control-Allow-Origin', origin || '*')
+  response.headers.set('Access-Control-Allow-Credentials', 'true')
+  response.headers.set('Access-Control-Expose-Headers', 'set-auth-token')
+  return response
 })
 
 // Token exchange endpoint: session token → short-lived JWT

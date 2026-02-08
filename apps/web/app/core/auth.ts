@@ -23,6 +23,7 @@ export const auth = betterAuth({
       clientSecret: process.env.APPLE_CLIENT_SECRET!,
     },
   },
+  trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:5173").split(","),
   plugins: [bearer()],
   advanced: {
     database: { generateId: false },

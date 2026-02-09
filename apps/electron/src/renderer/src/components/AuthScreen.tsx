@@ -226,34 +226,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
           >
             Sign in with Google
           </button>
-          <button
-            onClick={() => handleSocialSignIn('github')}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: 'white',
-              fontSize: '0.875rem'
-            }}
-          >
-            Sign in with GitHub
-          </button>
-          <button
-            onClick={() => handleSocialSignIn('apple')}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: 'white',
-              fontSize: '0.875rem'
-            }}
-          >
-            Sign in with Apple
-          </button>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.875rem' }}>

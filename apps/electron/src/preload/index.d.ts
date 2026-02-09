@@ -13,6 +13,7 @@ declare global {
   interface Window {
     electron: ElectronAPI
     api: {
+      updateAuthToken: (token: string | null) => void
       updateTimerStates: (timers: TimerState[]) => void
       onShowTaskDetail: (callback: (taskId: number) => void) => () => void
       onNotificationTimerStarted: (callback: (taskId: number) => void) => () => void
@@ -20,6 +21,7 @@ declare global {
       getNotificationPermission: () => Promise<NotificationPermissionStatus>
       requestNotificationPermission: () => Promise<NotificationPermissionStatus>
       openNotificationSettings: () => Promise<void>
+      signInWithOAuth: (provider: string) => Promise<string | null>
     }
   }
 }

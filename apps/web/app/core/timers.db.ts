@@ -36,26 +36,29 @@ export function convertDbTimerToApi(dbTimer: SelectTaskTimer): TaskTimer {
 }
 
 // Timer database functions
-export async function getAllTimers(db: DB): Promise<TaskTimer[]> {
+export async function getAllTimers(db: DB, userId: number): Promise<TaskTimer[]> {
   const dbTimers = await db
-    .select()
+    .select({ timer: taskTimersTable })
     .from(taskTimersTable)
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(eq(tasksTable.userId, userId))
     .orderBy(desc(taskTimersTable.createdAt))
 
-  return dbTimers.map(convertDbTimerToApi)
+  return dbTimers.map(r => convertDbTimerToApi(r.timer))
 }
 
-export async function getAllTimersByTaskIds(db: DB, taskIds: number[]): Promise<TaskTimer[]> {
+export async function getAllTimersByTaskIds(db: DB, userId: number, taskIds: number[]): Promise<TaskTimer[]> {
   if (taskIds.length === 0) return []
 
   const uniqueIds = Array.from(new Set(taskIds))
   const dbTimers = await db
-    .select()
+    .select({ timer: taskTimersTable })
     .from(taskTimersTable)
-    .where(inArray(taskTimersTable.taskId, uniqueIds))
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(and(eq(tasksTable.userId, userId), inArray(taskTimersTable.taskId, uniqueIds)))
     .orderBy(desc(taskTimersTable.createdAt))
 
-  return dbTimers.map(convertDbTimerToApi)
+  return dbTimers.map(r => convertDbTimerToApi(r.timer))
 }
 
 export async function getTimersByTaskId(db: DB, userId: number, taskId: number): Promise<TaskTimer[] | null> {
@@ -78,17 +81,18 @@ export async function getTimersByTaskId(db: DB, userId: number, taskId: number):
   return dbTimers.map(convertDbTimerToApi)
 }
 
-export async function getTimerById(db: DB, timerId: number): Promise<TaskTimer | null> {
-  const [dbTimer] = await db
-    .select()
+export async function getTimerById(db: DB, userId: number, timerId: number): Promise<TaskTimer | null> {
+  const [result] = await db
+    .select({ timer: taskTimersTable })
     .from(taskTimersTable)
-    .where(eq(taskTimersTable.id, timerId))
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(and(eq(taskTimersTable.id, timerId), eq(tasksTable.userId, userId)))
 
-  if (!dbTimer) {
+  if (!result) {
     return null
   }
 
-  return convertDbTimerToApi(dbTimer)
+  return convertDbTimerToApi(result.timer)
 }
 
 export async function createTimer(db: DB, userId: number, data: CreateTimer): Promise<TaskTimer | null> {
@@ -118,13 +122,15 @@ export async function createTimer(db: DB, userId: number, data: CreateTimer): Pr
   return convertDbTimerToApi(dbTimer)
 }
 
-export async function updateTimer(db: DB, timerId: number, data: UpdateTimer): Promise<TaskTimer | null> {
-  const [existingTimer] = await db
-    .select()
+export async function updateTimer(db: DB, userId: number, timerId: number, data: UpdateTimer): Promise<TaskTimer | null> {
+  // Verify timer exists and belongs to user via task ownership
+  const [existing] = await db
+    .select({ timer: taskTimersTable })
     .from(taskTimersTable)
-    .where(eq(taskTimersTable.id, timerId))
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(and(eq(taskTimersTable.id, timerId), eq(tasksTable.userId, userId)))
 
-  if (!existingTimer) {
+  if (!existing) {
     return null
   }
 
@@ -168,13 +174,15 @@ export async function stopActiveTimersForTask(db: DB, taskId: number): Promise<n
   return result.length
 }
 
-export async function deleteTimer(db: DB, timerId: number): Promise<TaskTimer | null> {
-  const [existingTimer] = await db
-    .select()
+export async function deleteTimer(db: DB, userId: number, timerId: number): Promise<TaskTimer | null> {
+  // Verify timer exists and belongs to user via task ownership
+  const [existing] = await db
+    .select({ timer: taskTimersTable })
     .from(taskTimersTable)
-    .where(eq(taskTimersTable.id, timerId))
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(and(eq(taskTimersTable.id, timerId), eq(tasksTable.userId, userId)))
 
-  if (!existingTimer) {
+  if (!existing) {
     return null
   }
 

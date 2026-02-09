@@ -14,6 +14,10 @@ type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
 
 // Custom APIs for renderer
 const api = {
+  // Auth token management
+  updateAuthToken: (token: string | null): void => {
+    ipcRenderer.send('auth:token-update', token)
+  },
   // Update all active timer states for tray display
   updateTimerStates: (timers: TimerState[]): void => {
     ipcRenderer.send('timer:states-change', timers)
@@ -54,7 +58,10 @@ const api = {
   requestNotificationPermission: (): Promise<NotificationPermissionStatus> =>
     ipcRenderer.invoke('notification:request-permission'),
   openNotificationSettings: (): Promise<void> =>
-    ipcRenderer.invoke('notification:open-settings')
+    ipcRenderer.invoke('notification:open-settings'),
+  // OAuth social sign-in via popup BrowserWindow
+  signInWithOAuth: (provider: string): Promise<string | null> =>
+    ipcRenderer.invoke('auth:social-sign-in', provider)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -1,7 +1,7 @@
 import { Notification, shell, systemPreferences } from 'electron'
 import { spawn } from 'child_process'
 
-const API_URL = import.meta.env.MAIN_VITE_API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:3000'
 const POLL_INTERVAL_MS = 30 * 1000 // Poll every 30 seconds
 const NOTIFY_BEFORE_MS = 60 * 1000 // Notify 1 minute before
 const NEXT_TASK_WINDOW_MS = 30 * 60 * 1000 // 30 minutes window for next task
@@ -49,9 +49,22 @@ export class NotificationScheduler {
   private sentNotifications: Map<string, NotificationRecord> = new Map()
   private snoozedNotifications: Map<string, SnoozeRecord> = new Map()
   private handlers: NotificationHandler | null = null
+  private authToken: string | null = null
 
   setHandlers(handlers: NotificationHandler): void {
     this.handlers = handlers
+  }
+
+  setAuthToken(token: string | null): void {
+    this.authToken = token
+  }
+
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {}
+    if (this.authToken) {
+      headers['Authorization'] = `Bearer ${this.authToken}`
+    }
+    return headers
   }
 
   /**
@@ -179,7 +192,9 @@ export class NotificationScheduler {
 
   private async fetchTasks(): Promise<Task[]> {
     try {
-      const response = await fetch(`${API_URL}/api/tasks?completed=false`)
+      const response = await fetch(`${API_URL}/api/tasks?completed=false`, {
+        headers: this.getAuthHeaders()
+      })
       if (!response.ok) return []
       const data = (await response.json()) as { tasks: Task[] }
       return data.tasks || []
@@ -191,7 +206,9 @@ export class NotificationScheduler {
 
   private async fetchActiveTimers(): Promise<TaskTimer[]> {
     try {
-      const response = await fetch(`${API_URL}/api/timers`)
+      const response = await fetch(`${API_URL}/api/timers`, {
+        headers: this.getAuthHeaders()
+      })
       if (!response.ok) return []
       const data = (await response.json()) as { timers: TaskTimer[] }
       // Filter to only active timers (no endTime)
@@ -206,7 +223,7 @@ export class NotificationScheduler {
     try {
       await fetch(`${API_URL}/api/timers`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
         body: JSON.stringify({
           taskId,
           startTime: new Date().toISOString()
@@ -223,7 +240,7 @@ export class NotificationScheduler {
     try {
       await fetch(`${API_URL}/api/timers/${timerId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
         body: JSON.stringify({
           endTime: new Date().toISOString()
         })

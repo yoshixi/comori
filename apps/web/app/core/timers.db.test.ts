@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, beforeEach, afterAll, expect } from 'vitest'
-import { createSqliteLibsqlTestContext, type SqliteLibsqlTestContext } from '../db/tests/sqliteLibsqlTestUtils'
-import { ensureDefaultUser, createTask } from './tasks.db'
+import { createSqliteLibsqlTestContext, createTestUser, type SqliteLibsqlTestContext } from '../db/tests/sqliteLibsqlTestUtils'
+import { createTask } from './tasks.db'
 import { createTimer, getAllTimersByTaskIds, stopActiveTimersForTask, updateTimer, getTimersByTaskId } from './timers.db'
 
 describe('timers.db', () => {
@@ -22,7 +22,7 @@ describe('timers.db', () => {
 
   it('returns timers only for the requested task ids', async () => {
     const db = testContext.db
-    const user = await ensureDefaultUser(db)
+    const user = await createTestUser(db)
 
     const taskA = await createTask(db, user.id, {
       title: 'Task A'
@@ -44,14 +44,14 @@ describe('timers.db', () => {
       startTime: new Date('2024-01-01T12:00:00.000Z').toISOString()
     })
 
-    const result = await getAllTimersByTaskIds(db, [taskA.id])
+    const result = await getAllTimersByTaskIds(db, user.id, [taskA.id])
     expect(result).toHaveLength(2)
     expect(result.every((timer) => timer.taskId === taskA.id)).toBe(true)
   })
 
   it('returns timers for multiple task ids', async () => {
     const db = testContext.db
-    const user = await ensureDefaultUser(db)
+    const user = await createTestUser(db)
 
     const taskA = await createTask(db, user.id, {
       title: 'Task A'
@@ -69,7 +69,7 @@ describe('timers.db', () => {
       startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
     })
 
-    const result = await getAllTimersByTaskIds(db, [taskA.id, taskB.id])
+    const result = await getAllTimersByTaskIds(db, user.id, [taskA.id, taskB.id])
     expect(result).toHaveLength(2)
     const taskIds = new Set(result.map((timer) => timer.taskId))
     expect(taskIds.has(taskA.id)).toBe(true)
@@ -79,7 +79,7 @@ describe('timers.db', () => {
   describe('stopActiveTimersForTask', () => {
     it('stops all active timers for a task', async () => {
       const db = testContext.db
-      const user = await ensureDefaultUser(db)
+      const user = await createTestUser(db)
 
       const task = await createTask(db, user.id, {
         title: 'Task with active timers'
@@ -112,7 +112,7 @@ describe('timers.db', () => {
 
     it('does not affect already stopped timers', async () => {
       const db = testContext.db
-      const user = await ensureDefaultUser(db)
+      const user = await createTestUser(db)
 
       const task = await createTask(db, user.id, {
         title: 'Task with mixed timers'
@@ -129,7 +129,7 @@ describe('timers.db', () => {
         taskId: task.id,
         startTime: new Date('2024-01-01T11:00:00.000Z').toISOString()
       })
-      await updateTimer(db, stoppedTimer!.id, {
+      await updateTimer(db, user.id, stoppedTimer!.id, {
         endTime: new Date('2024-01-01T12:00:00.000Z').toISOString()
       })
 
@@ -145,7 +145,7 @@ describe('timers.db', () => {
 
     it('returns 0 when no active timers exist', async () => {
       const db = testContext.db
-      const user = await ensureDefaultUser(db)
+      const user = await createTestUser(db)
 
       const task = await createTask(db, user.id, {
         title: 'Task with no timers'
@@ -157,7 +157,7 @@ describe('timers.db', () => {
 
     it('only stops timers for the specified task', async () => {
       const db = testContext.db
-      const user = await ensureDefaultUser(db)
+      const user = await createTestUser(db)
 
       const taskA = await createTask(db, user.id, {
         title: 'Task A'

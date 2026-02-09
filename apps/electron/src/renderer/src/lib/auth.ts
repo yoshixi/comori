@@ -1,10 +1,10 @@
 import { createAuthClient } from 'better-auth/client'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-const AUTH_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '')
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+const API_BASE_URL = `${BASE_URL}/api`
 
 export const authClient = createAuthClient({
-  baseURL: AUTH_BASE_URL,
+  baseURL: BASE_URL,
   basePath: '/api/auth',
   fetchOptions: {
     onSuccess: (ctx) => {

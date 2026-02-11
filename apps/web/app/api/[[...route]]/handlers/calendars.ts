@@ -68,22 +68,22 @@ async function getValidTokensOrThrow(
   db: ReturnType<typeof getDb>,
   userId: number
 ): Promise<{ tokens: ProviderTokens } | { errorMessage: string }> {
-  const token = await getOAuthToken(db, userId, 'google')
-  if (!token) {
-    return { errorMessage: 'Google OAuth not connected' }
+  const account = await getOAuthToken(db, userId, 'google')
+  if (!account || !account.accessToken) {
+    return { errorMessage: 'Google OAuth not connected. Please sign in with Google.' }
   }
 
   const providerTokens: ProviderTokens = {
-    accessToken: token.accessToken,
-    refreshToken: token.refreshToken,
-    expiresAt: token.expiresAt
+    accessToken: account.accessToken,
+    refreshToken: account.refreshToken || '',
+    expiresAt: account.accessTokenExpiresAt || 0
   }
 
   try {
     const validTokens = await getValidGoogleTokens(providerTokens)
 
     // Update tokens in DB if they were refreshed
-    if (validTokens.accessToken !== token.accessToken) {
+    if (validTokens.accessToken !== account.accessToken) {
       await updateOAuthToken(db, userId, 'google', {
         accessToken: validTokens.accessToken,
         refreshToken: validTokens.refreshToken,

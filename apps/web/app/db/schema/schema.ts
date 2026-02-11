@@ -108,21 +108,6 @@ export const taskTagsTable = sqliteTable('task_tags', {
   uniqueTaskTag: unique().on(table.taskId, table.tagId),
 }));
 
-// OAuth Tokens table (for Calendar API access - separate from better-auth accounts)
-export const oauthTokensTable = sqliteTable('oauth_tokens', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
-  providerType: text('provider_type').notNull(), // 'google' | 'outlook' | 'apple'
-  accessToken: text('access_token').notNull(),
-  refreshToken: text('refresh_token').notNull(),
-  expiresAt: integer('expires_at', { mode: 'number' }).notNull(), // Unix timestamp
-  scope: text('scope').notNull(), // Granted scopes
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-}, (table) => ({
-  uniqueUserProvider: unique().on(table.userId, table.providerType),
-}));
-
 // Calendars table (provider-agnostic)
 export const calendarsTable = sqliteTable('calendars', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
@@ -179,7 +164,6 @@ export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_creat
 export const tagsUserIdIdx = index('tags_user_id_idx').on(tagsTable.userId);
 export const taskTagsTaskIdIdx = index('task_tags_task_id_idx').on(taskTagsTable.taskId);
 export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.tagId);
-export const oauthTokensUserIdIdx = index('oauth_tokens_user_id_idx').on(oauthTokensTable.userId);
 export const calendarsUserIdIdx = index('calendars_user_id_idx').on(calendarsTable.userId);
 export const calendarEventsCalendarIdIdx = index('calendar_events_calendar_id_idx').on(calendarEventsTable.calendarId);
 export const calendarEventsStartAtIdx = index('calendar_events_start_at_idx').on(calendarEventsTable.startAt);
@@ -207,8 +191,6 @@ export type InsertAccount = typeof accountsTable.$inferInsert;
 export type SelectAccount = typeof accountsTable.$inferSelect;
 export type InsertVerification = typeof verificationsTable.$inferInsert;
 export type SelectVerification = typeof verificationsTable.$inferSelect;
-export type InsertOauthToken = typeof oauthTokensTable.$inferInsert;
-export type SelectOauthToken = typeof oauthTokensTable.$inferSelect;
 export type InsertCalendar = typeof calendarsTable.$inferInsert;
 export type SelectCalendar = typeof calendarsTable.$inferSelect;
 export type InsertCalendarEvent = typeof calendarEventsTable.$inferInsert;

@@ -84,17 +84,17 @@ export const googleCalendarWebhookHandler: RouteHandler<
       return c.json({}, 200)
     }
 
-    // Get OAuth tokens
-    const token = await getOAuthToken(db, userId, 'google')
-    if (!token) {
-      console.warn('OAuth token not found for user:', userId)
+    // Get OAuth tokens from accounts table (populated by better-auth)
+    const account = await getOAuthToken(db, userId, 'google')
+    if (!account || !account.accessToken) {
+      console.warn('Google account not found for user:', userId)
       return c.json({}, 200)
     }
 
     const providerTokens: ProviderTokens = {
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-      expiresAt: token.expiresAt
+      accessToken: account.accessToken,
+      refreshToken: account.refreshToken || '',
+      expiresAt: account.accessTokenExpiresAt || 0
     }
 
     try {
@@ -102,7 +102,7 @@ export const googleCalendarWebhookHandler: RouteHandler<
       const validTokens = await getValidGoogleTokens(providerTokens)
 
       // Update tokens if refreshed
-      if (validTokens.accessToken !== token.accessToken) {
+      if (validTokens.accessToken !== account.accessToken) {
         await updateOAuthToken(db, userId, 'google', {
           accessToken: validTokens.accessToken,
           refreshToken: validTokens.refreshToken,

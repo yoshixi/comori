@@ -30,9 +30,7 @@ import {
   createTagRoute,
   updateTagRoute,
   deleteTagRoute,
-  // Google OAuth routes
-  getGoogleAuthUrlRoute,
-  googleAuthCallbackRoute,
+  // Google OAuth routes (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusRoute,
   deleteGoogleAuthRoute,
   // Calendar routes
@@ -80,9 +78,7 @@ import {
   createTagHandler,
   updateTagHandler,
   deleteTagHandler,
-  // Google OAuth handlers
-  getGoogleAuthUrlHandler,
-  googleAuthCallbackHandler,
+  // Google OAuth handlers (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusHandler,
   deleteGoogleAuthHandler,
   // Calendar handlers
@@ -219,6 +215,7 @@ app.use('/*', async (c, next) => {
   const path = c.req.path
   if (
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/webhooks') || // Google Calendar push notifications (no JWT)
     path === '/api/token' ||
     path === '/api/desktop-oauth' ||
     path === '/api/desktop-auth-callback' ||
@@ -281,9 +278,7 @@ app.openapi(createTagRoute, createTagHandler)
 app.openapi(updateTagRoute, updateTagHandler)
 app.openapi(deleteTagRoute, deleteTagHandler)
 
-// Register Google OAuth routes
-app.openapi(getGoogleAuthUrlRoute, getGoogleAuthUrlHandler)
-app.openapi(googleAuthCallbackRoute, googleAuthCallbackHandler)
+// Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
 app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
 app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
 

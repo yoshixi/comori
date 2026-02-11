@@ -16,7 +16,7 @@ export const OAuthTokenModel = z.object({
     description: 'OAuth provider type',
     example: 'google'
   }),
-  expiresAt: z.string().openapi({
+  expiresAt: z.string().nullable().openapi({
     description: 'Token expiration timestamp',
     example: '2024-12-31T23:59:59.000Z'
   }),

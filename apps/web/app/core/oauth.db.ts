@@ -1,55 +1,55 @@
 import { eq, and } from 'drizzle-orm'
-import { oauthTokensTable, type InsertOauthToken, type SelectOauthToken } from '../db/schema/schema'
+import { accountsTable, type SelectAccount } from '../db/schema/schema'
 import { type DB } from './common.db'
 import { formatTimestamp, getCurrentUnixTimestamp } from './common.core'
 import type { ProviderType, OAuthToken } from './oauth.core'
 
-// Internal types for token data
-export interface CreateOAuthToken {
-  userId: number
-  providerType: ProviderType
+// Internal types for token data (compatible with accounts table)
+export interface OAuthTokenData {
   accessToken: string
-  refreshToken: string
+  refreshToken: string | null
   expiresAt: number // Unix timestamp
-  scope: string
+  scope: string | null
 }
 
 export interface UpdateOAuthToken {
   accessToken?: string
-  refreshToken?: string
+  refreshToken?: string | null
   expiresAt?: number // Unix timestamp
-  scope?: string
 }
 
-// Convert database token to API token (without exposing sensitive data)
-export function convertDbTokenToApi(dbToken: SelectOauthToken): OAuthToken {
+// Convert account record to API token format
+export function convertAccountToApiToken(account: SelectAccount): OAuthToken {
   return {
-    id: dbToken.id.toString(),
-    userId: dbToken.userId.toString(),
-    providerType: dbToken.providerType as ProviderType,
-    expiresAt: formatTimestamp(dbToken.expiresAt),
-    scope: dbToken.scope,
-    createdAt: formatTimestamp(dbToken.createdAt),
-    updatedAt: formatTimestamp(dbToken.updatedAt)
+    id: account.id.toString(),
+    userId: account.userId.toString(),
+    providerType: account.providerId as ProviderType,
+    expiresAt: account.accessTokenExpiresAt
+      ? formatTimestamp(account.accessTokenExpiresAt)
+      : null,
+    scope: account.scope || '',
+    createdAt: formatTimestamp(account.createdAt),
+    updatedAt: formatTimestamp(account.updatedAt)
   }
 }
 
-// Get OAuth token by user ID and provider type
+// Get OAuth token from accounts table by user ID and provider
+// This retrieves tokens stored by better-auth during social login
 export async function getOAuthToken(
   db: DB,
   userId: number,
   providerType: ProviderType
-): Promise<SelectOauthToken | null> {
-  const [token] = await db
+): Promise<SelectAccount | null> {
+  const [account] = await db
     .select()
-    .from(oauthTokensTable)
+    .from(accountsTable)
     .where(
       and(
-        eq(oauthTokensTable.userId, userId),
-        eq(oauthTokensTable.providerType, providerType)
+        eq(accountsTable.userId, userId),
+        eq(accountsTable.providerId, providerType)
       )
     )
-  return token || null
+  return account || null
 }
 
 // Check if user has a valid (non-expired) token
@@ -58,108 +58,46 @@ export async function hasValidOAuthToken(
   userId: number,
   providerType: ProviderType
 ): Promise<boolean> {
-  const token = await getOAuthToken(db, userId, providerType)
-  if (!token) return false
+  const account = await getOAuthToken(db, userId, providerType)
+  if (!account || !account.accessToken) return false
+
+  // If no expiry is set, assume token is valid
+  if (!account.accessTokenExpiresAt) return true
 
   const now = getCurrentUnixTimestamp()
-  return token.expiresAt > now
+  return account.accessTokenExpiresAt > now
 }
 
-// Upsert OAuth token (create or update)
-export async function upsertOAuthToken(
-  db: DB,
-  data: CreateOAuthToken
-): Promise<SelectOauthToken> {
-  const now = getCurrentUnixTimestamp()
-
-  // Check if token already exists
-  const existingToken = await getOAuthToken(db, data.userId, data.providerType)
-
-  if (existingToken) {
-    // Update existing token
-    const [updatedToken] = await db
-      .update(oauthTokensTable)
-      .set({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        expiresAt: data.expiresAt,
-        scope: data.scope,
-        updatedAt: now
-      })
-      .where(eq(oauthTokensTable.id, existingToken.id))
-      .returning()
-
-    if (!updatedToken) {
-      throw new Error('Failed to update OAuth token')
-    }
-    return updatedToken
-  }
-
-  // Create new token (id is auto-incremented)
-  const tokenData: Omit<InsertOauthToken, 'id'> = {
-    userId: data.userId,
-    providerType: data.providerType,
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    expiresAt: data.expiresAt,
-    scope: data.scope,
-    createdAt: now,
-    updatedAt: now
-  }
-
-  const [newToken] = await db
-    .insert(oauthTokensTable)
-    .values(tokenData)
-    .returning()
-
-  if (!newToken) {
-    throw new Error('Failed to create OAuth token')
-  }
-  return newToken
-}
-
-// Update OAuth token (for token refresh)
+// Update OAuth token in accounts table (for token refresh)
+// Note: Accounts are created by better-auth during social login,
+// so we only update tokens here, not create new accounts
 export async function updateOAuthToken(
   db: DB,
   userId: number,
   providerType: ProviderType,
   data: UpdateOAuthToken
-): Promise<SelectOauthToken | null> {
-  const existingToken = await getOAuthToken(db, userId, providerType)
-  if (!existingToken) return null
+): Promise<SelectAccount | null> {
+  const existingAccount = await getOAuthToken(db, userId, providerType)
+  if (!existingAccount) return null
 
   const now = getCurrentUnixTimestamp()
-  const updateData: Partial<InsertOauthToken> = {
+  const updateData: Partial<SelectAccount> = {
     updatedAt: now
   }
 
   if (data.accessToken !== undefined) updateData.accessToken = data.accessToken
   if (data.refreshToken !== undefined) updateData.refreshToken = data.refreshToken
-  if (data.expiresAt !== undefined) updateData.expiresAt = data.expiresAt
-  if (data.scope !== undefined) updateData.scope = data.scope
+  if (data.expiresAt !== undefined) updateData.accessTokenExpiresAt = data.expiresAt
 
-  const [updatedToken] = await db
-    .update(oauthTokensTable)
+  const [updatedAccount] = await db
+    .update(accountsTable)
     .set(updateData)
-    .where(eq(oauthTokensTable.id, existingToken.id))
+    .where(eq(accountsTable.id, existingAccount.id))
     .returning()
 
-  return updatedToken || null
+  return updatedAccount || null
 }
 
-// Delete OAuth token
-export async function deleteOAuthToken(
-  db: DB,
-  userId: number,
-  providerType: ProviderType
-): Promise<SelectOauthToken | null> {
-  const existingToken = await getOAuthToken(db, userId, providerType)
-  if (!existingToken) return null
-
-  const [deletedToken] = await db
-    .delete(oauthTokensTable)
-    .where(eq(oauthTokensTable.id, existingToken.id))
-    .returning()
-
-  return deletedToken || null
-}
+// Note: We don't provide upsertOAuthToken or deleteOAuthToken because
+// account creation/deletion is managed by better-auth.
+// If you need to disconnect a provider, use better-auth's unlinkAccount method.

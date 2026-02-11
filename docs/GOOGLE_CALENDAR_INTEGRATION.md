@@ -7,18 +7,28 @@ This document describes the Google Calendar integration feature for the Shuchu a
 The Google Calendar integration allows users to connect their Google Calendar account and import calendar events into Shuchu. This enables users to see their scheduled events alongside their tasks.
 
 **Key Features:**
-- OAuth 2.0 authentication with Google
+- OAuth 2.0 authentication with Google (via better-auth)
 - Import calendars from Google Calendar
 - Sync events from selected calendars
 - Query events with date range filters
 - Push notifications for real-time updates (webhooks)
 
 **Design Decisions:**
-- **OAuth Flow:** Backend handles OAuth (stores tokens, refreshes them, fetches events)
+- **OAuth Flow:** Handled by better-auth during Google sign-in (tokens stored in `accounts` table)
 - **Import Strategy:** Full replace (clear existing events for a calendar on sync)
 - **Provider Agnostic:** Schema designed to support future providers (Outlook, Apple Calendar)
 
 Base URL: `/api`
+
+## Authentication
+
+Google Calendar access is granted when users sign in with Google through better-auth. The OAuth configuration requests calendar scopes (`calendar.readonly` and `calendar.events.readonly`) during the sign-in flow, so users don't need a separate authorization step to connect their calendars.
+
+**How it works:**
+1. User signs in with Google via better-auth (`/api/auth/callback/google`)
+2. better-auth stores OAuth tokens (including calendar access) in the `accounts` table
+3. Calendar API calls use the tokens from the `accounts` table
+4. Tokens are automatically refreshed when expired
 
 ## Environment Variables
 
@@ -27,7 +37,6 @@ Required environment variables for Google OAuth:
 ```bash
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 ```
 
 For push notifications (webhooks), you also need:
@@ -40,28 +49,12 @@ WEBHOOK_BASE_URL=https://your-public-domain.com
 
 ## Data Models
 
-### OAuthToken (Internal)
-
-OAuth tokens are stored internally and not exposed via API (except status information).
-
-```typescript
-{
-  id: string;           // UUID v7
-  userId: string;       // UUID v7, references user
-  providerType: string; // 'google' | 'outlook' | 'apple'
-  expiresAt: string;    // ISO 8601 datetime
-  scope: string;        // Granted OAuth scopes
-  createdAt: string;    // ISO 8601 datetime
-  updatedAt: string;    // ISO 8601 datetime
-}
-```
-
 ### Calendar
 
 ```typescript
 {
-  id: string;                // UUID v7
-  userId: string;            // UUID v7, references user
+  id: string;                // Integer ID (auto-increment)
+  userId: string;            // Integer, references user
   providerType: string;      // 'google' | 'outlook' | 'apple'
   providerCalendarId: string; // Provider's calendar ID (e.g., 'primary')
   name: string;              // Display name
@@ -76,8 +69,8 @@ OAuth tokens are stored internally and not exposed via API (except status inform
 **Example:**
 ```json
 {
-  "id": "01916b3e-abcd-7890-cdef-1234567890ab",
-  "userId": "01916b3e-1234-7890-abcd-ef1234567890",
+  "id": "1",
+  "userId": "1",
   "providerType": "google",
   "providerCalendarId": "primary",
   "name": "Work Calendar",
@@ -93,8 +86,8 @@ OAuth tokens are stored internally and not exposed via API (except status inform
 
 ```typescript
 {
-  id: string;              // UUID v7
-  calendarId: string;      // UUID v7, references calendar
+  id: string;              // Integer ID (auto-increment)
+  calendarId: string;      // Integer, references calendar
   providerType: string;    // 'google' | 'outlook' | 'apple'
   providerEventId: string; // Provider's event ID
   title: string;           // Event title
@@ -111,8 +104,8 @@ OAuth tokens are stored internally and not exposed via API (except status inform
 **Example:**
 ```json
 {
-  "id": "01916b3e-abcd-7890-cdef-1234567890ab",
-  "calendarId": "01916b3e-1234-7890-abcd-ef1234567890",
+  "id": "1",
+  "calendarId": "1",
   "providerType": "google",
   "providerEventId": "abc123xyz",
   "title": "Team Meeting",
@@ -146,8 +139,8 @@ Watch channel for push notifications.
 
 ```typescript
 {
-  id: string;           // UUID v7
-  calendarId: string;   // UUID v7, references calendar
+  id: string;           // Integer ID (auto-increment)
+  calendarId: string;   // Integer, references calendar
   channelId: string;    // UUID sent to Google for identifying the channel
   resourceId: string;   // Resource ID returned by Google
   providerType: string; // 'google' | 'outlook' | 'apple'
@@ -158,59 +151,13 @@ Watch channel for push notifications.
 }
 ```
 
-**Example:**
-```json
-{
-  "id": "01916b3e-abcd-7890-cdef-1234567890ab",
-  "calendarId": "01916b3e-1234-7890-abcd-ef1234567890",
-  "channelId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "resourceId": "AbCdEfGhIjKl",
-  "providerType": "google",
-  "expiresAt": 1704672000,
-  "token": "verification-token-123",
-  "createdAt": 1704067200,
-  "updatedAt": 1704067200
-}
-```
-
 ## Endpoints
 
-### OAuth Flow
-
-#### GET /auth/google
-
-Get the Google OAuth authorization URL to redirect the user.
-
-**Response:**
-```json
-{
-  "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?..."
-}
-```
-
-#### GET /auth/google/callback
-
-OAuth callback endpoint. Exchange authorization code for tokens.
-
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| code | string | Yes | Authorization code from Google |
-| state | string | No | State parameter for CSRF protection |
-| error | string | No | Error code if authorization failed |
-
-**Response (Success):**
-```json
-{
-  "connected": true,
-  "providerType": "google",
-  "expiresAt": "2024-01-15T11:00:00.000Z"
-}
-```
+### OAuth Status
 
 #### GET /auth/google/status
 
-Check if user has a valid Google OAuth connection.
+Check if user has a valid Google OAuth connection (via better-auth sign-in).
 
 **Response:**
 ```json
@@ -230,13 +177,15 @@ Or if not connected:
 
 #### DELETE /auth/google
 
-Disconnect Google OAuth and remove all associated calendar data.
+Disconnect Google Calendar data (removes calendars and events).
+
+> **Note:** This removes calendar data but does not unlink the Google account from better-auth. To fully unlink, use better-auth's unlinkAccount method.
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Google OAuth disconnected successfully"
+  "message": "Google Calendar data disconnected successfully"
 }
 ```
 
@@ -346,8 +295,8 @@ Start watching a calendar for changes. Google will send push notifications to ou
 ```json
 {
   "watchChannel": {
-    "id": "01916b3e-abcd-7890-cdef-1234567890ab",
-    "calendarId": "01916b3e-1234-7890-abcd-ef1234567890",
+    "id": "1",
+    "calendarId": "1",
     "channelId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "resourceId": "AbCdEfGhIjKl",
     "providerType": "google",
@@ -399,6 +348,8 @@ Stop watching a calendar for changes.
 
 Webhook endpoint that receives push notifications from Google. This is called automatically by Google when calendar events change.
 
+> **Note:** This endpoint is exempt from JWT authentication since Google's servers call it directly without auth tokens.
+
 **Request Headers (from Google):**
 | Header | Description |
 |--------|-------------|
@@ -429,7 +380,7 @@ List events with optional filters.
 
 **Examples:**
 - `/events` - Get all events
-- `/events?calendarId=uuid-here` - Get events for specific calendar
+- `/events?calendarId=1` - Get events for specific calendar
 - `/events?startDate=2024-01-01T00:00:00Z&endDate=2024-01-31T23:59:59Z` - Date range
 
 **Response:**
@@ -446,28 +397,27 @@ Get a specific event by ID.
 
 ## Database Schema
 
-### oauth_tokens
+### accounts (better-auth)
 
-| Column | Type | Constraints |
+OAuth tokens are stored in the `accounts` table managed by better-auth.
+
+| Column | Type | Description |
 |--------|------|-------------|
-| id | blob | PRIMARY KEY (UUID v7) |
-| user_id | blob | NOT NULL, FOREIGN KEY -> users |
-| provider_type | text | NOT NULL |
-| access_token | text | NOT NULL |
-| refresh_token | text | NOT NULL |
-| expires_at | integer | NOT NULL (Unix timestamp) |
-| scope | text | NOT NULL |
-| created_at | integer | NOT NULL |
-| updated_at | integer | NOT NULL |
-
-**Unique constraint:** (user_id, provider_type)
+| id | integer | PRIMARY KEY (auto-increment) |
+| user_id | integer | FOREIGN KEY -> users |
+| provider_id | text | Provider name ('google') |
+| account_id | text | Provider's user ID |
+| access_token | text | OAuth access token |
+| refresh_token | text | OAuth refresh token |
+| access_token_expires_at | integer | Unix timestamp |
+| scope | text | Granted scopes |
 
 ### calendars
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | blob | PRIMARY KEY (UUID v7) |
-| user_id | blob | NOT NULL, FOREIGN KEY -> users |
+| id | integer | PRIMARY KEY (auto-increment) |
+| user_id | integer | NOT NULL, FOREIGN KEY -> users |
 | provider_type | text | NOT NULL |
 | provider_calendar_id | text | NOT NULL |
 | name | text | NOT NULL |
@@ -483,8 +433,8 @@ Get a specific event by ID.
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | blob | PRIMARY KEY (UUID v7) |
-| calendar_id | blob | NOT NULL, FOREIGN KEY -> calendars (CASCADE) |
+| id | integer | PRIMARY KEY (auto-increment) |
+| calendar_id | integer | NOT NULL, FOREIGN KEY -> calendars (CASCADE) |
 | provider_type | text | NOT NULL |
 | provider_event_id | text | NOT NULL |
 | title | text | NOT NULL |
@@ -502,8 +452,8 @@ Get a specific event by ID.
 
 | Column | Type | Constraints |
 |--------|------|-------------|
-| id | blob | PRIMARY KEY (UUID v7) |
-| calendar_id | blob | NOT NULL, FOREIGN KEY -> calendars (CASCADE) |
+| id | integer | PRIMARY KEY (auto-increment) |
+| calendar_id | integer | NOT NULL, FOREIGN KEY -> calendars (CASCADE) |
 | channel_id | text | NOT NULL |
 | resource_id | text | NOT NULL |
 | provider_type | text | NOT NULL |
@@ -522,24 +472,24 @@ Get a specific event by ID.
 apps/web/app/
 ├── api/[[...route]]/
 │   ├── handlers/
-│   │   ├── google-auth.ts   # OAuth handlers
+│   │   ├── google-auth.ts   # OAuth status handlers
 │   │   ├── calendars.ts     # Calendar CRUD + watch handlers
 │   │   ├── events.ts        # Event query handlers
 │   │   └── webhooks.ts      # Webhook handlers
 │   └── routes/
-│       ├── google-auth.ts   # OAuth route definitions
+│       ├── google-auth.ts   # OAuth status route definitions
 │       ├── calendars.ts     # Calendar + watch route definitions
 │       ├── events.ts        # Event route definitions
 │       └── webhooks.ts      # Webhook route definitions
 ├── core/
+│   ├── auth.ts              # better-auth configuration (includes calendar scopes)
 │   ├── oauth.core.ts        # OAuth Zod schemas
-│   ├── oauth.db.ts          # OAuth token CRUD
+│   ├── oauth.db.ts          # OAuth token access (reads from accounts table)
 │   ├── calendars.core.ts    # Calendar Zod schemas
 │   ├── calendars.db.ts      # Calendar CRUD
 │   ├── events.core.ts       # Event Zod schemas
 │   ├── events.db.ts         # Event CRUD
-│   ├── watch-channels.core.ts # Watch channel Zod schemas
-│   ├── watch-channels.db.ts   # Watch channel CRUD
+│   ├── watch-channels.db.ts # Watch channel CRUD
 │   └── calendar-providers/
 │       ├── types.ts         # Provider interface
 │       └── google.service.ts # Google API client
@@ -560,7 +510,7 @@ This approach is simple and ensures consistency, though it may be less efficient
 
 Access tokens are automatically refreshed when:
 - Token expires within 5 minutes of API call
-- Refreshed tokens are stored back to the database
+- Refreshed tokens are stored back to the `accounts` table
 
 ## Future Considerations
 

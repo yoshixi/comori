@@ -37,7 +37,7 @@ import {
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar } from './components/Sidebar'
-import { SettingsView } from './components/SettingsView'
+import { AccountView } from './components/AccountView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { Dialog, DialogContent } from './components/ui/dialog'
 import { formatDateTimeInput, normalizeDueDate, normalizeDateTime, getTodayRange, formatTimeRangeShort } from './lib/time'
@@ -45,7 +45,7 @@ import { CalendarView, type ViewMode } from './components/CalendarView'
 import { TaskTimeRangePicker } from './components/TaskTimeRangePicker'
 import { useIsNarrow } from './hooks/use-mobile'
 
-type View = 'tasks' | 'calendar' | 'settings'
+type View = 'tasks' | 'calendar' | 'account'
 
 // Keyboard shortcut definitions
 type KeyBinding = {
@@ -1271,8 +1271,8 @@ function App(): React.JSX.Element {
         onOpenTaskDetail={setSelectedTask}
       />
       <SidebarInset>
-        {currentView === 'settings' ? (
-          <SettingsView />
+        {currentView === 'account' ? (
+          <AccountView />
         ) : currentView === 'calendar' ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-8">
             <main className="flex min-h-0 flex-1 flex-col gap-6">

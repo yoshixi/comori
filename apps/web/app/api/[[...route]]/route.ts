@@ -115,7 +115,7 @@ app.use('/*', cors({
 }))
 
 // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
-app.on(['POST', 'GET'], '/auth/**', (c) => {
+app.on(['POST', 'GET'], '/auth/*', (c) => {
   return auth.handler(c.req.raw)
 })
 

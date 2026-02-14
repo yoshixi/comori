@@ -10,6 +10,8 @@ import {
 } from "../db/schema/schema";
 
 export const auth = betterAuth({
+  secret: process.env.BETTER_AUTH_SECRET!,
+  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
   database: drizzleAdapter(getDb(), {
     provider: "sqlite",
     usePlural: true,
@@ -20,6 +22,18 @@ export const auth = betterAuth({
       verifications: verificationsTable,
     },
   }),
+  logger: {
+    level: "debug",
+    log: (level, message, ...args) => {
+      // Send logs to a custom logging service
+      console.log({
+        level,
+        message,
+        metadata: args,
+        timestamp: new Date().toISOString()
+      });
+    }
+  },
   emailAndPassword: { enabled: true },
   socialProviders: {
     google: {

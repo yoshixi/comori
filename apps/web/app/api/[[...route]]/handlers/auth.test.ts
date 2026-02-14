@@ -75,7 +75,7 @@ describe('Auth & Token Endpoints', () => {
     app = new OpenAPIHono<AppBindings>().basePath('/api');
 
     // Mount better-auth handler
-    app.on(['POST', 'GET'], '/auth/**', (c) => {
+    app.on(['POST', 'GET'], '/auth/*', (c) => {
       return testAuth.handler(c.req.raw);
     });
 

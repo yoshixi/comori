@@ -632,9 +632,129 @@ Returns 200 OK to Google
 - **Tokens refresh automatically** - When access token expires, we use the refresh token
 - **Full replace strategy** - On each sync, we delete and re-import all events (simple but not incremental)
 
+## UI Implementation (Electron App)
+
+This section describes the user interface for managing Google Calendar integration in the Electron desktop app.
+
+### Settings View
+
+The Settings view (`SettingsView.tsx`) provides calendar management functionality:
+
+**Location:** Sidebar menu → Settings
+
+**Sections:**
+
+1. **Google Calendar Connection Status**
+   - Shows connection status (Connected/Not connected)
+   - If not connected, displays message to sign in with Google in Account
+
+2. **Available Calendars** (collapsible, shown when connected)
+   - Lists all calendars from the user's Google account
+   - Each calendar shows: color dot, name, primary badge (if applicable)
+   - "Add" button on the left side to import a calendar
+   - "Added" badge for already-imported calendars
+
+3. **Synced Calendars** (collapsible, shown when connected and has calendars)
+   - Lists imported calendars with management controls
+   - Each calendar shows: color dot, name, last synced timestamp
+   - Enable/disable toggle for each calendar
+   - "Sync Now" button to manually trigger sync
+   - "Remove" button to delete calendar and its events
+
+### Calendar Events Display
+
+Calendar events are displayed in the CalendarView alongside tasks:
+
+**Visual Distinction:**
+- **Tasks:** Primary color styling (blue/purple tones), interactive
+- **Events:** Grayish styling (`bg-slate-200/60`, `border-slate-400`), read-only
+
+**Event Rendering:**
+- Events use lane-based layout (same as tasks) to handle overlaps
+- Each event shows: title, time range, calendar name
+- Events are non-interactive (`pointer-events-none`) - they're for reference only
+- All-day events are currently skipped (future enhancement)
+
+**Code Location:** `CalendarView.tsx` lines 932-967
+
+```tsx
+{/* Calendar events - grayish to distinguish from tasks */}
+{dayEvents.map((eventItem) => (
+  <div
+    className="absolute rounded-md px-2 py-1 text-left text-xs pointer-events-none
+               bg-slate-200/60 dark:bg-slate-700/50
+               border-l-[3px] border-slate-400 dark:border-slate-500"
+    style={{ top, height, left, width }}
+  >
+    <div className="font-medium text-slate-600 dark:text-slate-300">
+      {eventItem.event.title}
+    </div>
+    ...
+  </div>
+))}
+```
+
+### Calendar Filter Dropdown
+
+A dropdown in the CalendarView toolbar to toggle calendar visibility:
+
+**Location:** CalendarView toolbar (right side, next to Day/Week buttons)
+
+**Features:**
+- Shows "Calendars (X/Y)" indicating visible/total count
+- Lists all synced calendars with toggle checkmarks
+- Visibility state persisted in localStorage (`shuchu:visible-calendar-ids`)
+- Unchecking a calendar hides its events from the view
+
+**Code Location:** `CalendarFilterDropdown.tsx`
+
+### Data Hooks
+
+**useCalendarSettings** (`hooks/useCalendarSettings.ts`)
+- Manages calendar settings state
+- Provides: `isGoogleConnected`, `availableCalendars`, `syncedCalendars`
+- Actions: `addCalendar`, `removeCalendar`, `toggleCalendarEnabled`, `syncCalendar`
+
+**useCalendarEvents** (`hooks/useCalendarEvents.ts`)
+- Fetches events for a date range
+- Manages visibility filtering
+- Provides: `events`, `calendars`, `visibleCalendarIds`
+- Actions: `toggleCalendarVisibility`, `setAllCalendarsVisible`
+- Fetches events for ±2-6 weeks around current date for smooth navigation
+
+### File Structure (Electron App)
+
+```
+apps/electron/src/renderer/src/
+├── components/
+│   ├── SettingsView.tsx          # Calendar settings UI
+│   ├── CalendarView.tsx          # Day/week view with event rendering
+│   ├── CalendarFilterDropdown.tsx # Visibility toggle dropdown
+│   └── Sidebar.tsx               # Navigation (includes Settings)
+├── hooks/
+│   ├── useCalendarSettings.ts    # Calendar management hook
+│   └── useCalendarEvents.ts      # Event fetching + visibility hook
+└── lib/
+    └── calendar-utils.ts         # Layout calculations (including calculateEventLayouts)
+```
+
+### Design Decisions
+
+1. **Grayish events:** Calendar events use neutral gray colors to clearly distinguish them from tasks (which use primary colors). This helps users quickly identify what's a task vs. an imported event.
+
+2. **Read-only events:** Events are non-interactive since they're managed in Google Calendar. Users can see them for reference but cannot modify them in Shuchu.
+
+3. **Visibility persistence:** Calendar visibility preferences are stored in localStorage so they persist across sessions.
+
+4. **Left-side action buttons:** In the Available Calendars list, Add/Added buttons are positioned on the left to remain visible even with long calendar names.
+
+5. **String ID conversion:** Calendar IDs from the API are numbers but visibility state uses strings for localStorage compatibility. All comparisons convert IDs to strings with `String(id)`.
+
 ## Future Considerations
 
 - **Incremental Sync:** Use Google Calendar's sync tokens for delta updates
 - **Multiple Providers:** Add Outlook and Apple Calendar support
 - **Watch Channel Renewal:** Automatically renew watch channels before expiration
 - **Background Sync:** Periodic automatic sync via cron/scheduler as fallback
+- **All-day Events:** Add support for rendering all-day events at the top of day columns
+- **Event Colors:** Option to use original calendar colors instead of uniform gray

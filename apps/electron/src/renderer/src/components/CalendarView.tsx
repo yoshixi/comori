@@ -17,7 +17,8 @@ import React, { useMemo, useState, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Minus, Pencil, Play, Plus, Square, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '../lib/utils'
-import type { Task, TaskTimer } from '../gen/api'
+import { CalendarFilterDropdown } from './CalendarFilterDropdown'
+import type { Task, TaskTimer, CalendarEvent, Calendar } from '../gen/api'
 import {
   MINUTES_PER_DAY,
   DAY_MS,
@@ -42,7 +43,9 @@ import {
   getSlotIndexFromEvent,
   dateForSlot,
   assignLanes,
-  type TaskLayout
+  calculateEventLayouts,
+  type TaskLayout,
+  type CalendarEventLayout
 } from '../lib/calendar-utils'
 
 // ============================================================================
@@ -76,6 +79,14 @@ type CalendarViewProps = {
   onTaskStopTimer?: (taskId: number, timerId: number) => void
   /** Callback when user drags to create a new time range */
   onCreateRange?: (range: { startAt: string; endAt: string }) => void
+  /** Calendar events to display (from Google Calendar sync) */
+  calendarEvents?: CalendarEvent[]
+  /** Synced calendars (for colors and visibility filter) */
+  calendars?: Calendar[]
+  /** Set of visible calendar IDs */
+  visibleCalendarIds?: Set<string>
+  /** Callback to toggle calendar visibility */
+  onToggleCalendarVisibility?: (calendarId: string) => void
   /** Additional CSS classes */
   className?: string
 }
@@ -106,6 +117,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onTaskStartTimer,
   onTaskStopTimer,
   onCreateRange,
+  calendarEvents,
+  calendars,
+  visibleCalendarIds,
+  onToggleCalendarVisibility,
   className
 }) => {
   // ==========================================================================
@@ -293,6 +308,23 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     return { scheduledByDay: finalized }
   }, [tasks, activeBase, dayCount, slotMinutes, slotCount])
+
+  // ==========================================================================
+  // Memoized: Calendar Event Layout Calculation
+  // ==========================================================================
+  const eventsByDay = useMemo(() => {
+    if (!calendarEvents || calendarEvents.length === 0) {
+      return new Map<number, CalendarEventLayout[]>()
+    }
+    return calculateEventLayouts(
+      calendarEvents,
+      calendars ?? [],
+      activeBase,
+      dayCount,
+      slotMinutes,
+      slotCount
+    )
+  }, [calendarEvents, calendars, activeBase, dayCount, slotMinutes, slotCount])
 
   // ==========================================================================
   // Effect: Drag-to-Create (New Task Time Range)
@@ -657,6 +689,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           >
             Week
           </Button>
+          {calendars && calendars.length > 0 && visibleCalendarIds && onToggleCalendarVisibility && (
+            <CalendarFilterDropdown
+              calendars={calendars}
+              visibleCalendarIds={visibleCalendarIds}
+              onToggleVisibility={onToggleCalendarVisibility}
+            />
+          )}
         </div>
       </div>
 
@@ -696,6 +735,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           >
             {Array.from({ length: dayCount }, (_, dayIndex) => {
               const dayTasks = scheduledByDay.get(dayIndex) ?? []
+              const dayEvents = eventsByDay.get(dayIndex) ?? []
               const selection =
                 dragSelection && dragSelection.dayIndex === dayIndex ? dragSelection : null
               const selectionTop = selection ? selection.startSlot * slotHeight : 0
@@ -887,6 +927,38 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           </div>
                         </div>
                       </button>
+                    )
+                  })}
+                  {/* Calendar events (read-only, from Google Calendar) - grayish to distinguish from tasks */}
+                  {dayEvents.map((eventItem) => {
+                    const top = eventItem.startSlot * slotHeight
+                    const height = Math.max(1, (eventItem.endSlot - eventItem.startSlot) * slotHeight)
+                    const width = 100 / eventItem.laneCount
+                    const left = eventItem.lane * width
+
+                    return (
+                      <div
+                        key={eventItem.event.id}
+                        className="absolute rounded-md px-2 py-1 text-left text-xs pointer-events-none bg-slate-200/60 dark:bg-slate-700/50 border-l-[3px] border-slate-400 dark:border-slate-500"
+                        style={{
+                          top,
+                          height,
+                          left: `${left}%`,
+                          width: `${width}%`
+                        }}
+                      >
+                        <div className="font-medium line-clamp-1 text-slate-600 dark:text-slate-300">
+                          {eventItem.event.title}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {formatTimeRange(eventItem.startDate, eventItem.endDate)}
+                        </div>
+                        {eventItem.calendar && (
+                          <div className="text-[9px] text-slate-400 dark:text-slate-500 truncate">
+                            {eventItem.calendar.name}
+                          </div>
+                        )}
+                      </div>
                     )
                   })}
                 </div>

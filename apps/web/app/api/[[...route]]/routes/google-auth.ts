@@ -9,10 +9,10 @@ import { ErrorResponseModel } from '../../../core/common.core'
 // Users sign in with Google via better-auth's /api/auth/callback/google endpoint.
 // These routes are for checking status and managing calendar data.
 
-// GET /auth/google/status - Check OAuth status
+// GET /oauth/google/status - Check OAuth status
 export const getGoogleAuthStatusRoute = createRoute({
   method: 'get',
-  path: '/auth/google/status',
+  path: '/oauth/google/status',
   summary: 'Check Google OAuth status',
   description: 'Check if the user has a valid Google OAuth connection (via better-auth)',
   responses: {
@@ -35,10 +35,10 @@ export const getGoogleAuthStatusRoute = createRoute({
   }
 })
 
-// DELETE /auth/google - Disconnect Google OAuth
+// DELETE /oauth/google - Disconnect Google OAuth
 export const deleteGoogleAuthRoute = createRoute({
   method: 'delete',
-  path: '/auth/google',
+  path: '/oauth/google',
   summary: 'Disconnect Google Calendar data',
   description: 'Removes all calendar data associated with the Google account. Note: To fully unlink the Google account, use better-auth unlinkAccount.',
   responses: {

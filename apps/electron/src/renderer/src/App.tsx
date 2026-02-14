@@ -10,8 +10,9 @@ import {
   type Task
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
-import { AppSidebar } from './components/Sidebar'
+import { AppSidebar, type View } from './components/Sidebar'
 import { AccountView } from './components/AccountView'
+import { SettingsView } from './components/SettingsView'
 import { SidebarProvider, SidebarInset, useSidebar } from './components/ui/sidebar'
 import { Dialog, DialogContent } from './components/ui/dialog'
 import { formatDateTimeInput, normalizeDateTime } from './lib/time'
@@ -19,9 +20,9 @@ import { CalendarView, type ViewMode } from './components/CalendarView'
 import { TaskTimeRangePicker } from './components/TaskTimeRangePicker'
 import { useIsNarrow } from './hooks/use-mobile'
 import { useTasksData } from './hooks/useTasksData'
+import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
-
-type View = 'tasks' | 'calendar' | 'account'
+import { startOfDay, addDays } from './lib/calendar-utils'
 
 // Keyboard shortcut definitions
 type KeyBinding = {
@@ -164,6 +165,27 @@ function App(): React.JSX.Element {
     handleDeleteTask
   } = tasksData
 
+  // Calculate date range for calendar events - fetch a wider window to cover navigation
+  // We fetch events for the current month +/- 2 weeks to ensure smooth navigation
+  const calendarDateRange = useMemo(() => {
+    const now = new Date()
+    const startDate = addDays(startOfDay(now), -14) // 2 weeks ago
+    const endDate = addDays(startOfDay(now), 45) // ~6 weeks ahead
+    return { startDate, endDate }
+  }, [])
+
+  // Calendar events data layer
+  const {
+    events: calendarEvents,
+    calendars,
+    visibleCalendarIds,
+    toggleCalendarVisibility
+  } = useCalendarEvents({
+    startDate: calendarDateRange.startDate,
+    endDate: calendarDateRange.endDate,
+    enabled: currentView === 'calendar'
+  })
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
   const [scheduleEditingTask, setScheduleEditingTask] = useState<Task | null>(null)
@@ -294,6 +316,8 @@ function App(): React.JSX.Element {
       <SidebarInset>
         {currentView === 'account' ? (
           <AccountView />
+        ) : currentView === 'settings' ? (
+          <SettingsView />
         ) : currentView === 'calendar' ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-8">
             <main className="flex min-h-0 flex-1 flex-col gap-6">
@@ -344,6 +368,10 @@ function App(): React.JSX.Element {
                       tagIds: filterTagIds
                     })
                   }}
+                  calendarEvents={calendarEvents}
+                  calendars={calendars}
+                  visibleCalendarIds={visibleCalendarIds}
+                  onToggleCalendarVisibility={toggleCalendarVisibility}
                 />
               )}
             </main>

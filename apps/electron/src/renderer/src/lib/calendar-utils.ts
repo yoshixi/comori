@@ -1,7 +1,7 @@
 /**
  * Shared calendar utilities for CalendarView and TaskTimeRangePicker
  */
-import type { Task } from '../gen/api'
+import type { Task, CalendarEvent, Calendar } from '../gen/api'
 
 // ============================================================================
 // Constants
@@ -104,6 +104,30 @@ export type TaskLayout = {
   /** Parsed start date */
   startDate: Date
   /** Parsed/computed end date */
+  endDate: Date
+}
+
+/**
+ * Internal representation of a calendar event positioned on the calendar grid.
+ * Similar to TaskLayout but for external calendar events (read-only display).
+ */
+export type CalendarEventLayout = {
+  event: CalendarEvent
+  /** The calendar this event belongs to */
+  calendar?: Calendar
+  /** Which day column (0 for day view, 0-6 for week view) */
+  dayIndex: number
+  /** Starting slot index (inclusive) */
+  startSlot: number
+  /** Ending slot index (exclusive) */
+  endSlot: number
+  /** Horizontal lane for overlapping items (0-based) */
+  lane: number
+  /** Total number of lanes in this time range */
+  laneCount: number
+  /** Parsed start date */
+  startDate: Date
+  /** Parsed end date */
   endDate: Date
 }
 
@@ -318,4 +342,100 @@ export const calculateTaskLayouts = (
   })
 
   return finalized
+}
+
+/**
+ * Calculates calendar event layouts for a given day range.
+ *
+ * @param events - Array of calendar events to layout
+ * @param calendars - Array of calendars (to associate colors/names)
+ * @param activeBase - The base date for the view (start of day or week)
+ * @param dayCount - Number of days in the view (1 or 7)
+ * @param slotMinutes - Minutes per slot
+ * @param slotCount - Total number of slots
+ * @returns Map of dayIndex to array of CalendarEventLayout items
+ */
+export const calculateEventLayouts = (
+  events: CalendarEvent[],
+  calendars: Calendar[],
+  activeBase: Date,
+  dayCount: number,
+  slotMinutes: number,
+  slotCount: number
+): Map<number, CalendarEventLayout[]> => {
+  const calendarMap = new Map(calendars.map((c) => [c.id, c]))
+  const scheduledMap = new Map<number, CalendarEventLayout[]>()
+
+  events.forEach((event) => {
+    // Skip all-day events for now (they need different rendering)
+    if (event.isAllDay) return
+
+    const startDate = new Date(event.startAt)
+    if (Number.isNaN(startDate.getTime())) return
+
+    const endDate = new Date(event.endAt)
+    if (Number.isNaN(endDate.getTime())) return
+
+    const baseTime = startOfDay(activeBase).getTime()
+    const startDayTime = startOfDay(startDate).getTime()
+    const dayIndex = Math.round((startDayTime - baseTime) / DAY_MS)
+    if (dayIndex < 0 || dayIndex >= dayCount) return
+
+    const startMinutes = startDate.getHours() * 60 + startDate.getMinutes()
+    const endMinutesRaw = endDate.getHours() * 60 + endDate.getMinutes()
+    const endMinutes = clamp(endMinutesRaw, 0, MINUTES_PER_DAY)
+
+    const startSlot = clamp(Math.floor(startMinutes / slotMinutes), 0, slotCount - 1)
+    const endSlot = clamp(Math.ceil(endMinutes / slotMinutes), startSlot + 1, slotCount)
+
+    const entry: CalendarEventLayout = {
+      event,
+      calendar: calendarMap.get(event.calendarId),
+      dayIndex,
+      startSlot,
+      endSlot,
+      lane: 0,
+      laneCount: 1,
+      startDate,
+      endDate
+    }
+
+    const list = scheduledMap.get(dayIndex) ?? []
+    list.push(entry)
+    scheduledMap.set(dayIndex, list)
+  })
+
+  // Assign lanes for overlapping events
+  const finalized = new Map<number, CalendarEventLayout[]>()
+  scheduledMap.forEach((list, dayIndex) => {
+    finalized.set(dayIndex, assignEventLanes(list))
+  })
+
+  return finalized
+}
+
+/**
+ * Assigns horizontal lanes to overlapping events (same algorithm as tasks).
+ */
+const assignEventLanes = (events: CalendarEventLayout[]): CalendarEventLayout[] => {
+  const lanesEnd: number[] = []
+
+  const sorted = [...events].sort((a, b) => {
+    if (a.startSlot === b.startSlot) return a.endSlot - b.endSlot
+    return a.startSlot - b.startSlot
+  })
+
+  sorted.forEach((item) => {
+    let laneIndex = lanesEnd.findIndex((endSlot) => item.startSlot >= endSlot)
+    if (laneIndex === -1) {
+      laneIndex = lanesEnd.length
+      lanesEnd.push(item.endSlot)
+    } else {
+      lanesEnd[laneIndex] = item.endSlot
+    }
+    item.lane = laneIndex
+  })
+
+  const laneCount = Math.max(lanesEnd.length, 1)
+  return sorted.map((item) => ({ ...item, laneCount }))
 }

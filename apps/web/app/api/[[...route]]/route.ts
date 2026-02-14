@@ -29,7 +29,28 @@ import {
   getTagRoute,
   createTagRoute,
   updateTagRoute,
-  deleteTagRoute
+  deleteTagRoute,
+  // Google OAuth routes (status/disconnect only - auth handled by better-auth)
+  getGoogleAuthStatusRoute,
+  deleteGoogleAuthRoute,
+  // Calendar routes
+  listAvailableCalendarsRoute,
+  listCalendarsRoute,
+  createCalendarRoute,
+  getCalendarRoute,
+  updateCalendarRoute,
+  deleteCalendarRoute,
+  syncCalendarRoute,
+  syncAllCalendarsRoute,
+  // Calendar watch routes
+  watchCalendarRoute,
+  stopWatchingCalendarRoute,
+  getWatchStatusRoute,
+  // Event routes
+  listEventsRoute,
+  getEventRoute,
+  // Webhook routes
+  googleCalendarWebhookRoute
 } from './routes'
 
 // Import handlers from local handlers directory
@@ -56,7 +77,28 @@ import {
   getTagHandler,
   createTagHandler,
   updateTagHandler,
-  deleteTagHandler
+  deleteTagHandler,
+  // Google OAuth handlers (status/disconnect only - auth handled by better-auth)
+  getGoogleAuthStatusHandler,
+  deleteGoogleAuthHandler,
+  // Calendar handlers
+  listAvailableCalendarsHandler,
+  listCalendarsHandler,
+  createCalendarHandler,
+  getCalendarHandler,
+  updateCalendarHandler,
+  deleteCalendarHandler,
+  syncCalendarHandler,
+  syncAllCalendarsHandler,
+  // Calendar watch handlers
+  watchCalendarHandler,
+  stopWatchingCalendarHandler,
+  getWatchStatusHandler,
+  // Event handlers
+  listEventsHandler,
+  getEventHandler,
+  // Webhook handlers
+  googleCalendarWebhookHandler
 } from './handlers'
 
 const app = new OpenAPIHono<AppBindings>().basePath('/api')
@@ -73,7 +115,7 @@ app.use('/*', cors({
 }))
 
 // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
-app.on(['POST', 'GET'], '/auth/**', (c) => {
+app.on(['POST', 'GET'], '/auth/*', (c) => {
   return auth.handler(c.req.raw)
 })
 
@@ -173,6 +215,7 @@ app.use('/*', async (c, next) => {
   const path = c.req.path
   if (
     path.startsWith('/api/auth') ||
+    path.startsWith('/api/webhooks') || // Google Calendar push notifications (no JWT)
     path === '/api/token' ||
     path === '/api/desktop-oauth' ||
     path === '/api/desktop-auth-callback' ||
@@ -234,6 +277,32 @@ app.openapi(getTagRoute, getTagHandler)
 app.openapi(createTagRoute, createTagHandler)
 app.openapi(updateTagRoute, updateTagHandler)
 app.openapi(deleteTagRoute, deleteTagHandler)
+
+// Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
+app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
+app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
+
+// Register calendar routes
+app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)
+app.openapi(listCalendarsRoute, listCalendarsHandler)
+app.openapi(createCalendarRoute, createCalendarHandler)
+app.openapi(getCalendarRoute, getCalendarHandler)
+app.openapi(updateCalendarRoute, updateCalendarHandler)
+app.openapi(deleteCalendarRoute, deleteCalendarHandler)
+app.openapi(syncCalendarRoute, syncCalendarHandler)
+app.openapi(syncAllCalendarsRoute, syncAllCalendarsHandler)
+
+// Register event routes
+app.openapi(listEventsRoute, listEventsHandler)
+app.openapi(getEventRoute, getEventHandler)
+
+// Register calendar watch routes
+app.openapi(watchCalendarRoute, watchCalendarHandler)
+app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
+app.openapi(getWatchStatusRoute, getWatchStatusHandler)
+
+// Register webhook routes
+app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)
 
 // The OpenAPI documentation will be available at /doc
 app.doc('/doc', {

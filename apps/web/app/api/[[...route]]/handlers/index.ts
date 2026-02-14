@@ -8,6 +8,10 @@ export * from './timers'
 export * from './tags'
 export * from './comments'
 export * from './activities'
+export * from './google-auth'
+export * from './calendars'
+export * from './events'
+export * from './webhooks'
 
 // Health check handler
 export const healthHandler: RouteHandler<typeof healthRoute, AppBindings> = (c) => {

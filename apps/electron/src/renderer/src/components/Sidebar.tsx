@@ -1,5 +1,5 @@
 import React from 'react'
-import { CalendarDays, ListTodo, CircleUser } from 'lucide-react'
+import { CalendarDays, ListTodo, CircleUser, Settings } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +15,7 @@ import {
 import { InProgressPanel } from './InProgressPanel'
 import type { Task, TaskTimer } from '../gen/api'
 
-type View = 'tasks' | 'calendar' | 'account'
+export type View = 'tasks' | 'calendar' | 'account' | 'settings'
 
 interface AppSidebarProps {
   currentView: View
@@ -29,6 +29,7 @@ interface AppSidebarProps {
 const menuItems = [
   { id: 'calendar' as const, label: 'Calendar', icon: CalendarDays },
   { id: 'tasks' as const, label: 'Tasks', icon: ListTodo },
+  { id: 'settings' as const, label: 'Settings', icon: Settings },
   { id: 'account' as const, label: 'Account', icon: CircleUser }
 ]
 

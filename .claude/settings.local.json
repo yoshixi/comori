@@ -34,7 +34,12 @@
       "Bash(pnpm --filter web add:*)",
       "Bash(devenv shell:*)",
       "Bash(git stash:*)",
-      "Bash(pnpm --filter electron add:*)"
+      "Bash(cat:*)",
+      "Bash(git checkout:*)",
+      "Bash(pnpm --filter web run check-types:*)",
+      "Bash(git diff:*)",
+      "Bash(pnpm --filter electron add:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

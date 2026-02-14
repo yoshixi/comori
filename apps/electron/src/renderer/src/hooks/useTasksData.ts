@@ -12,7 +12,7 @@ import {
 } from '../gen/api'
 import { normalizeDateTime, normalizeDueDate, getTodayRange } from '../lib/time'
 
-type View = 'tasks' | 'calendar' | 'account'
+type View = 'tasks' | 'calendar' | 'account' | 'settings'
 
 interface TasksDataOptions {
   currentView: View

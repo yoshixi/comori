@@ -12,14 +12,25 @@ import useSWRMutation from 'swr/mutation'
 import type { SWRMutationConfiguration } from 'swr/mutation'
 
 import type {
+  AvailableCalendarsResponse,
+  CalendarEventListResponse,
+  CalendarEventResponse,
+  CalendarListResponse,
+  CalendarResponse,
+  CalendarSyncResponse,
+  CreateCalendar,
   CreateTag,
   CreateTask,
   CreateTaskComment,
   CreateTimer,
   ErrorResponse,
+  GetApiEventsParams,
   GetApiTasksParams,
   GetApiTimersParams,
   HealthResponse,
+  OAuthDisconnectResponse,
+  OAuthStatusResponse,
+  StopWatchResponse,
   TagListResponse,
   TagResponse,
   TaskActivitiesResponse,
@@ -29,10 +40,14 @@ import type {
   TaskResponse,
   TimerListResponse,
   TimerResponse,
+  UpdateCalendar,
   UpdateTag,
   UpdateTask,
   UpdateTaskComment,
-  UpdateTimer
+  UpdateTimer,
+  WatchChannelResponse,
+  WatchChannelStatus,
+  WebhookResponse
 } from '../schemas'
 
 import { customInstance } from '../../../lib/api/mutator'
@@ -1101,6 +1116,720 @@ export const useDeleteApiTagsId = <TError = ErrorResponse | ErrorResponse>(
 
   const swrKey = swrOptions?.swrKey ?? getDeleteApiTagsIdMutationKey(id)
   const swrFn = getDeleteApiTagsIdMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Check if the user has a valid Google OAuth connection (via better-auth)
+ * @summary Check Google OAuth status
+ */
+export const getApiOauthGoogleStatus = () => {
+  return customInstance<OAuthStatusResponse>({ url: `/api/oauth/google/status`, method: 'GET' })
+}
+
+export const getGetApiOauthGoogleStatusKey = () => [`/api/oauth/google/status`] as const
+
+export type GetApiOauthGoogleStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiOauthGoogleStatus>>
+>
+export type GetApiOauthGoogleStatusQueryError = ErrorResponse
+
+/**
+ * @summary Check Google OAuth status
+ */
+export const useGetApiOauthGoogleStatus = <TError = ErrorResponse>(options?: {
+  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiOauthGoogleStatus>>, TError> & {
+    swrKey?: Key
+    enabled?: boolean
+  }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiOauthGoogleStatusKey() : null))
+  const swrFn = () => getApiOauthGoogleStatus()
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Removes all calendar data associated with the Google account. Note: To fully unlink the Google account, use better-auth unlinkAccount.
+ * @summary Disconnect Google Calendar data
+ */
+export const deleteApiOauthGoogle = () => {
+  return customInstance<OAuthDisconnectResponse>({ url: `/api/oauth/google`, method: 'DELETE' })
+}
+
+export const getDeleteApiOauthGoogleMutationFetcher = () => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiOauthGoogle()
+  }
+}
+export const getDeleteApiOauthGoogleMutationKey = () => [`/api/oauth/google`] as const
+
+export type DeleteApiOauthGoogleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiOauthGoogle>>
+>
+export type DeleteApiOauthGoogleMutationError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Disconnect Google Calendar data
+ */
+export const useDeleteApiOauthGoogle = <TError = ErrorResponse | ErrorResponse>(options?: {
+  swr?: SWRMutationConfiguration<
+    Awaited<ReturnType<typeof deleteApiOauthGoogle>>,
+    TError,
+    Key,
+    Arguments,
+    Awaited<ReturnType<typeof deleteApiOauthGoogle>>
+  > & { swrKey?: string }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiOauthGoogleMutationKey()
+  const swrFn = getDeleteApiOauthGoogleMutationFetcher()
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Retrieve available calendars from Google Calendar API that can be synced
+ * @summary List available Google Calendars
+ */
+export const getApiCalendarsAvailable = () => {
+  return customInstance<AvailableCalendarsResponse>({
+    url: `/api/calendars/available`,
+    method: 'GET'
+  })
+}
+
+export const getGetApiCalendarsAvailableKey = () => [`/api/calendars/available`] as const
+
+export type GetApiCalendarsAvailableQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiCalendarsAvailable>>
+>
+export type GetApiCalendarsAvailableQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary List available Google Calendars
+ */
+export const useGetApiCalendarsAvailable = <TError = ErrorResponse | ErrorResponse>(options?: {
+  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiCalendarsAvailable>>, TError> & {
+    swrKey?: Key
+    enabled?: boolean
+  }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiCalendarsAvailableKey() : null))
+  const swrFn = () => getApiCalendarsAvailable()
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Retrieve all calendars that have been added for syncing
+ * @summary List integrated calendars
+ */
+export const getApiCalendars = () => {
+  return customInstance<CalendarListResponse>({ url: `/api/calendars`, method: 'GET' })
+}
+
+export const getGetApiCalendarsKey = () => [`/api/calendars`] as const
+
+export type GetApiCalendarsQueryResult = NonNullable<Awaited<ReturnType<typeof getApiCalendars>>>
+export type GetApiCalendarsQueryError = ErrorResponse
+
+/**
+ * @summary List integrated calendars
+ */
+export const useGetApiCalendars = <TError = ErrorResponse>(options?: {
+  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiCalendars>>, TError> & {
+    swrKey?: Key
+    enabled?: boolean
+  }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiCalendarsKey() : null))
+  const swrFn = () => getApiCalendars()
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Add a Google Calendar to be synced
+ * @summary Add a calendar to sync
+ */
+export const postApiCalendars = (createCalendar: CreateCalendar) => {
+  return customInstance<CalendarResponse>({
+    url: `/api/calendars`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data: createCalendar
+  })
+}
+
+export const getPostApiCalendarsMutationFetcher = () => {
+  return (_: Key, { arg }: { arg: CreateCalendar }) => {
+    return postApiCalendars(arg)
+  }
+}
+export const getPostApiCalendarsMutationKey = () => [`/api/calendars`] as const
+
+export type PostApiCalendarsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiCalendars>>
+>
+export type PostApiCalendarsMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+
+/**
+ * @summary Add a calendar to sync
+ */
+export const usePostApiCalendars = <
+  TError = ErrorResponse | ErrorResponse | ErrorResponse
+>(options?: {
+  swr?: SWRMutationConfiguration<
+    Awaited<ReturnType<typeof postApiCalendars>>,
+    TError,
+    Key,
+    CreateCalendar,
+    Awaited<ReturnType<typeof postApiCalendars>>
+  > & { swrKey?: string }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiCalendarsMutationKey()
+  const swrFn = getPostApiCalendarsMutationFetcher()
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Retrieve a specific calendar by ID
+ * @summary Get a calendar
+ */
+export const getApiCalendarsId = (id: number) => {
+  return customInstance<CalendarResponse>({ url: `/api/calendars/${id}`, method: 'GET' })
+}
+
+export const getGetApiCalendarsIdKey = (id: number) => [`/api/calendars/${id}`] as const
+
+export type GetApiCalendarsIdQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiCalendarsId>>
+>
+export type GetApiCalendarsIdQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Get a calendar
+ */
+export const useGetApiCalendarsId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiCalendarsId>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!id
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiCalendarsIdKey(id) : null))
+  const swrFn = () => getApiCalendarsId(id)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Update calendar settings (e.g., enable/disable sync)
+ * @summary Update a calendar
+ */
+export const patchApiCalendarsId = (id: number, updateCalendar: UpdateCalendar) => {
+  return customInstance<CalendarResponse>({
+    url: `/api/calendars/${id}`,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    data: updateCalendar
+  })
+}
+
+export const getPatchApiCalendarsIdMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: UpdateCalendar }) => {
+    return patchApiCalendarsId(id, arg)
+  }
+}
+export const getPatchApiCalendarsIdMutationKey = (id: number) => [`/api/calendars/${id}`] as const
+
+export type PatchApiCalendarsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApiCalendarsId>>
+>
+export type PatchApiCalendarsIdMutationError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Update a calendar
+ */
+export const usePatchApiCalendarsId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof patchApiCalendarsId>>,
+      TError,
+      Key,
+      UpdateCalendar,
+      Awaited<ReturnType<typeof patchApiCalendarsId>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPatchApiCalendarsIdMutationKey(id)
+  const swrFn = getPatchApiCalendarsIdMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Remove a calendar and delete all its synced events
+ * @summary Remove a calendar
+ */
+export const deleteApiCalendarsId = (id: number) => {
+  return customInstance<CalendarResponse>({ url: `/api/calendars/${id}`, method: 'DELETE' })
+}
+
+export const getDeleteApiCalendarsIdMutationFetcher = (id: number) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiCalendarsId(id)
+  }
+}
+export const getDeleteApiCalendarsIdMutationKey = (id: number) => [`/api/calendars/${id}`] as const
+
+export type DeleteApiCalendarsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiCalendarsId>>
+>
+export type DeleteApiCalendarsIdMutationError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Remove a calendar
+ */
+export const useDeleteApiCalendarsId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof deleteApiCalendarsId>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof deleteApiCalendarsId>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiCalendarsIdMutationKey(id)
+  const swrFn = getDeleteApiCalendarsIdMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Trigger a sync for a specific calendar to import latest events
+ * @summary Sync a calendar
+ */
+export const postApiCalendarsIdSync = (id: number) => {
+  return customInstance<CalendarSyncResponse>({ url: `/api/calendars/${id}/sync`, method: 'POST' })
+}
+
+export const getPostApiCalendarsIdSyncMutationFetcher = (id: number) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return postApiCalendarsIdSync(id)
+  }
+}
+export const getPostApiCalendarsIdSyncMutationKey = (id: number) =>
+  [`/api/calendars/${id}/sync`] as const
+
+export type PostApiCalendarsIdSyncMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiCalendarsIdSync>>
+>
+export type PostApiCalendarsIdSyncMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+
+/**
+ * @summary Sync a calendar
+ */
+export const usePostApiCalendarsIdSync = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof postApiCalendarsIdSync>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof postApiCalendarsIdSync>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiCalendarsIdSyncMutationKey(id)
+  const swrFn = getPostApiCalendarsIdSyncMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Trigger a sync for all enabled calendars
+ * @summary Sync all calendars
+ */
+export const postApiCalendarsSync = () => {
+  return customInstance<CalendarSyncResponse>({ url: `/api/calendars/sync`, method: 'POST' })
+}
+
+export const getPostApiCalendarsSyncMutationFetcher = () => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return postApiCalendarsSync()
+  }
+}
+export const getPostApiCalendarsSyncMutationKey = () => [`/api/calendars/sync`] as const
+
+export type PostApiCalendarsSyncMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiCalendarsSync>>
+>
+export type PostApiCalendarsSyncMutationError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Sync all calendars
+ */
+export const usePostApiCalendarsSync = <TError = ErrorResponse | ErrorResponse>(options?: {
+  swr?: SWRMutationConfiguration<
+    Awaited<ReturnType<typeof postApiCalendarsSync>>,
+    TError,
+    Key,
+    Arguments,
+    Awaited<ReturnType<typeof postApiCalendarsSync>>
+  > & { swrKey?: string }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiCalendarsSyncMutationKey()
+  const swrFn = getPostApiCalendarsSyncMutationFetcher()
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Retrieve calendar events with optional filters (calendarId, startDate, endDate)
+ * @summary List calendar events
+ */
+export const getApiEvents = (params?: GetApiEventsParams) => {
+  return customInstance<CalendarEventListResponse>({ url: `/api/events`, method: 'GET', params })
+}
+
+export const getGetApiEventsKey = (params?: GetApiEventsParams) =>
+  [`/api/events`, ...(params ? [params] : [])] as const
+
+export type GetApiEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getApiEvents>>>
+export type GetApiEventsQueryError = ErrorResponse
+
+/**
+ * @summary List calendar events
+ */
+export const useGetApiEvents = <TError = ErrorResponse>(
+  params?: GetApiEventsParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiEvents>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiEventsKey(params) : null))
+  const swrFn = () => getApiEvents(params)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Retrieve a specific calendar event by ID
+ * @summary Get an event
+ */
+export const getApiEventsId = (id: number) => {
+  return customInstance<CalendarEventResponse>({ url: `/api/events/${id}`, method: 'GET' })
+}
+
+export const getGetApiEventsIdKey = (id: number) => [`/api/events/${id}`] as const
+
+export type GetApiEventsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiEventsId>>>
+export type GetApiEventsIdQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Get an event
+ */
+export const useGetApiEventsId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiEventsId>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!id
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiEventsIdKey(id) : null))
+  const swrFn = () => getApiEventsId(id)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Start watching a calendar for push notifications when events change
+ * @summary Watch calendar for changes
+ */
+export const postApiCalendarsIdWatch = (id: number) => {
+  return customInstance<WatchChannelResponse>({ url: `/api/calendars/${id}/watch`, method: 'POST' })
+}
+
+export const getPostApiCalendarsIdWatchMutationFetcher = (id: number) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return postApiCalendarsIdWatch(id)
+  }
+}
+export const getPostApiCalendarsIdWatchMutationKey = (id: number) =>
+  [`/api/calendars/${id}/watch`] as const
+
+export type PostApiCalendarsIdWatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiCalendarsIdWatch>>
+>
+export type PostApiCalendarsIdWatchMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+
+/**
+ * @summary Watch calendar for changes
+ */
+export const usePostApiCalendarsIdWatch = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof postApiCalendarsIdWatch>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof postApiCalendarsIdWatch>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiCalendarsIdWatchMutationKey(id)
+  const swrFn = getPostApiCalendarsIdWatchMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Stop receiving push notifications for a calendar
+ * @summary Stop watching calendar
+ */
+export const deleteApiCalendarsIdWatch = (id: number) => {
+  return customInstance<StopWatchResponse>({ url: `/api/calendars/${id}/watch`, method: 'DELETE' })
+}
+
+export const getDeleteApiCalendarsIdWatchMutationFetcher = (id: number) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiCalendarsIdWatch(id)
+  }
+}
+export const getDeleteApiCalendarsIdWatchMutationKey = (id: number) =>
+  [`/api/calendars/${id}/watch`] as const
+
+export type DeleteApiCalendarsIdWatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiCalendarsIdWatch>>
+>
+export type DeleteApiCalendarsIdWatchMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+
+/**
+ * @summary Stop watching calendar
+ */
+export const useDeleteApiCalendarsIdWatch = <
+  TError = ErrorResponse | ErrorResponse | ErrorResponse
+>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof deleteApiCalendarsIdWatch>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof deleteApiCalendarsIdWatch>>
+    > & { swrKey?: string }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiCalendarsIdWatchMutationKey(id)
+  const swrFn = getDeleteApiCalendarsIdWatchMutationFetcher(id)
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Get the current watch channel status for a calendar
+ * @summary Get watch status
+ */
+export const getApiCalendarsIdWatch = (id: number) => {
+  return customInstance<WatchChannelStatus>({ url: `/api/calendars/${id}/watch`, method: 'GET' })
+}
+
+export const getGetApiCalendarsIdWatchKey = (id: number) => [`/api/calendars/${id}/watch`] as const
+
+export type GetApiCalendarsIdWatchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiCalendarsIdWatch>>
+>
+export type GetApiCalendarsIdWatchQueryError = ErrorResponse | ErrorResponse
+
+/**
+ * @summary Get watch status
+ */
+export const useGetApiCalendarsIdWatch = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiCalendarsIdWatch>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
+  }
+) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const isEnabled = swrOptions?.enabled !== false && !!id
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiCalendarsIdWatchKey(id) : null))
+  const swrFn = () => getApiCalendarsIdWatch(id)
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
+
+  return {
+    swrKey,
+    ...query
+  }
+}
+
+/**
+ * Receives push notifications from Google Calendar when events change
+ * @summary Google Calendar webhook
+ */
+export const postApiWebhooksGoogleCalendar = () => {
+  return customInstance<WebhookResponse>({ url: `/api/webhooks/google-calendar`, method: 'POST' })
+}
+
+export const getPostApiWebhooksGoogleCalendarMutationFetcher = () => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return postApiWebhooksGoogleCalendar()
+  }
+}
+export const getPostApiWebhooksGoogleCalendarMutationKey = () =>
+  [`/api/webhooks/google-calendar`] as const
+
+export type PostApiWebhooksGoogleCalendarMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiWebhooksGoogleCalendar>>
+>
+export type PostApiWebhooksGoogleCalendarMutationError = void
+
+/**
+ * @summary Google Calendar webhook
+ */
+export const usePostApiWebhooksGoogleCalendar = <TError = void>(options?: {
+  swr?: SWRMutationConfiguration<
+    Awaited<ReturnType<typeof postApiWebhooksGoogleCalendar>>,
+    TError,
+    Key,
+    Arguments,
+    Awaited<ReturnType<typeof postApiWebhooksGoogleCalendar>>
+  > & { swrKey?: string }
+}) => {
+  const { swr: swrOptions } = options ?? {}
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiWebhooksGoogleCalendarMutationKey()
+  const swrFn = getPostApiWebhooksGoogleCalendarMutationFetcher()
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 

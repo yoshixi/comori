@@ -108,6 +108,55 @@ export const taskTagsTable = sqliteTable('task_tags', {
   uniqueTaskTag: unique().on(table.taskId, table.tagId),
 }));
 
+// Calendars table (provider-agnostic)
+export const calendarsTable = sqliteTable('calendars', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
+  providerType: text('provider_type').notNull(), // 'google' | 'outlook' | 'apple'
+  providerCalendarId: text('provider_calendar_id').notNull(), // Provider's calendar ID
+  name: text('name').notNull(), // Display name
+  color: text('color'), // Calendar color
+  isEnabled: integer('is_enabled', { mode: 'number' }).notNull().default(1), // Whether to sync this calendar
+  lastSyncedAt: integer('last_synced_at', { mode: 'number' }), // Unix timestamp
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+  uniqueUserProviderCalendar: unique().on(table.userId, table.providerType, table.providerCalendarId),
+}));
+
+// Calendar Events table (provider-agnostic)
+export const calendarEventsTable = sqliteTable('calendar_events', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  calendarId: integer('calendar_id', { mode: 'number' }).notNull().references(() => calendarsTable.id, { onDelete: 'cascade' }),
+  providerType: text('provider_type').notNull(), // 'google' | 'outlook' | 'apple' (denormalized for queries)
+  providerEventId: text('provider_event_id').notNull(), // Provider's event ID
+  title: text('title').notNull(),
+  description: text('description'),
+  startAt: integer('start_at', { mode: 'number' }).notNull(), // Unix timestamp
+  endAt: integer('end_at', { mode: 'number' }).notNull(), // Unix timestamp
+  isAllDay: integer('is_all_day', { mode: 'number' }).notNull().default(0),
+  location: text('location'),
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+  uniqueCalendarEvent: unique().on(table.calendarId, table.providerEventId),
+}));
+
+// Calendar Watch Channels table (for push notifications)
+export const calendarWatchChannelsTable = sqliteTable('calendar_watch_channels', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  calendarId: integer('calendar_id', { mode: 'number' }).notNull().references(() => calendarsTable.id, { onDelete: 'cascade' }),
+  channelId: text('channel_id').notNull(), // UUID sent to Google for identifying the channel
+  resourceId: text('resource_id').notNull(), // Resource ID returned by Google
+  providerType: text('provider_type').notNull(), // 'google' | 'outlook' | 'apple'
+  expiresAt: integer('expires_at', { mode: 'number' }).notNull(), // Unix timestamp when channel expires
+  token: text('token'), // Optional verification token
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+  uniqueCalendarChannel: unique().on(table.calendarId, table.providerType),
+}));
+
 // Indexes
 export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
 export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
@@ -115,6 +164,13 @@ export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_creat
 export const tagsUserIdIdx = index('tags_user_id_idx').on(tagsTable.userId);
 export const taskTagsTaskIdIdx = index('task_tags_task_id_idx').on(taskTagsTable.taskId);
 export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.tagId);
+export const calendarsUserIdIdx = index('calendars_user_id_idx').on(calendarsTable.userId);
+export const calendarEventsCalendarIdIdx = index('calendar_events_calendar_id_idx').on(calendarEventsTable.calendarId);
+export const calendarEventsStartAtIdx = index('calendar_events_start_at_idx').on(calendarEventsTable.startAt);
+export const calendarEventsEndAtIdx = index('calendar_events_end_at_idx').on(calendarEventsTable.endAt);
+export const calendarWatchChannelsCalendarIdIdx = index('calendar_watch_channels_calendar_id_idx').on(calendarWatchChannelsTable.calendarId);
+export const calendarWatchChannelsChannelIdIdx = index('calendar_watch_channels_channel_id_idx').on(calendarWatchChannelsTable.channelId);
+export const calendarWatchChannelsExpiresAtIdx = index('calendar_watch_channels_expires_at_idx').on(calendarWatchChannelsTable.expiresAt);
 
 // Type exports
 export type InsertUser = typeof usersTable.$inferInsert;
@@ -135,3 +191,9 @@ export type InsertAccount = typeof accountsTable.$inferInsert;
 export type SelectAccount = typeof accountsTable.$inferSelect;
 export type InsertVerification = typeof verificationsTable.$inferInsert;
 export type SelectVerification = typeof verificationsTable.$inferSelect;
+export type InsertCalendar = typeof calendarsTable.$inferInsert;
+export type SelectCalendar = typeof calendarsTable.$inferSelect;
+export type InsertCalendarEvent = typeof calendarEventsTable.$inferInsert;
+export type SelectCalendarEvent = typeof calendarEventsTable.$inferSelect;
+export type InsertCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferInsert;
+export type SelectCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferSelect;

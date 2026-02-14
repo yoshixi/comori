@@ -41,6 +41,7 @@ export function TasksView({
               onStartTimer={data.handleStartTimer}
               onStopTimer={data.handleStopTimer}
               onCreateTaskAndStartTimer={data.handleCreateTaskAndStartTimer}
+              onDeleteTask={data.handleDeleteTask}
               onTaskSelect={onTaskSelect}
               filterTagIds={filterTagIds}
             />
@@ -52,6 +53,7 @@ export function TasksView({
               onStartTimer={data.handleStartTimer}
               onStopTimer={data.handleStopTimer}
               onToggleCompletion={data.handleToggleTaskCompletion}
+              onDeleteTask={data.handleDeleteTask}
               onTaskSelect={onTaskSelect}
               filterTagIds={filterTagIds}
               onFilterTagIdsChange={onFilterTagIdsChange}

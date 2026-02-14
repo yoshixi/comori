@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Play, CheckCircle, Maximize2 } from 'lucide-react'
+import { Play, CheckCircle, Maximize2, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Switch } from '../ui/switch'
@@ -14,6 +14,7 @@ interface UpcomingTabProps {
   onStartTimer: (taskId: number) => void
   onStopTimer: (taskId: number, timerId: number) => void
   onToggleCompletion: (task: Task) => void
+  onDeleteTask: (taskId: number) => void
   onTaskSelect: (task: Task) => void
   filterTagIds: number[]
   onFilterTagIdsChange: (ids: number[]) => void
@@ -24,6 +25,7 @@ export function UpcomingTab({
   onStartTimer,
   onStopTimer,
   onToggleCompletion,
+  onDeleteTask,
   onTaskSelect,
   filterTagIds,
   onFilterTagIdsChange
@@ -151,6 +153,15 @@ export function UpcomingTab({
                   title="Open details"
                 >
                   <Maximize2 className="h-4 w-4 text-blue-600" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }}
+                  className="h-7 w-7 hover:bg-red-100 shrink-0"
+                  title="Delete task"
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               </div>
             )

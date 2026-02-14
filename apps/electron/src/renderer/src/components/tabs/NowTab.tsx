@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Circle, Play, Plus, Square } from 'lucide-react'
+import { Circle, Play, Plus, Square, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -13,6 +13,7 @@ interface NowTabProps {
   onStartTimer: (taskId: number) => void
   onStopTimer: (taskId: number, timerId: number) => void
   onCreateTaskAndStartTimer: (title: string, tagIds?: number[]) => void
+  onDeleteTask: (taskId: number) => void
   onTaskSelect: (task: Task) => void
   filterTagIds: number[]
 }
@@ -83,6 +84,7 @@ export function NowTab({
   onStartTimer,
   onStopTimer,
   onCreateTaskAndStartTimer,
+  onDeleteTask,
   onTaskSelect,
   filterTagIds
 }: NowTabProps): React.JSX.Element {
@@ -228,6 +230,15 @@ export function NowTab({
                     ))}
                   </div>
                 )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }}
+                  className="h-7 w-7 hover:bg-red-100 shrink-0"
+                  title="Delete task"
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
               </div>
             ))}
           </div>

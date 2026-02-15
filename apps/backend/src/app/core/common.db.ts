@@ -1,21 +1,27 @@
-import { drizzle as drizzleD1 } from 'drizzle-orm/d1'
 import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql'
 import { createClient } from '@libsql/client'
-import type { D1Database } from '@cloudflare/workers-types'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+import fs from 'fs'
+import path from 'path'
 import * as schema from '../db/schema/schema'
 
 const DRIZZLE_CONFIG = {
   casing: 'snake_case' as const,
 }
 
-type DbOptions = {
-  d1?: D1Database
-}
-
-let sqliteInstance: ReturnType<typeof drizzleLibsql> | null = null
+let dbInstance: ReturnType<typeof drizzleLibsql> | null = null
 
 const getEnv = () => (typeof process === 'undefined' ? {} : process.env)
+const isNodeRuntime = () => typeof process !== 'undefined' && !!process.versions?.node
+
+const getLocalDbUrl = () => {
+  if (!isNodeRuntime()) {
+    throw new Error('Local SQLite file database is not supported in this runtime. Set TURSO_CONNECTION_URL/TURSO_AUTH_TOKEN instead.')
+  }
+  const tmpDir = path.join(process.cwd(), 'tmp')
+  fs.mkdirSync(tmpDir, { recursive: true })
+  return `file:${path.join(tmpDir, 'local.db')}`
+}
 
 const getDbFromSqlite = (url: string) =>
   drizzleLibsql({
@@ -25,29 +31,32 @@ const getDbFromSqlite = (url: string) =>
   })
 
 export const resetDbForTests = () => {
-  sqliteInstance = null
+  dbInstance = null
 }
 
-export function getDb(options: DbOptions = {}): DB {
+export function getDb(): DB {
   const env = getEnv()
-  const provider = env.DB_PROVIDER || 'd1'
+  if (dbInstance) return dbInstance as unknown as DB
 
-  if (provider === 'sqlite') {
-    const url = env.SQLITE_URL || 'file::memory:?cache=shared'
-    if (!sqliteInstance) {
-      sqliteInstance = getDbFromSqlite(url)
-    }
-    return sqliteInstance as unknown as DB
+  if (env.TURSO_CONNECTION_URL && env.TURSO_AUTH_TOKEN) {
+    dbInstance = drizzleLibsql({
+      connection: {
+        url: env.TURSO_CONNECTION_URL,
+        authToken: env.TURSO_AUTH_TOKEN
+      },
+      schema,
+      ...DRIZZLE_CONFIG
+    })
+    return dbInstance as unknown as DB
   }
 
-  if (!options.d1) {
-    throw new Error('D1 binding is required when DB_PROVIDER is not sqlite')
+  if (!isNodeRuntime()) {
+    throw new Error('Turso credentials are required in this runtime. Set TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN.')
   }
 
-  return drizzleD1(options.d1, {
-    schema,
-    ...DRIZZLE_CONFIG,
-  }) as unknown as DB
+  const url = env.SQLITE_URL || getLocalDbUrl()
+  dbInstance = getDbFromSqlite(url)
+  return dbInstance as unknown as DB
 }
 
 export type DB = BaseSQLiteDatabase<'async', unknown, typeof schema>

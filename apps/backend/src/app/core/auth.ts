@@ -9,11 +9,11 @@ import {
   verificationsTable,
 } from "../db/schema/schema";
 
-export const createAuth = (database: Parameters<typeof getDb>[0]) =>
+export const createAuth = () =>
   betterAuth({
     secret: process.env.BETTER_AUTH_SECRET!,
     baseURL: process.env.BETTER_AUTH_URL || "http://localhost:8787",
-    database: drizzleAdapter(getDb(database), {
+    database: drizzleAdapter(getDb(), {
       provider: "sqlite",
       usePlural: true,
       schema: {

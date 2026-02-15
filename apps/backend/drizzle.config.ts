@@ -1,48 +1,25 @@
 import { defineConfig } from 'drizzle-kit'
-import type { Config } from 'drizzle-kit'
-import { execSync } from 'child_process'
 
-const schema = './src/app/db/schema/schema.ts'
-const out = './migrations'
+const hasTursoConfig = process.env.TURSO_CONNECTION_URL && process.env.TURSO_AUTH_TOKEN
+const useLocalDb = !hasTursoConfig
 
-const mode = process.env.DRIZZLE_ENV ?? process.env.ENV ?? process.env.Env ?? 'local'
+console.log(`[drizzle-config] Using ${useLocalDb ? 'local SQLite' : 'Turso'} database`)
 
-const getLocalSqlitePath = () => {
-  const cmd =
-    "find .wrangler/state/v3/d1/miniflare-D1DatabaseObject -type f -name '*.sqlite' -print -quit"
-  const sqlitePath = execSync(cmd).toString().trim()
-  if (!sqlitePath) {
-    throw new Error('Local D1 sqlite file not found. Run `wrangler d1 migrations apply --local` once to initialize it.')
-  }
-  return sqlitePath
-}
-
-let config: Config
-
-if (mode === 'local') {
-  const sqlitePath = getLocalSqlitePath()
-  console.log(`[drizzle-config] Using local D1 sqlite file: ${sqlitePath}`)
-  config = defineConfig({
-    schema,
-    out,
-    dialect: 'sqlite',
-    dbCredentials: {
-      url: sqlitePath,
-    },
-  })
-} else {
-  console.log('[drizzle-config] Using remote D1 HTTP driver')
-  config = defineConfig({
-    schema,
-    out,
-    dialect: 'sqlite',
-    driver: 'd1-http',
-    dbCredentials: {
-      accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
-      databaseId: process.env.D1_DATABASE_ID!,
-      token: process.env.CLOUDFLARE_API_TOKEN!,
-    },
-  })
-}
-
-export default config
+export default defineConfig({
+  schema: './src/app/db/schema/schema.ts',
+  out: './migrations',
+  ...(useLocalDb
+    ? {
+        dialect: 'sqlite',
+        dbCredentials: {
+          url: './tmp/local.db'
+        }
+      }
+    : {
+        dialect: 'turso',
+        dbCredentials: {
+          url: process.env.TURSO_CONNECTION_URL!,
+          authToken: process.env.TURSO_AUTH_TOKEN!
+        }
+      })
+})

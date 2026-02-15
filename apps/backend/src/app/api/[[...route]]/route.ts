@@ -115,14 +115,21 @@ app.use('/*', cors({
 
 // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
 app.on(['POST', 'GET'], '/auth/*', (c) => {
-  const auth = createAuth({ d1: c.env.DB })
+  const auth = createAuth()
   return auth.handler(c.req.raw)
 })
 
 // Token exchange endpoint: session token → short-lived JWT
 app.post('/token', async (c) => {
-  const auth = createAuth({ d1: c.env.DB })
-  const session = await auth.api.getSession({ headers: c.req.raw.headers })
+  const auth = createAuth()
+  let session = await auth.api.getSession({ headers: c.req.raw.headers })
+  const authHeader = c.req.header('Authorization')
+  if (!session && authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    const headers = new Headers(c.req.raw.headers)
+    headers.set('cookie', `better-auth.session_token=${token}`)
+    session = await auth.api.getSession({ headers })
+  }
   if (!session) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
@@ -132,6 +139,29 @@ app.post('/token', async (c) => {
     name: session.user.name,
   })
   return c.json({ token: jwt })
+})
+
+// Session lookup endpoint: bearer session token → user/session data
+app.get('/session', async (c) => {
+  const auth = createAuth()
+  let session = await auth.api.getSession({ headers: c.req.raw.headers })
+  const authHeader = c.req.header('Authorization')
+  if (!session && authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7)
+    const headers = new Headers(c.req.raw.headers)
+    headers.set('cookie', `better-auth.session_token=${token}`)
+    session = await auth.api.getSession({ headers })
+  }
+  if (!session) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  return c.json({
+    user: {
+      id: Number(session.user.id),
+      email: session.user.email,
+      name: session.user.name,
+    }
+  })
 })
 
 // Desktop app OAuth initiation: the browser navigates here directly so that
@@ -149,7 +179,7 @@ app.get('/desktop-oauth', async (c) => {
   const callbackURL = `${baseUrl}/api/desktop-auth-callback?port=${port}`
 
   // Call better-auth internally to get the OAuth URL + state cookie
-  const auth = createAuth({ d1: c.env.DB })
+  const auth = createAuth()
   const authResponse = await auth.handler(
     new Request(`${baseUrl}/api/auth/sign-in/social`, {
       method: 'POST',
@@ -198,7 +228,7 @@ app.get('/desktop-auth-callback', async (c) => {
 
   const cookies = c.req.header('cookie') || ''
   const match = cookies.match(/better-auth\.session_token=([^;]+)/)
-  const sessionToken = match?.[1]
+  const sessionToken = match?.[1] || undefined
 
   if (!sessionToken) {
     return c.html(
@@ -219,6 +249,7 @@ app.use('/*', async (c, next) => {
     path.startsWith('/api/auth') ||
     path.startsWith('/api/webhooks') || // Google Calendar push notifications (no JWT)
     path === '/api/token' ||
+    path === '/api/session' ||
     path === '/api/desktop-oauth' ||
     path === '/api/desktop-auth-callback' ||
     path === '/api/health' ||

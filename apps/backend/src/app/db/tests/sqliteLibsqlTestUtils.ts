@@ -52,10 +52,8 @@ export async function createSqliteLibsqlTestContext(): Promise<SqliteLibsqlTestC
   const dbPath = path.join(tmpDir, 'test.db')
   const url = `file:${dbPath}`
 
-  const prevProvider = process.env.DB_PROVIDER
   const prevUrl = process.env.SQLITE_URL
 
-  process.env.DB_PROVIDER = 'sqlite'
   process.env.SQLITE_URL = url
   resetDbForTests()
 
@@ -78,11 +76,6 @@ export async function createSqliteLibsqlTestContext(): Promise<SqliteLibsqlTestC
     db: db as unknown as DB,
     reset,
     stop: () => {
-      if (prevProvider === undefined) {
-        delete process.env.DB_PROVIDER
-      } else {
-        process.env.DB_PROVIDER = prevProvider
-      }
       if (prevUrl === undefined) {
         delete process.env.SQLITE_URL
       } else {

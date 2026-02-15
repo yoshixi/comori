@@ -83,9 +83,16 @@ describe('Auth & Token Endpoints', () => {
 
     // Token exchange endpoint (mirrors route.ts)
     app.post('/token', async (c) => {
-      const session = await testAuth.api.getSession({
+      let session = await testAuth.api.getSession({
         headers: c.req.raw.headers,
       });
+      const authHeader = c.req.header('Authorization');
+      if (!session && authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const headers = new Headers(c.req.raw.headers);
+        headers.set('cookie', `better-auth.session_token=${token}`);
+        session = await testAuth.api.getSession({ headers });
+      }
       if (!session) {
         return c.json({ error: 'Unauthorized' }, 401);
       }
@@ -97,12 +104,38 @@ describe('Auth & Token Endpoints', () => {
       return c.json({ token: jwt });
     });
 
+    // Session lookup endpoint (mirrors route.ts)
+    app.get('/session', async (c) => {
+      let session = await testAuth.api.getSession({
+        headers: c.req.raw.headers,
+      });
+      const authHeader = c.req.header('Authorization');
+      if (!session && authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.slice(7);
+        const headers = new Headers(c.req.raw.headers);
+        headers.set('cookie', `better-auth.session_token=${token}`);
+        session = await testAuth.api.getSession({ headers });
+      }
+      if (!session) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+      return c.json({
+        user: {
+          id: Number(session.user.id),
+          email: session.user.email,
+          name: session.user.name,
+        },
+        session: session.session,
+      });
+    });
+
     // JWT auth middleware (mirrors route.ts)
     app.use('/*', async (c, next) => {
       const path = c.req.path;
       if (
         path.startsWith('/api/auth') ||
         path === '/api/token' ||
+        path === '/api/session' ||
         path === '/api/health'
       ) {
         return next();
@@ -296,6 +329,66 @@ describe('Auth & Token Endpoints', () => {
       );
 
       expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /api/session', () => {
+    it('should return session data with bearer session token', async () => {
+      const signUpRes = await signUp(
+        'session@example.com',
+        'password123456',
+        'Session User'
+      );
+      const sessionToken = getSessionToken(signUpRes);
+      expect(sessionToken).toBeTruthy();
+
+      const res = await request(
+        new Request('http://localhost/api/session', {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.user).toBeDefined();
+      expect(data.user.email).toBe('session@example.com');
+    });
+
+    it('should reject request without Authorization header', async () => {
+      const res = await request(new Request('http://localhost/api/session'));
+      expect(res.status).toBe(401);
+    });
+
+    it('should reject invalid session token', async () => {
+      const res = await request(
+        new Request('http://localhost/api/session', {
+          headers: { Authorization: 'Bearer invalid-session-token' },
+        })
+      );
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /api/auth/get-session', () => {
+    it('should return session data with bearer session token', async () => {
+      const signUpRes = await signUp(
+        'session@example.com',
+        'password123456',
+        'Session User'
+      );
+      const sessionToken = getSessionToken(signUpRes);
+      expect(sessionToken).toBeTruthy();
+
+      const res = await request(
+        new Request('http://localhost/api/auth/get-session', {
+          headers: { Authorization: `Bearer ${sessionToken}` },
+        })
+      );
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.user).toBeDefined();
+      expect(data.user.email).toBe('session@example.com');
     });
   });
 

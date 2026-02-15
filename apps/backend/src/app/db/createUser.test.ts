@@ -10,7 +10,7 @@ describe('createUser', () => {
 
     const getCtx = () => {
         if (!ctx) {
-            throw new Error('D1 test context has not been initialized');
+            throw new Error('Test context has not been initialized');
         }
         return ctx;
     };
@@ -32,7 +32,7 @@ describe('createUser', () => {
         }
     });
 
-    it('creates a user row in the D1 database', async () => {
+    it('creates a user row in the database', async () => {
         const context = getCtx();
         const created = await createUser(context.db, 'Alice', 'alice@example.com');
 

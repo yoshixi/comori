@@ -3,12 +3,5 @@
   "name": "backend",
   "compatibility_date": "2025-08-03",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "./src/index.tsx",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "shuchu",
-      "database_id": "c020574a-5623-407b-be0c-cd192bab9545"
-    }
-  ]
+  "main": "./src/index.tsx"
 }

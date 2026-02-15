@@ -1,11 +1,9 @@
-import type { D1Database } from '@cloudflare/workers-types'
 import * as schema from '../schema/schema'
 import { type DB } from '../../core/common.db'
 import { createSqliteLibsqlTestContext } from './sqliteLibsqlTestUtils'
 
 export type D1TestContext = {
   db: DB
-  d1?: D1Database
   reset: () => Promise<void>
   stop: () => Promise<void>
 }
@@ -21,8 +19,7 @@ export async function createTestUser(db: DB, name = 'Test User', email = 'test@e
 export const createTestRequest = (context: D1TestContext) => {
   return (app: { request: (...args: any[]) => Response | Promise<Response> }) => {
     return async (input: RequestInput, init?: RequestInit): Promise<TestResponse> => {
-      const env = context.d1 ? { DB: context.d1 } : {}
-      const response = await app.request(input, init, env)
+      const response = await app.request(input, init, {})
       return response as TestResponse
     }
   }

@@ -94,7 +94,7 @@ export const googleCalendarWebhookHandler: RouteHandler<
     const providerTokens: ProviderTokens = {
       accessToken: account.accessToken,
       refreshToken: account.refreshToken || '',
-      expiresAt: account.accessTokenExpiresAt || 0
+      expiresAt: account.accessTokenExpiresAt || new Date(0)
     }
 
     try {

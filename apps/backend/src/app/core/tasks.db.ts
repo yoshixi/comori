@@ -1,7 +1,7 @@
 import { eq, and, desc, asc, inArray, isNull, notInArray, exists, notExists, sql, or, gte, lt, type SQL } from 'drizzle-orm'
 import { tasksTable, taskTagsTable, tagsTable, taskTimersTable, type InsertTask, type SelectTask, type InsertTaskTag } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, parseISOToUnixTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
+import { formatTimestamp, parseISOToDate, getCurrentTimestamp, validateRequiredString } from './common.core'
 import { convertDbTagToApi, type Tag } from './tags.db'
 import { stopActiveTimersForTask } from './timers.db'
 
@@ -109,7 +109,7 @@ async function setTaskTags(db: DB, userId: number, taskId: number, tagIds: numbe
   const taskTagData: InsertTaskTag[] = tagIds.map(tagId => ({
     taskId: taskId,
     tagId: tagId,
-    createdAt: getCurrentUnixTimestamp()
+    createdAt: getCurrentTimestamp()
   }))
 
   await db.insert(taskTagsTable).values(taskTagData)
@@ -216,10 +216,10 @@ export async function getAllTasks(db: DB, userId: number, filters?: TaskFilterOp
 
     // Apply date filters as AND conditions
     if (filters?.startAtFrom) {
-      baseConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+      baseConditions.push(gte(tasksTable.startAt, parseISOToDate(filters.startAtFrom)))
     }
     if (filters?.startAtTo) {
-      baseConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+      baseConditions.push(lt(tasksTable.startAt, parseISOToDate(filters.startAtTo)))
     }
   } else if (filters?.scheduled === false) {
     // When combined with date filters, use OR condition:
@@ -234,10 +234,10 @@ export async function getAllTasks(db: DB, userId: number, filters?: TaskFilterOp
       const dateConditions: SQL[] = []
       dateConditions.push(sql`${tasksTable.startAt} IS NOT NULL`)
       if (filters.startAtFrom) {
-        dateConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+        dateConditions.push(gte(tasksTable.startAt, parseISOToDate(filters.startAtFrom)))
       }
       if (filters.startAtTo) {
-        dateConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+        dateConditions.push(lt(tasksTable.startAt, parseISOToDate(filters.startAtTo)))
       }
       orConditions.push(and(...dateConditions)!)
 
@@ -249,10 +249,10 @@ export async function getAllTasks(db: DB, userId: number, filters?: TaskFilterOp
   } else {
     // No scheduled filter specified, apply date filters as AND conditions
     if (filters?.startAtFrom) {
-      baseConditions.push(gte(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtFrom)))
+      baseConditions.push(gte(tasksTable.startAt, parseISOToDate(filters.startAtFrom)))
     }
     if (filters?.startAtTo) {
-      baseConditions.push(lt(tasksTable.startAt, parseISOToUnixTimestamp(filters.startAtTo)))
+      baseConditions.push(lt(tasksTable.startAt, parseISOToDate(filters.startAtTo)))
     }
   }
 
@@ -323,15 +323,15 @@ export async function getTaskById(db: DB, userId: number, taskId: number): Promi
 }
 
 export async function createTask(db: DB, userId: number, data: CreateTask): Promise<Task> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const taskData: InsertTask = {
     userId: userId,
     title: validateRequiredString(data.title, 'Title'),
     description: data.description?.trim() || null,
-    dueAt: data.dueDate ? parseISOToUnixTimestamp(data.dueDate) : null,
-    startAt: data.startAt ? parseISOToUnixTimestamp(data.startAt) : null,
-    endAt: data.endAt ? parseISOToUnixTimestamp(data.endAt) : null,
-    completedAt: data.completedAt ? parseISOToUnixTimestamp(data.completedAt) : null,
+    dueAt: data.dueDate ? parseISOToDate(data.dueDate) : null,
+    startAt: data.startAt ? parseISOToDate(data.startAt) : null,
+    endAt: data.endAt ? parseISOToDate(data.endAt) : null,
+    completedAt: data.completedAt ? parseISOToDate(data.completedAt) : null,
     createdAt: now,
     updatedAt: now
   }
@@ -366,7 +366,7 @@ export async function updateTask(db: DB, userId: number, taskId: number, data: U
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTask> = {
     updatedAt: now
   }
@@ -374,16 +374,16 @@ export async function updateTask(db: DB, userId: number, taskId: number, data: U
   if (data.title !== undefined) updateData.title = validateRequiredString(data.title, 'Title')
   if (data.description !== undefined) updateData.description = data.description.trim() || null
   if (data.dueDate !== undefined) {
-    updateData.dueAt = data.dueDate ? parseISOToUnixTimestamp(data.dueDate) : null
+    updateData.dueAt = data.dueDate ? parseISOToDate(data.dueDate) : null
   }
   if (data.startAt !== undefined) {
-    updateData.startAt = data.startAt ? parseISOToUnixTimestamp(data.startAt) : null
+    updateData.startAt = data.startAt ? parseISOToDate(data.startAt) : null
   }
   if (data.endAt !== undefined) {
-    updateData.endAt = data.endAt ? parseISOToUnixTimestamp(data.endAt) : null
+    updateData.endAt = data.endAt ? parseISOToDate(data.endAt) : null
   }
   if (data.completedAt !== undefined) {
-    updateData.completedAt = data.completedAt ? parseISOToUnixTimestamp(data.completedAt) : null
+    updateData.completedAt = data.completedAt ? parseISOToDate(data.completedAt) : null
 
     // Stop active timers when task is marked as completed
     if (data.completedAt) {

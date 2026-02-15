@@ -5,7 +5,7 @@ import {
   type SelectCalendarWatchChannel
 } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { getCurrentUnixTimestamp } from './common.core'
+import { getCurrentTimestamp } from './common.core'
 import type { ProviderType } from './oauth.core'
 
 // Create a watch channel
@@ -15,10 +15,10 @@ export async function createWatchChannel(
   providerType: ProviderType,
   channelId: string,
   resourceId: string,
-  expiresAt: number,
+  expiresAt: Date,
   token?: string
 ): Promise<SelectCalendarWatchChannel> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   // Delete any existing channel for this calendar
   await db
@@ -109,7 +109,7 @@ export async function deleteWatchChannel(
 export async function getExpiredWatchChannels(
   db: DB
 ): Promise<SelectCalendarWatchChannel[]> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   return db
     .select()
@@ -122,8 +122,8 @@ export async function getExpiringWatchChannels(
   db: DB,
   withinSeconds: number = 3600 // Default 1 hour
 ): Promise<SelectCalendarWatchChannel[]> {
-  const now = getCurrentUnixTimestamp()
-  const threshold = now + withinSeconds
+  const now = getCurrentTimestamp()
+  const threshold = new Date(now.getTime() + withinSeconds * 1000)
 
   return db
     .select()
@@ -135,7 +135,7 @@ export async function getExpiringWatchChannels(
 export async function getAllActiveWatchChannels(
   db: DB
 ): Promise<SelectCalendarWatchChannel[]> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   return db
     .select()

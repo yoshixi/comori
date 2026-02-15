@@ -29,8 +29,8 @@ export const getGoogleAuthStatusHandler: RouteHandler<
     // Check if token is expired (if expiry is set)
     let isExpired = false
     if (account.accessTokenExpiresAt) {
-      const now = Math.floor(Date.now() / 1000)
-      isExpired = account.accessTokenExpiresAt <= now
+      const now = Date.now()
+      isExpired = account.accessTokenExpiresAt.getTime() <= now
     }
 
     return c.json(

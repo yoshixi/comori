@@ -36,7 +36,7 @@ import {
   getValidGoogleTokens
 } from '../../../core/calendar-providers/google.service'
 import type { ProviderTokens } from '../../../core/calendar-providers/types'
-import { getCurrentUnixTimestamp } from '../../../core/common.core'
+import { formatTimestamp, getCurrentTimestamp } from '../../../core/common.core'
 
 // Helper function to convert watch channel to API format
 function convertWatchChannelToApi(channel: {
@@ -45,10 +45,10 @@ function convertWatchChannelToApi(channel: {
   channelId: string
   resourceId: string
   providerType: string
-  expiresAt: number
+  expiresAt: Date
   token: string | null
-  createdAt: number
-  updatedAt: number
+  createdAt: Date
+  updatedAt: Date
 }) {
   return {
     id: channel.id.toString(),
@@ -56,10 +56,10 @@ function convertWatchChannelToApi(channel: {
     channelId: channel.channelId,
     resourceId: channel.resourceId,
     providerType: channel.providerType,
-    expiresAt: channel.expiresAt,
+    expiresAt: formatTimestamp(channel.expiresAt),
     token: channel.token,
-    createdAt: channel.createdAt,
-    updatedAt: channel.updatedAt
+    createdAt: formatTimestamp(channel.createdAt),
+    updatedAt: formatTimestamp(channel.updatedAt)
   }
 }
 
@@ -76,7 +76,7 @@ async function getValidTokensOrThrow(
   const providerTokens: ProviderTokens = {
     accessToken: account.accessToken,
     refreshToken: account.refreshToken || '',
-    expiresAt: account.accessTokenExpiresAt || 0
+    expiresAt: account.accessTokenExpiresAt || new Date(0)
   }
 
   try {
@@ -393,7 +393,7 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
 
     // Check if there's already an active watch channel
     const existingChannel = await getWatchChannelByCalendarId(db, id, 'google')
-    const now = getCurrentUnixTimestamp()
+    const now = getCurrentTimestamp()
     if (existingChannel && existingChannel.expiresAt > now) {
       // Return existing channel
       return c.json({ watchChannel: convertWatchChannelToApi(existingChannel) }, 200)
@@ -506,9 +506,9 @@ export const getWatchStatusHandler: RouteHandler<typeof getWatchStatusRoute, App
       )
     }
 
-    const now = getCurrentUnixTimestamp()
+    const now = getCurrentTimestamp()
     const isActive = watchChannel.expiresAt > now
-    const expiresIn = isActive ? watchChannel.expiresAt - now : null
+    const expiresIn = isActive ? Math.floor((watchChannel.expiresAt.getTime() - now.getTime()) / 1000) : null
 
     return c.json(
       {

@@ -61,10 +61,9 @@ export const googleCalendarProvider: CalendarProvider = {
       throw new Error('Failed to obtain tokens from Google')
     }
 
-    // Calculate expiry timestamp
     const expiresAt = tokens.expiry_date
-      ? Math.floor(tokens.expiry_date / 1000)
-      : Math.floor(Date.now() / 1000) + 3600 // Default 1 hour if not provided
+      ? new Date(tokens.expiry_date)
+      : new Date(Date.now() + 3600 * 1000)
 
     return {
       accessToken: tokens.access_token,
@@ -85,8 +84,8 @@ export const googleCalendarProvider: CalendarProvider = {
     }
 
     const expiresAt = credentials.expiry_date
-      ? Math.floor(credentials.expiry_date / 1000)
-      : Math.floor(Date.now() / 1000) + 3600
+      ? new Date(credentials.expiry_date)
+      : new Date(Date.now() + 3600 * 1000)
 
     return {
       accessToken: credentials.access_token,
@@ -166,21 +165,17 @@ export const googleCalendarProvider: CalendarProvider = {
         const isAllDay = !item.start?.dateTime
 
         // Parse start and end times
-        let startAt: number
-        let endAt: number
+        let startAt: Date
+        let endAt: Date
 
         if (isAllDay) {
           // All-day event: date is in YYYY-MM-DD format
-          startAt = Math.floor(new Date(item.start?.date || '').getTime() / 1000)
-          endAt = Math.floor(new Date(item.end?.date || '').getTime() / 1000)
+          startAt = new Date(item.start?.date || '')
+          endAt = new Date(item.end?.date || '')
         } else {
           // Timed event
-          startAt = Math.floor(
-            new Date(item.start?.dateTime || '').getTime() / 1000
-          )
-          endAt = Math.floor(
-            new Date(item.end?.dateTime || '').getTime() / 1000
-          )
+          startAt = new Date(item.start?.dateTime || '')
+          endAt = new Date(item.end?.dateTime || '')
         }
 
         events.push({
@@ -239,8 +234,8 @@ export const googleCalendarProvider: CalendarProvider = {
       channelId: response.data.id || channelId,
       resourceId: response.data.resourceId,
       expiresAt: response.data.expiration
-        ? Math.floor(Number(response.data.expiration) / 1000)
-        : Math.floor(expirationMs / 1000)
+        ? new Date(Number(response.data.expiration))
+        : new Date(expirationMs)
     }
   },
 
@@ -270,11 +265,11 @@ export const googleCalendarProvider: CalendarProvider = {
 export async function getValidGoogleTokens(
   tokens: ProviderTokens
 ): Promise<ProviderTokens> {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Date.now()
   const bufferSeconds = 300 // 5 minute buffer
 
   // If token is still valid (with buffer), return as is
-  if (tokens.expiresAt > now + bufferSeconds) {
+  if (tokens.expiresAt.getTime() > now + bufferSeconds * 1000) {
     return tokens
   }
 

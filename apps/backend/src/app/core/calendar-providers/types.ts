@@ -13,8 +13,8 @@ export interface ProviderEvent {
   providerEventId: string
   title: string
   description?: string
-  startAt: number // Unix timestamp
-  endAt: number // Unix timestamp
+  startAt: Date
+  endAt: Date
   isAllDay: boolean
   location?: string
 }
@@ -23,21 +23,21 @@ export interface ProviderEvent {
 export interface ProviderTokens {
   accessToken: string
   refreshToken: string
-  expiresAt: number // Unix timestamp
+  expiresAt: Date
 }
 
 // Token refresh result
 export interface RefreshedTokens {
   accessToken: string
   refreshToken?: string // Some providers return a new refresh token
-  expiresAt: number
+  expiresAt: Date
 }
 
 // Watch channel creation result
 export interface WatchChannelResult {
   channelId: string
   resourceId: string
-  expiresAt: number // Unix timestamp
+  expiresAt: Date
 }
 
 // Watch channel info for stopping

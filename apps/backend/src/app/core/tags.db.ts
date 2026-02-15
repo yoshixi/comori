@@ -1,7 +1,7 @@
 import { eq, and, desc, inArray } from 'drizzle-orm'
 import { tagsTable, type InsertTag, type SelectTag } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
+import { formatTimestamp, getCurrentTimestamp, validateRequiredString } from './common.core'
 
 // Define API types without zod dependencies
 export interface Tag {
@@ -54,7 +54,7 @@ export async function getTagById(db: DB, userId: number, tagId: number): Promise
 }
 
 export async function createTag(db: DB, userId: number, data: CreateTag): Promise<Tag> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const tagData: InsertTag = {
     userId: userId,
     name: validateRequiredString(data.name, 'Tag name'),
@@ -81,7 +81,7 @@ export async function updateTag(db: DB, userId: number, tagId: number, data: Upd
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTag> = {
     updatedAt: now
   }

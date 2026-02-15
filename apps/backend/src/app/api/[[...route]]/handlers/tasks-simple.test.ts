@@ -120,7 +120,7 @@ describe('Task Handlers (Simplified)', () => {
       const incompleteTaskId = await createTask('Incomplete Task');
       const completedTaskId = await createTask('Completed Task');
 
-      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completionTimestamp = new Date().toISOString();
       const completeRes = await request(new Request(`http://localhost/tasks/${completedTaskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -282,7 +282,7 @@ describe('Task Handlers (Simplified)', () => {
       const { task } = await createRes.json();
       const taskId = task.id;
 
-      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completionTimestamp = new Date().toISOString();
       const completeReq = new Request(`http://localhost/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -291,7 +291,9 @@ describe('Task Handlers (Simplified)', () => {
       const completeRes = await request(completeReq);
       expect(completeRes.status).toBe(200);
       const completeData = await completeRes.json();
-      expect(completeData.task.completedAt).toBe(completionTimestamp);
+      expect(Math.floor(new Date(completeData.task.completedAt).getTime() / 1000)).toBe(
+        Math.floor(new Date(completionTimestamp).getTime() / 1000)
+      );
 
       const reopenReq = new Request(`http://localhost/tasks/${taskId}`, {
         method: 'PUT',
@@ -452,7 +454,7 @@ describe('Task Handlers (Simplified)', () => {
       expect(timersBeforeData.timers[0].endTime).toBeNull();
 
       // Complete the task
-      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completionTimestamp = new Date().toISOString();
       const completeTaskReq = new Request(`http://localhost/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -507,7 +509,7 @@ describe('Task Handlers (Simplified)', () => {
       expect(timersBeforeData.timers.every((t: { endTime: string | null }) => t.endTime === null)).toBe(true);
 
       // Complete the task
-      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completionTimestamp = new Date().toISOString();
       await request(new Request(`http://localhost/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -556,7 +558,7 @@ describe('Task Handlers (Simplified)', () => {
       }));
 
       // Complete task 1
-      const completionTimestamp = new Date(Math.floor(Date.now() / 1000) * 1000).toISOString();
+      const completionTimestamp = new Date().toISOString();
       await request(new Request(`http://localhost/tasks/${task1.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

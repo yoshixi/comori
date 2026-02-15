@@ -9,13 +9,8 @@ export const IdSchema = z.coerce.number().int().positive().openapi({
   example: 1,
 })
 
-export function formatTimestamp(timestamp: number): string {
-  if (!Number.isFinite(timestamp)) {
-    console.warn('Invalid timestamp value:', timestamp)
-    return new Date(0).toISOString()
-  }
-
-  const date = new Date(timestamp * 1000)
+export function formatTimestamp(timestamp: Date): string {
+  const date = timestamp
   if (Number.isNaN(date.getTime())) {
     console.warn('Invalid timestamp value after conversion:', timestamp)
     return new Date(0).toISOString()
@@ -24,12 +19,12 @@ export function formatTimestamp(timestamp: number): string {
   return date.toISOString()
 }
 
-export function parseISOToUnixTimestamp(isoString: string): number {
-  return Math.floor(new Date(isoString).getTime() / 1000)
+export function parseISOToDate(isoString: string): Date {
+  return new Date(isoString)
 }
 
-export function getCurrentUnixTimestamp(): number {
-  return Math.floor(Date.now() / 1000)
+export function getCurrentTimestamp(): Date {
+  return new Date()
 }
 
 export function validateRequiredString(value: string | undefined | null, fieldName: string): string {

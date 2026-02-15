@@ -1,7 +1,7 @@
 import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
 import { taskTimersTable, tasksTable, type InsertTaskTimer, type SelectTaskTimer } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, parseISOToUnixTimestamp, getCurrentUnixTimestamp } from './common.core'
+import { formatTimestamp, parseISOToDate, getCurrentTimestamp } from './common.core'
 
 // Define API types without zod dependencies
 export interface TaskTimer {
@@ -106,10 +106,10 @@ export async function createTimer(db: DB, userId: number, data: CreateTimer): Pr
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const timerData: InsertTaskTimer = {
     taskId: data.taskId,
-    startTime: parseISOToUnixTimestamp(data.startTime),
+    startTime: parseISOToDate(data.startTime),
     createdAt: now,
     updatedAt: now
   }
@@ -134,17 +134,17 @@ export async function updateTimer(db: DB, userId: number, timerId: number, data:
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTaskTimer> = {
     updatedAt: now
   }
 
   if (data.startTime !== undefined) {
-    updateData.startTime = parseISOToUnixTimestamp(data.startTime)
+    updateData.startTime = parseISOToDate(data.startTime)
   }
 
   if (data.endTime !== undefined) {
-    updateData.endTime = data.endTime ? parseISOToUnixTimestamp(data.endTime) : null
+    updateData.endTime = data.endTime ? parseISOToDate(data.endTime) : null
   }
 
   const result = await db
@@ -162,7 +162,7 @@ export async function updateTimer(db: DB, userId: number, timerId: number, data:
 }
 
 export async function stopActiveTimersForTask(db: DB, taskId: number): Promise<number> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   // Stop all active timers (endTime is null) for this task in a single update
   const result = await db

@@ -8,10 +8,10 @@ export const WatchChannelModel = z
     channelId: z.string(),
     resourceId: z.string(),
     providerType: z.string(),
-    expiresAt: z.number(),
+    expiresAt: z.iso.datetime(),
     token: z.string().nullable(),
-    createdAt: z.number(),
-    updatedAt: z.number()
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime()
   })
   .openapi('WatchChannel')
 

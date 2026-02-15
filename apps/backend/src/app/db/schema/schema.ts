@@ -8,21 +8,21 @@ export const usersTable = sqliteTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Sessions table (better-auth)
 export const sessionsTable = sqliteTable('sessions', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   token: text('token').notNull().unique(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
   userId: integer('user_id', { mode: 'number' }).notNull()
     .references(() => usersTable.id, { onDelete: 'cascade' }),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Accounts table (better-auth)
@@ -35,12 +35,12 @@ export const accountsTable = sqliteTable('accounts', {
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   idToken: text('id_token'),
-  accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'number' }),
-  refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'number' }),
+  accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp' }),
+  refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp' }),
   scope: text('scope'),
   password: text('password'),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Verifications table (better-auth)
@@ -48,9 +48,9 @@ export const verificationsTable = sqliteTable('verifications', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
-  expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Tasks table
@@ -59,22 +59,22 @@ export const tasksTable = sqliteTable('tasks', {
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
-  dueAt: integer('due_at', { mode: 'number' }), // Unix timestamp
-  startAt: integer('start_at', { mode: 'number' }), // Unix timestamp
-  endAt: integer('end_at', { mode: 'number' }), // Unix timestamp
-  completedAt: integer('completed_at', { mode: 'number' }), // Unix timestamp
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  dueAt: integer('due_at', { mode: 'timestamp' }),
+  startAt: integer('start_at', { mode: 'timestamp' }),
+  endAt: integer('end_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // TaskTimers table
 export const taskTimersTable = sqliteTable('task_timers', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
-  startTime: integer('start_time', { mode: 'number' }).notNull(), // Unix timestamp (seconds)
-  endTime: integer('end_time', { mode: 'number' }), // Unix timestamp (seconds, optional)
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  startTime: integer('start_time', { mode: 'timestamp' }).notNull(),
+  endTime: integer('end_time', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // TaskComments table
@@ -83,8 +83,8 @@ export const taskCommentsTable = sqliteTable('task_comments', {
   taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
   authorId: integer('author_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Tags table (user-scoped tags)
@@ -92,8 +92,8 @@ export const tagsTable = sqliteTable('tags', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueUserTag: unique().on(table.userId, table.name),
 }));
@@ -103,7 +103,7 @@ export const taskTagsTable = sqliteTable('task_tags', {
   id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
   tagId: integer('tag_id', { mode: 'number' }).notNull().references(() => tagsTable.id, { onDelete: 'cascade' }),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueTaskTag: unique().on(table.taskId, table.tagId),
 }));
@@ -117,9 +117,9 @@ export const calendarsTable = sqliteTable('calendars', {
   name: text('name').notNull(), // Display name
   color: text('color'), // Calendar color
   isEnabled: integer('is_enabled', { mode: 'number' }).notNull().default(1), // Whether to sync this calendar
-  lastSyncedAt: integer('last_synced_at', { mode: 'number' }), // Unix timestamp
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  lastSyncedAt: integer('last_synced_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueUserProviderCalendar: unique().on(table.userId, table.providerType, table.providerCalendarId),
 }));
@@ -132,12 +132,12 @@ export const calendarEventsTable = sqliteTable('calendar_events', {
   providerEventId: text('provider_event_id').notNull(), // Provider's event ID
   title: text('title').notNull(),
   description: text('description'),
-  startAt: integer('start_at', { mode: 'number' }).notNull(), // Unix timestamp
-  endAt: integer('end_at', { mode: 'number' }).notNull(), // Unix timestamp
+  startAt: integer('start_at', { mode: 'timestamp' }).notNull(),
+  endAt: integer('end_at', { mode: 'timestamp' }).notNull(),
   isAllDay: integer('is_all_day', { mode: 'number' }).notNull().default(0),
   location: text('location'),
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueCalendarEvent: unique().on(table.calendarId, table.providerEventId),
 }));
@@ -149,10 +149,10 @@ export const calendarWatchChannelsTable = sqliteTable('calendar_watch_channels',
   channelId: text('channel_id').notNull(), // UUID sent to Google for identifying the channel
   resourceId: text('resource_id').notNull(), // Resource ID returned by Google
   providerType: text('provider_type').notNull(), // 'google' | 'outlook' | 'apple'
-  expiresAt: integer('expires_at', { mode: 'number' }).notNull(), // Unix timestamp when channel expires
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
   token: text('token'), // Optional verification token
-  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 }, (table) => ({
   uniqueCalendarChannel: unique().on(table.calendarId, table.providerType),
 }));

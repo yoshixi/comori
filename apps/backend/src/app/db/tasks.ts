@@ -3,6 +3,7 @@ import { eq, and, desc } from 'drizzle-orm'
 import { tasksTable, usersTable, type InsertTask, type SelectTask, type SelectUser } from './schema/schema'
 import type { Task, CreateTask, UpdateTask } from '../core/tasks.core'
 import { type DB } from './common'
+import { formatTimestamp, getCurrentTimestamp, parseISOToDate } from '../core/common.core'
 
 // Convert database task to API task
 export function convertDbTaskToApi(dbTask: SelectTask): Task {
@@ -11,13 +12,13 @@ export function convertDbTaskToApi(dbTask: SelectTask): Task {
     id: dbTask.id,
     title: dbTask.title,
     description: dbTask.description || '',
-    dueDate: dbTask.dueAt ? new Date(dbTask.dueAt * 1000).toISOString() : undefined,
-    startAt: dbTask.startAt ? new Date(dbTask.startAt * 1000).toISOString() : undefined,
-    endAt: dbTask.endAt ? new Date(dbTask.endAt * 1000).toISOString() : undefined,
-    completedAt: dbTask.completedAt ? new Date(dbTask.completedAt * 1000).toISOString() : undefined,
+    dueDate: dbTask.dueAt ? formatTimestamp(dbTask.dueAt) : undefined,
+    startAt: dbTask.startAt ? formatTimestamp(dbTask.startAt) : undefined,
+    endAt: dbTask.endAt ? formatTimestamp(dbTask.endAt) : undefined,
+    completedAt: dbTask.completedAt ? formatTimestamp(dbTask.completedAt) : undefined,
     tags: [], // This old implementation doesn't load tags - use app/core/tasks.db.ts for full functionality
-    createdAt: new Date(dbTask.createdAt * 1000).toISOString(),
-    updatedAt: new Date(dbTask.updatedAt * 1000).toISOString()
+    createdAt: formatTimestamp(dbTask.createdAt),
+    updatedAt: formatTimestamp(dbTask.updatedAt)
   }
 }
 
@@ -68,13 +69,13 @@ export async function getTaskById(db: DB, userId: number, taskId: number): Promi
 }
 
 export async function createTask(db: DB, userId: number, data: CreateTask): Promise<Task> {
-  const now = Math.floor(Date.now() / 1000) // Unix timestamp in seconds
+  const now = getCurrentTimestamp()
   const taskData: InsertTask = {
     userId: userId,
     title: data.title.trim(),
     description: data.description?.trim() || null,
-    dueAt: data.dueDate ? Math.floor(new Date(data.dueDate).getTime() / 1000) : null,
-    endAt: data.endAt ? Math.floor(new Date(data.endAt).getTime() / 1000) : null,
+    dueAt: data.dueDate ? parseISOToDate(data.dueDate) : null,
+    endAt: data.endAt ? parseISOToDate(data.endAt) : null,
     createdAt: now,
     updatedAt: now
   }
@@ -98,15 +99,15 @@ export async function updateTask(db: DB, userId: number, taskId: number, data: U
     return null
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTask> = {
     updatedAt: now
   }
 
   if (data.title !== undefined) updateData.title = data.title.trim()
   if (data.description !== undefined) updateData.description = data.description.trim() || null
-  if (data.dueDate !== undefined) updateData.dueAt = data.dueDate ? Math.floor(new Date(data.dueDate).getTime() / 1000) : null
-  if (data.endAt !== undefined) updateData.endAt = data.endAt ? Math.floor(new Date(data.endAt).getTime() / 1000) : null
+  if (data.dueDate !== undefined) updateData.dueAt = data.dueDate ? parseISOToDate(data.dueDate) : null
+  if (data.endAt !== undefined) updateData.endAt = data.endAt ? parseISOToDate(data.endAt) : null
 
   const result = await db
     .update(tasksTable)

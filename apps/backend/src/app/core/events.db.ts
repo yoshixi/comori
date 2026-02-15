@@ -6,7 +6,7 @@ import {
   type SelectCalendarEvent
 } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentUnixTimestamp, parseISOToUnixTimestamp } from './common.core'
+import { formatTimestamp, getCurrentTimestamp, parseISOToDate } from './common.core'
 import type { ProviderType } from './oauth.core'
 import type { CalendarEvent } from './events.core'
 import type { ProviderEvent } from './calendar-providers/types'
@@ -70,12 +70,12 @@ export async function getAllEvents(
 
   // Date range filters
   if (params?.startDate) {
-    const startTimestamp = parseISOToUnixTimestamp(params.startDate)
+    const startTimestamp = parseISOToDate(params.startDate)
     conditions.push(gte(calendarEventsTable.endAt, startTimestamp))
   }
 
   if (params?.endDate) {
-    const endTimestamp = parseISOToUnixTimestamp(params.endDate)
+    const endTimestamp = parseISOToDate(params.endDate)
     conditions.push(lte(calendarEventsTable.startAt, endTimestamp))
   }
 
@@ -127,7 +127,7 @@ export async function importEventsForCalendar(
   providerType: ProviderType,
   events: ProviderEvent[]
 ): Promise<number> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   // Delete all existing events for this calendar (full replace)
   await db

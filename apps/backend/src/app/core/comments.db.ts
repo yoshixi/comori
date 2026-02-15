@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { taskCommentsTable, tasksTable, type InsertTaskComment, type SelectTaskComment } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentUnixTimestamp, validateRequiredString } from './common.core'
+import { formatTimestamp, getCurrentTimestamp, validateRequiredString } from './common.core'
 
 export interface TaskComment {
   id: number
@@ -112,7 +112,7 @@ export async function createComment(db: DB, userId: number, data: CreateComment)
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const commentData: InsertTaskComment = {
     taskId: data.taskId,
     authorId: userId,
@@ -156,7 +156,7 @@ export async function updateComment(
     return null
   }
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTaskComment> = {
     updatedAt: now
   }

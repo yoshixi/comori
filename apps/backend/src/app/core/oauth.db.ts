@@ -1,21 +1,21 @@
 import { eq, and } from 'drizzle-orm'
 import { accountsTable, type SelectAccount } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentUnixTimestamp } from './common.core'
+import { formatTimestamp, getCurrentTimestamp } from './common.core'
 import type { ProviderType, OAuthToken } from './oauth.core'
 
 // Internal types for token data (compatible with accounts table)
 export interface OAuthTokenData {
   accessToken: string
   refreshToken: string | null
-  expiresAt: number // Unix timestamp
+  expiresAt: Date
   scope: string | null
 }
 
 export interface UpdateOAuthToken {
   accessToken?: string
   refreshToken?: string | null
-  expiresAt?: number // Unix timestamp
+  expiresAt?: Date
 }
 
 // Convert account record to API token format
@@ -64,7 +64,7 @@ export async function hasValidOAuthToken(
   // If no expiry is set, assume token is valid
   if (!account.accessTokenExpiresAt) return true
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   return account.accessTokenExpiresAt > now
 }
 
@@ -80,7 +80,7 @@ export async function updateOAuthToken(
   const existingAccount = await getOAuthToken(db, userId, providerType)
   if (!existingAccount) return null
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<SelectAccount> = {
     updatedAt: now
   }

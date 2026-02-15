@@ -3,16 +3,17 @@ import { eq, and, desc } from 'drizzle-orm'
 import { taskTimersTable, tasksTable, type InsertTaskTimer, type SelectTaskTimer } from './schema/schema'
 import type { TaskTimer, CreateTimer, UpdateTimer } from '../core/timers.core'
 import { type DB } from './common'
+import { formatTimestamp, getCurrentTimestamp, parseISOToDate } from '../core/common.core'
 
 // Convert database timer to API timer
 export function convertDbTimerToApi(dbTimer: SelectTaskTimer): TaskTimer {
   return {
     id: dbTimer.id,
     taskId: dbTimer.taskId,
-    startTime: new Date(dbTimer.startTime * 1000).toISOString(),
-    endTime: dbTimer.endTime ? new Date(dbTimer.endTime * 1000).toISOString() : undefined,
-    createdAt: new Date(dbTimer.createdAt * 1000).toISOString(),
-    updatedAt: new Date(dbTimer.updatedAt * 1000).toISOString()
+    startTime: formatTimestamp(dbTimer.startTime),
+    endTime: dbTimer.endTime ? formatTimestamp(dbTimer.endTime) : undefined,
+    createdAt: formatTimestamp(dbTimer.createdAt),
+    updatedAt: formatTimestamp(dbTimer.updatedAt)
   }
 }
 
@@ -70,10 +71,10 @@ export async function createTimer(db: DB, userId: number, data: CreateTimer): Pr
     return null
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = getCurrentTimestamp()
   const timerData: InsertTaskTimer = {
     taskId: data.taskId,
-    startTime: Math.floor(new Date(data.startTime).getTime() / 1000),
+    startTime: parseISOToDate(data.startTime),
     createdAt: now,
     updatedAt: now
   }
@@ -96,13 +97,13 @@ export async function updateTimer(db: DB, timerId: number, data: UpdateTimer): P
     return null
   }
 
-  const now = Math.floor(Date.now() / 1000)
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertTaskTimer> = {
     updatedAt: now
   }
 
   if (data.endTime !== undefined) {
-    updateData.endTime = data.endTime ? Math.floor(new Date(data.endTime).getTime() / 1000) : null
+    updateData.endTime = data.endTime ? parseISOToDate(data.endTime) : null
   }
 
   const result = await db

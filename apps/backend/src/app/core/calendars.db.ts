@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm'
 import { calendarsTable, type InsertCalendar, type SelectCalendar } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentUnixTimestamp } from './common.core'
+import { formatTimestamp, getCurrentTimestamp } from './common.core'
 import type { ProviderType } from './oauth.core'
 import type { Calendar, CreateCalendar, UpdateCalendar } from './calendars.core'
 
@@ -122,7 +122,7 @@ export async function createCalendar(
   providerName: string,
   providerColor?: string
 ): Promise<Calendar> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
 
   // id is auto-incremented
   const calendarData: Omit<InsertCalendar, 'id'> = {
@@ -165,7 +165,7 @@ export async function updateCalendar(
 
   if (!existingCalendar) return null
 
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   const updateData: Partial<InsertCalendar> = {
     updatedAt: now
   }
@@ -188,7 +188,7 @@ export async function updateCalendarLastSynced(
   db: DB,
   calendarId: number
 ): Promise<void> {
-  const now = getCurrentUnixTimestamp()
+  const now = getCurrentTimestamp()
   await db
     .update(calendarsTable)
     .set({ lastSyncedAt: now, updatedAt: now })

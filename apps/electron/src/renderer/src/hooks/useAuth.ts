@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { clearAuthState, getJwt } from '../lib/auth'
+import { authClient, clearAuthState, getJwt } from '../lib/auth'
 
 interface AuthUser {
   id: string

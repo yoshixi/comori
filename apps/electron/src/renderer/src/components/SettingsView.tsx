@@ -1,196 +1,312 @@
-import React, { useEffect, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import React, { useState } from 'react'
+import {
+  CalendarDays,
+  CheckCircle,
+  Plus,
+  RefreshCw,
+  Trash2,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react'
 import { Button } from './ui/button'
-import { Keyboard, Info, Bell, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Switch } from './ui/switch'
+import { useCalendarSettings } from '../hooks/useCalendarSettings'
+import type { AvailableCalendar, Calendar } from '../gen/api'
 
-type NotificationPermissionStatus = 'granted' | 'denied' | 'not-determined'
+function CollapsibleSection({
+  title,
+  icon,
+  children,
+  defaultOpen = false
+}: {
+  title: string
+  icon: React.ReactNode
+  children: React.ReactNode
+  defaultOpen?: boolean
+}): React.JSX.Element {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="border rounded-lg">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-6 py-4 text-sm font-medium hover:bg-muted/50 transition-colors"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="flex items-center gap-2">
+          {icon}
+          {title}
+        </span>
+        {open ? (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        )}
+      </button>
+      {open && <div className="px-6 pb-5 pt-0">{children}</div>}
+    </div>
+  )
+}
 
-const keyboardShortcuts = [
-  { keys: ['⌘', 'N'], description: 'Create a new task' },
-  { keys: ['⌘', 'E'], description: 'Toggle sidebar' },
-  { keys: ['Space'], description: 'Toggle timer for selected task' },
-  { keys: ['Tab'], description: 'Navigate to next task' },
-  { keys: ['Shift', 'Tab'], description: 'Navigate to previous task' }
-]
+function CalendarColorDot({ color }: { color?: string | null }): React.JSX.Element {
+  return (
+    <div
+      className="h-3 w-3 rounded-full shrink-0"
+      style={{ backgroundColor: color ?? '#6366f1' }}
+    />
+  )
+}
 
-function NotificationStatusBadge({ status }: { status: NotificationPermissionStatus }): React.JSX.Element {
-  switch (status) {
-    case 'granted':
-      return (
-        <div className="flex items-center gap-1.5 text-green-600">
-          <CheckCircle className="h-4 w-4" />
-          <span className="text-sm font-medium">Enabled</span>
+function AvailableCalendarItem({
+  calendar,
+  onAdd,
+  isAdding
+}: {
+  calendar: AvailableCalendar
+  onAdd: () => void
+  isAdding: boolean
+}): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-3 py-2 border-b last:border-b-0">
+      {/* Action button/badge on left side - always visible */}
+      <div className="shrink-0 w-16">
+        {calendar.isAlreadyAdded ? (
+          <span className="flex items-center gap-1 text-xs text-green-600">
+            <CheckCircle className="h-3 w-3" />
+            Added
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onAdd}
+            disabled={isAdding}
+            className="h-7"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Add
+          </Button>
+        )}
+      </div>
+      {/* Calendar info - truncates when needed */}
+      <CalendarColorDot color={calendar.color} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">
+          {calendar.name}
+          {calendar.isPrimary && (
+            <span className="ml-2 text-xs text-muted-foreground">(Primary)</span>
+          )}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function SyncedCalendarItem({
+  calendar,
+  onToggleEnabled,
+  onSync,
+  onRemove,
+  isSyncing,
+  isRemoving
+}: {
+  calendar: Calendar
+  onToggleEnabled: (enabled: boolean) => void
+  onSync: () => void
+  onRemove: () => void
+  isSyncing: boolean
+  isRemoving: boolean
+}): React.JSX.Element {
+  const lastSynced = calendar.lastSyncedAt
+    ? new Date(calendar.lastSyncedAt).toLocaleString()
+    : 'Never'
+
+  return (
+    <div className="flex items-center justify-between py-3 border-b last:border-b-0">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <CalendarColorDot color={calendar.color} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">{calendar.name}</p>
+          <p className="text-xs text-muted-foreground">Last synced: {lastSynced}</p>
         </div>
-      )
-    case 'denied':
-      return (
-        <div className="flex items-center gap-1.5 text-red-600">
-          <XCircle className="h-4 w-4" />
-          <span className="text-sm font-medium">Disabled</span>
-        </div>
-      )
-    case 'not-determined':
-      return (
-        <div className="flex items-center gap-1.5 text-yellow-600">
-          <AlertCircle className="h-4 w-4" />
-          <span className="text-sm font-medium">Not Set</span>
-        </div>
-      )
-  }
+      </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={calendar.isEnabled}
+          onCheckedChange={onToggleEnabled}
+          aria-label={calendar.isEnabled ? 'Disable calendar' : 'Enable calendar'}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onSync}
+          disabled={isSyncing}
+          title="Sync now"
+          className="h-7 w-7 p-0"
+        >
+          <RefreshCw className={`h-3 w-3 ${isSyncing ? 'animate-spin' : ''}`} />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRemove}
+          disabled={isRemoving}
+          title="Remove calendar"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export function SettingsView(): React.JSX.Element {
-  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>('not-determined')
-  const [isRequesting, setIsRequesting] = useState(false)
+  const {
+    isGoogleConnected,
+    isLoading,
+    availableCalendars,
+    syncedCalendars,
+    addCalendar,
+    removeCalendar,
+    toggleCalendarEnabled,
+    syncCalendar
+  } = useCalendarSettings()
 
-  useEffect(() => {
-    // Check notification permission on mount
-    window.api.getNotificationPermission().then(setNotificationStatus)
-  }, [])
+  const [addingCalendarId, setAddingCalendarId] = useState<string | null>(null)
+  const [syncingCalendarId, setSyncingCalendarId] = useState<string | null>(null)
+  const [removingCalendarId, setRemovingCalendarId] = useState<string | null>(null)
 
-  const handleRequestPermission = async (): Promise<void> => {
-    setIsRequesting(true)
+  const handleAddCalendar = async (calendar: AvailableCalendar): Promise<void> => {
+    setAddingCalendarId(calendar.providerCalendarId)
     try {
-      const status = await window.api.requestNotificationPermission()
-      setNotificationStatus(status)
+      await addCalendar(calendar.providerCalendarId, calendar.name)
+    } catch (error) {
+      console.error('Failed to add calendar:', error)
     } finally {
-      setIsRequesting(false)
+      setAddingCalendarId(null)
     }
   }
 
-  const handleOpenSettings = (): void => {
-    window.api.openNotificationSettings()
+  const handleSyncCalendar = async (calendarId: string): Promise<void> => {
+    setSyncingCalendarId(calendarId)
+    try {
+      await syncCalendar(calendarId)
+    } catch (error) {
+      console.error('Failed to sync calendar:', error)
+    } finally {
+      setSyncingCalendarId(null)
+    }
+  }
+
+  const handleRemoveCalendar = async (calendarId: string): Promise<void> => {
+    setRemovingCalendarId(calendarId)
+    try {
+      await removeCalendar(calendarId)
+    } catch (error) {
+      console.error('Failed to remove calendar:', error)
+    } finally {
+      setRemovingCalendarId(null)
+    }
+  }
+
+  const handleToggleEnabled = async (
+    calendarId: string,
+    enabled: boolean
+  ): Promise<void> => {
+    try {
+      await toggleCalendarEnabled(calendarId, enabled)
+    } catch (error) {
+      console.error('Failed to toggle calendar:', error)
+    }
   }
 
   return (
-    <div className="p-8">
+    <div className="p-8 overflow-auto flex-1 min-h-0">
       <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
       <p className="mt-2 text-muted-foreground">
-        Configure your Shuchu experience.
+        Configure calendar integrations and sync preferences.
       </p>
 
       <div className="mt-8 space-y-6">
-        {/* Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-            </CardTitle>
-            <CardDescription>
-              Get reminders when tasks are about to start or end
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Permission Status</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {notificationStatus === 'granted'
-                      ? 'You will receive task reminders'
-                      : notificationStatus === 'denied'
-                        ? 'Enable notifications in system settings'
-                        : 'Allow notifications to receive task reminders'}
-                  </p>
-                </div>
-                <NotificationStatusBadge status={notificationStatus} />
-              </div>
-
-              <div className="flex gap-2">
-                {notificationStatus === 'not-determined' && (
-                  <Button
-                    size="sm"
-                    onClick={handleRequestPermission}
-                    disabled={isRequesting}
-                  >
-                    {isRequesting ? 'Requesting...' : 'Enable Notifications'}
-                  </Button>
-                )}
-                {notificationStatus === 'denied' && (
-                  <Button size="sm" variant="outline" onClick={handleOpenSettings}>
-                    Open System Settings
-                  </Button>
-                )}
-                {notificationStatus === 'granted' && (
-                  <Button size="sm" variant="outline" onClick={handleOpenSettings}>
-                    Manage in System Settings
-                  </Button>
-                )}
-              </div>
-
-              <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
-                <p className="font-medium text-foreground">Notification triggers:</p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  <li>1 minute before a task starts</li>
-                  <li>1 minute before a task ends</li>
-                  <li>Option to snooze for 5, 15, or 30 minutes</li>
-                </ul>
+        {/* Google Calendar Connection Status */}
+        <div className="border rounded-lg px-6 py-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CalendarDays className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Google Calendar</p>
+                <p className="text-xs text-muted-foreground">
+                  {isLoading
+                    ? 'Checking connection...'
+                    : isGoogleConnected
+                      ? 'Connected'
+                      : 'Not connected'}
+                </p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            {isGoogleConnected ? (
+              <span className="flex items-center gap-1.5 text-green-600 text-sm">
+                <CheckCircle className="h-4 w-4" />
+                Connected
+              </span>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sign in with Google in Account to sync calendars
+              </p>
+            )}
+          </div>
+        </div>
 
-        {/* Keyboard Shortcuts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Keyboard className="h-5 w-5" />
-              Keyboard Shortcuts
-            </CardTitle>
-            <CardDescription>
-              Quick actions to boost your productivity
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {keyboardShortcuts.map((shortcut, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {shortcut.description}
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {shortcut.keys.map((key, keyIndex) => (
-                      <React.Fragment key={keyIndex}>
-                        <kbd className="px-2 py-1 text-xs font-semibold bg-muted rounded border border-border">
-                          {key}
-                        </kbd>
-                        {keyIndex < shortcut.keys.length - 1 && (
-                          <span className="text-muted-foreground text-xs">+</span>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
+        {/* Available Calendars - only show when connected */}
+        {isGoogleConnected && (
+          <CollapsibleSection
+            title="Available Calendars"
+            icon={<Plus className="h-5 w-5 text-muted-foreground" />}
+            defaultOpen={syncedCalendars.length === 0}
+          >
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground py-2">Loading calendars...</p>
+            ) : availableCalendars.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-2">
+                No calendars found in your Google account.
+              </p>
+            ) : (
+              <div className="divide-y">
+                {availableCalendars.map((calendar) => (
+                  <AvailableCalendarItem
+                    key={calendar.providerCalendarId}
+                    calendar={calendar}
+                    onAdd={() => handleAddCalendar(calendar)}
+                    isAdding={addingCalendarId === calendar.providerCalendarId}
+                  />
+                ))}
+              </div>
+            )}
+          </CollapsibleSection>
+        )}
+
+        {/* Synced Calendars - only show when connected and has calendars */}
+        {isGoogleConnected && syncedCalendars.length > 0 && (
+          <CollapsibleSection
+            title="Synced Calendars"
+            icon={<CalendarDays className="h-5 w-5 text-muted-foreground" />}
+            defaultOpen
+          >
+            <div className="divide-y">
+              {syncedCalendars.map((calendar) => (
+                <SyncedCalendarItem
+                  key={calendar.id}
+                  calendar={calendar}
+                  onToggleEnabled={(enabled) => handleToggleEnabled(calendar.id, enabled)}
+                  onSync={() => handleSyncCalendar(calendar.id)}
+                  onRemove={() => handleRemoveCalendar(calendar.id)}
+                  isSyncing={syncingCalendarId === calendar.id}
+                  isRemoving={removingCalendarId === calendar.id}
+                />
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* About */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              About
-            </CardTitle>
-            <CardDescription>
-              Application information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Application</span>
-                <span>Shuchu</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Description</span>
-                <span>Focus-driven task management</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </CollapsibleSection>
+        )}
       </div>
     </div>
   )

@@ -32,7 +32,17 @@
       "Bash(git restore:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "Bash(/opt/homebrew/bin/pnpm --filter mobile run check-types)"
+      "WebFetch(domain:www.better-auth.com)",
+      "Bash(xargs:*)",
+      "Bash(pnpm --filter web add:*)",
+      "Bash(devenv shell:*)",
+      "Bash(git stash:*)",
+      "Bash(cat:*)",
+      "Bash(git checkout:*)",
+      "Bash(pnpm --filter web run check-types:*)",
+      "Bash(git diff:*)",
+      "Bash(pnpm --filter electron add:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

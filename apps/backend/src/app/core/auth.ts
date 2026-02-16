@@ -58,7 +58,14 @@ export const createAuth = () =>
       //   clientSecret: process.env.APPLE_CLIENT_SECRET!,
       // },
     },
-    trustedOrigins: (process.env.TRUSTED_ORIGINS || "http://localhost:5173").split(","),
+    trustedOrigins: [
+      ...(process.env.TRUSTED_ORIGINS || "http://localhost:5173")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+      "http://127.0.0.1:*",
+      "http://localhost:*"
+    ],
     plugins: [bearer()],
     advanced: {
       database: { generateId: false },

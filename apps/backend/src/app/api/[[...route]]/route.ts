@@ -32,6 +32,7 @@ import {
   // Google OAuth routes (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusRoute,
   deleteGoogleAuthRoute,
+  listGoogleAccountsRoute,
   // Calendar routes
   listAvailableCalendarsRoute,
   listCalendarsRoute,
@@ -80,6 +81,7 @@ import {
   // Google OAuth handlers (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusHandler,
   deleteGoogleAuthHandler,
+  listGoogleAccountsHandler,
   // Calendar handlers
   listAvailableCalendarsHandler,
   listCalendarsHandler,
@@ -314,6 +316,7 @@ app.openapi(deleteTagRoute, deleteTagHandler)
 // Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
 app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
 app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
+app.openapi(listGoogleAccountsRoute, listGoogleAccountsHandler)
 
 // Register calendar routes
 app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)

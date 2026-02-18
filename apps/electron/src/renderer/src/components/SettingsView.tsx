@@ -209,7 +209,9 @@ export function SettingsView(): React.JSX.Element {
     () =>
       googleAccounts.map((account, index) => ({
         id: account.accountId,
-        label: `Account ${index + 1} • ${account.accountId.slice(-6)}`
+        label: account.email
+          ? account.email
+          : `Account ${index + 1} • ${account.accountId.slice(-6)}`
       })),
     [googleAccounts]
   )

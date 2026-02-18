@@ -93,6 +93,9 @@ export const OAuthAccountModel = z.object({
   accountId: z.string().openapi({
     description: 'Provider-specific account ID'
   }),
+  email: z.string().email().optional().openapi({
+    description: 'Email associated with the provider account'
+  }),
   createdAt: z.string().openapi({
     description: 'Timestamp when the account was linked',
     example: '2024-01-01T10:00:00.000Z'

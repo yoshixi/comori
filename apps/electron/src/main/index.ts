@@ -408,37 +408,14 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'auth:social-link',
     async (_event, provider: string, sessionToken: string) => {
-      const apiUrl = `${import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:8787'}/api`
-
       const callbackServer = await startOAuthLinkCallbackServer()
-      const callbackURL = `http://127.0.0.1:${callbackServer.port}/callback?linked=1`
 
       try {
-        const response = await fetch(`${apiUrl}/auth/link-social`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${sessionToken}`,
-            Cookie: `better-auth.session_token=${sessionToken}`,
-            Origin: import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:8787'
-          },
-          body: JSON.stringify({
-            provider,
-            callbackURL,
-            disableRedirect: true
-          })
-        })
-
-        if (!response.ok) {
-          throw new Error(`Failed to start link flow: ${response.status}`)
-        }
-
-        const data = (await response.json()) as { url?: string }
-        if (!data.url) {
-          throw new Error('Missing OAuth URL for link flow')
-        }
-
-        shell.openExternal(data.url)
+        const apiUrl = `${import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:8787'}/api`
+        const linkUrl =
+          `${apiUrl}/desktop-link?provider=${encodeURIComponent(provider)}` +
+          `&port=${callbackServer.port}&session_token=${encodeURIComponent(sessionToken)}`
+        shell.openExternal(linkUrl)
 
         setTimeout(() => {
           if (mainWindow) {

@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react'
-import useSwr, { useSWRConfig } from 'swr'
+import { useSWRConfig } from 'swr'
 import {
+  useGetApiOauthGoogleAccounts,
+  getGetApiOauthGoogleAccountsKey,
+  useGetApiOauthGoogleStatus,
+  getGetApiOauthGoogleStatusKey,
+  useGetApiCalendarsAvailable,
+  getGetApiCalendarsAvailableKey,
   useGetApiCalendars,
   patchApiCalendarsId,
   deleteApiCalendarsId,
@@ -16,12 +22,9 @@ type OAuthAccount = {
   userId: string
   providerType: string
   accountId: string
+  email?: string
   createdAt: string
   updatedAt: string
-}
-
-type OAuthAccountsResponse = {
-  accounts: OAuthAccount[]
 }
 
 type OAuthStatusResponse = {
@@ -37,10 +40,6 @@ export type AvailableCalendarWithAccount = {
   color?: string
   isPrimary?: boolean
   isAlreadyAdded: boolean
-}
-
-type AvailableCalendarsResponse = {
-  calendars: AvailableCalendarWithAccount[]
 }
 
 export type CalendarWithAccount = Calendar & {
@@ -72,38 +71,40 @@ interface UseCalendarSettingsReturn {
   refresh: () => Promise<void>
 }
 
-const getGoogleAccountsKey = () => ['/api/oauth/google/accounts'] as const
-const getGoogleStatusKey = (accountId: string) => ['/api/oauth/google/status', accountId] as const
-const getAvailableCalendarsKey = (accountId: string) =>
-  ['/api/calendars/available', accountId] as const
-
 export function useCalendarSettings(
   providerAccountId?: string
 ): UseCalendarSettingsReturn {
   const { mutate } = useSWRConfig()
 
-  const { data: accountsData, isLoading: isAccountsLoading } = useSwr(
-    getGoogleAccountsKey(),
-    () =>
-      customInstance<OAuthAccountsResponse>({
-        url: '/api/oauth/google/accounts',
-        method: 'GET'
-      })
-  )
+  const { data: accountsData, isLoading: isAccountsLoading } =
+    useGetApiOauthGoogleAccounts()
 
   const googleAccounts = useMemo(
-    () => accountsData?.accounts ?? [],
+    () =>
+      (accountsData?.accounts ?? []).map((account) => {
+        const rawAccount = account as OAuthAccount & {
+          providerEmail?: string
+          provider_email?: string
+        }
+        const email =
+          account.email ||
+          rawAccount.providerEmail ||
+          rawAccount.provider_email ||
+          undefined
+
+        return {
+          ...account,
+          email
+        }
+      }),
     [accountsData?.accounts]
   )
 
-  const { data: statusData, isLoading: isStatusLoading } = useSwr(
-    providerAccountId ? getGoogleStatusKey(providerAccountId) : null,
-    () =>
-      customInstance<OAuthStatusResponse>({
-        url: '/api/oauth/google/status',
-        method: 'GET',
-        params: { accountId: providerAccountId }
-      })
+  const { data: statusData, isLoading: isStatusLoading } = useGetApiOauthGoogleStatus(
+    providerAccountId ? { accountId: providerAccountId } : undefined,
+    {
+      swr: { enabled: Boolean(providerAccountId) }
+    }
   )
 
   const isGoogleConnected = useMemo(() => {
@@ -114,17 +115,13 @@ export function useCalendarSettings(
   }, [googleAccounts.length, providerAccountId, statusData?.connected])
 
   // Get available calendars from Google
-  const { data: availableData, isLoading: isAvailableLoading } = useSwr(
-    providerAccountId && isGoogleConnected
-      ? getAvailableCalendarsKey(providerAccountId)
-      : null,
-    () =>
-      customInstance<AvailableCalendarsResponse>({
-        url: '/api/calendars/available',
-        method: 'GET',
-        params: { accountId: providerAccountId }
-      })
-  )
+  const { data: availableData, isLoading: isAvailableLoading } =
+    useGetApiCalendarsAvailable(
+      { accountId: providerAccountId || '' },
+      {
+        swr: { enabled: Boolean(providerAccountId && isGoogleConnected) }
+      }
+    )
 
   // Get synced calendars from our DB
   const { data: syncedData, isLoading: isSyncedLoading } = useGetApiCalendars({
@@ -141,9 +138,13 @@ export function useCalendarSettings(
 
   const refresh = useCallback(async () => {
     await Promise.all([
-      mutate(getGoogleAccountsKey()),
-      providerAccountId ? mutate(getGoogleStatusKey(providerAccountId)) : Promise.resolve(),
-      providerAccountId ? mutate(getAvailableCalendarsKey(providerAccountId)) : Promise.resolve(),
+      mutate(getGetApiOauthGoogleAccountsKey()),
+      providerAccountId
+        ? mutate(getGetApiOauthGoogleStatusKey({ accountId: providerAccountId }))
+        : Promise.resolve(),
+      providerAccountId
+        ? mutate(getGetApiCalendarsAvailableKey({ accountId: providerAccountId }))
+        : Promise.resolve(),
       mutate(getGetApiCalendarsKey()),
       mutate(getGetApiEventsKey())
     ])

@@ -39,6 +39,7 @@ export function convertAccountToApiAccount(account: SelectAccount): OAuthAccount
     userId: account.userId.toString(),
     providerType: account.providerId as ProviderType,
     accountId: account.accountId,
+    email: account.providerEmail || undefined,
     createdAt: formatTimestamp(account.createdAt),
     updatedAt: formatTimestamp(account.updatedAt)
   }
@@ -90,6 +91,7 @@ export async function listOAuthAccountRecords(
       )
     )
 }
+
 
 // Check if user has a valid (non-expired) token
 export async function hasValidOAuthToken(

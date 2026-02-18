@@ -6,14 +6,14 @@ import {
   listGoogleAccountsRoute
 } from '../routes/google-auth'
 import { getDb } from '../../../core/common.db'
-import { formatTimestamp } from '../../../core/common.core'
 import {
   getOAuthTokenForAccount,
-  listOAuthAccounts,
-  listOAuthAccountRecords
+  listOAuthAccountRecords,
+  listOAuthAccounts
 } from '../../../core/oauth.db'
 import { deleteAllCalendarsForProvider } from '../../../core/calendars.db'
 import { googleCalendarProvider } from '../../../core/calendar-providers/google.service'
+import { formatTimestamp } from '../../../core/common.core'
 
 // GET /auth/google/status - Check if user has Google OAuth connected via better-auth
 export const getGoogleAuthStatusHandler: RouteHandler<
@@ -166,6 +166,7 @@ export const listGoogleAccountsHandler: RouteHandler<
     const user = c.get('user')
 
     const accounts = await listOAuthAccounts(db, user.id, 'google')
+
     return c.json({ accounts }, 200)
   } catch (error) {
     console.error('Error listing Google OAuth accounts:', error)

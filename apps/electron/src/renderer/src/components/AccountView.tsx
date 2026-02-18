@@ -12,6 +12,7 @@ type OAuthAccount = {
   userId: string
   providerType: string
   accountId: string
+  email?: string
   createdAt: string
   updatedAt: string
 }
@@ -223,7 +224,9 @@ export function AccountView(): React.JSX.Element {
                 <div className="space-y-1">
                   {googleAccounts.map((account, index) => (
                     <div key={account.id} className="text-xs text-muted-foreground">
-                      Account {index + 1} • {account.accountId.slice(-6)}
+                      {account.email
+                        ? account.email
+                        : `Account ${index + 1} • ${account.accountId.slice(-6)}`}
                     </div>
                   ))}
                 </div>

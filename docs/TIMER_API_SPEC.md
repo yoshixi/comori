@@ -1,3 +1,10 @@
+---
+title: "Timer API Specification"
+brief_description: "This document describes the Timer API endpoints for the Shuchu application."
+created_at: "2026-01-16"
+update_at: "2026-02-08"
+---
+
 # Timer API Specification
 
 This document describes the Timer API endpoints for the Shuchu application.

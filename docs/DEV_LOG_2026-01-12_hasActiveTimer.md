@@ -1,3 +1,10 @@
+---
+title: "Dev Log: hasActiveTimer API Filter Implementation"
+brief_description: "**Date:** 2026-01-12"
+created_at: "2026-01-12"
+update_at: "2026-02-08"
+---
+
 # Dev Log: hasActiveTimer API Filter Implementation
 
 **Date:** 2026-01-12

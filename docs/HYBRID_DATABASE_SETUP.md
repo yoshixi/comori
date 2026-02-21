@@ -1,3 +1,10 @@
+---
+title: "Hybrid Database Setup Complete! 🎉"
+brief_description: "Hybrid Database Setup Complete! 🎉"
+created_at: "2025-12-20"
+update_at: "2026-01-25"
+---
+
 # Hybrid Database Setup Complete! 🎉
 
 ## Summary of Changes

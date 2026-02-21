@@ -1,3 +1,10 @@
+---
+title: "Task Log Feature Specification"
+brief_description: "Task Log Feature Specification"
+created_at: "2026-01-17"
+update_at: "2026-02-08"
+---
+
 # Task Log Feature Specification
 
 ## Objective

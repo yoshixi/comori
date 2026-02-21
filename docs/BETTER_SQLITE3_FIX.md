@@ -1,3 +1,10 @@
+---
+title: "🔧 Better-SQLite3 Native Module Fix"
+brief_description: "🔧 Better-SQLite3 Native Module Fix"
+created_at: "2025-12-20"
+update_at: "2026-01-25"
+---
+
 # 🔧 Better-SQLite3 Native Module Fix
 
 ## Issue

@@ -1,3 +1,10 @@
+---
+title: "Calendar View Feature (Electron)"
+brief_description: "This document introduces the Calendar view in the Electron renderer so other agents can safely update it."
+created_at: "2026-01-17"
+update_at: "2026-01-25"
+---
+
 # Calendar View Feature (Electron)
 
 This document introduces the Calendar view in the Electron renderer so other agents can safely update it.

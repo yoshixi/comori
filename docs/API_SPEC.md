@@ -1,3 +1,10 @@
+---
+title: "Shuchu API Specification"
+brief_description: "Shuchu API Specification"
+created_at: "2025-12-28"
+update_at: "2026-02-08"
+---
+
 # Shuchu API Specification
 
 ## Overview

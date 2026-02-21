@@ -1,3 +1,10 @@
+---
+title: "Shuchu - Product Concept"
+brief_description: "Shuchu - Product Concept"
+created_at: "2026-02-12"
+update_at: "2026-02-12"
+---
+
 # Shuchu - Product Concept
 
 ## One-liner

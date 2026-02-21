@@ -4,11 +4,11 @@ import type { AppBindings } from '../types'
 import { listGoogleAccountsRoute } from '../routes/google-auth'
 import { listGoogleAccountsHandler } from './google-auth'
 import {
-  createD1TestContext,
+  createSqliteLibsqlTestContext,
   createTestRequest,
   createTestUser,
-  type D1TestContext
-} from '../../../db/tests/d1TestUtils'
+  type SqliteLibsqlTestContext
+} from '../../../db/tests/sqliteLibsqlTestUtils'
 import { accountsTable } from '../../../db/schema/schema'
 
 type TestUser = { id: number; email: string; name: string }
@@ -30,14 +30,14 @@ const createTestApp = (getUser: () => TestUser | null) => {
 }
 
 describe('Google Auth Handlers', () => {
-  let testContext: D1TestContext
+  let testContext: SqliteLibsqlTestContext
   let app: OpenAPIHono<AppBindings>
   let request: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
   let testUser: TestUser | null = null
   let otherUser: TestUser | null = null
 
   beforeAll(async () => {
-    testContext = await createD1TestContext()
+    testContext = await createSqliteLibsqlTestContext()
     app = createTestApp(() => testUser)
     request = createTestRequest(testContext)(app)
   })

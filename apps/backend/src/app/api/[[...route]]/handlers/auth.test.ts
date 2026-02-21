@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { AppBindings } from '../types';
-import { createD1TestContext, createTestRequest, type D1TestContext } from '../../../db/tests/d1TestUtils';
+import { createSqliteLibsqlTestContext, createTestRequest, type SqliteLibsqlTestContext } from '../../../db/tests/sqliteLibsqlTestUtils';
 import { createAuth } from '../../../core/auth';
 import { SignJWT, jwtVerify } from 'jose';
 import { googleCalendarProvider } from '../../../core/calendar-providers/google.service';
@@ -40,7 +40,7 @@ async function testVerifyJwt(token: string) {
 }
 
 describe('Auth & Token Endpoints', () => {
-  let testContext: D1TestContext;
+  let testContext: SqliteLibsqlTestContext;
   let testAuth: ReturnType<typeof createAuth>;
   let app: OpenAPIHono<AppBindings>
   let request: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
@@ -52,7 +52,7 @@ describe('Auth & Token Endpoints', () => {
     process.env.GOOGLE_CLIENT_SECRET = 'test-google-client-secret';
     process.env.TRUSTED_ORIGINS = 'http://localhost';
 
-    testContext = await createD1TestContext();
+    testContext = await createSqliteLibsqlTestContext();
 
     testAuth = createAuth();
 

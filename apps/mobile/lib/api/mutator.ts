@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import { getJwt, clearAuthState } from '../auth'
 
 // API Configuration - defaults to localhost for development
 const getApiBaseUrl = (): string => {
@@ -8,7 +9,7 @@ const getApiBaseUrl = (): string => {
     return envUrl
   }
   // Default to localhost for development
-  return 'http://localhost:3000'
+  return 'http://localhost:8787'
 }
 
 export const API_BASE_URL = getApiBaseUrl()
@@ -26,7 +27,7 @@ export interface CustomRequestConfig {
  * Custom HTTP client for React Native
  * This function will be used by the generated API client
  */
-export const customInstance = <T>(config: CustomRequestConfig): Promise<T> => {
+export const customInstance = async <T>(config: CustomRequestConfig): Promise<T> => {
   const url = new URL(config.url, API_BASE_URL)
   if (config.params) {
     Object.entries(config.params).forEach(([key, value]) => {
@@ -41,28 +42,42 @@ export const customInstance = <T>(config: CustomRequestConfig): Promise<T> => {
     })
   }
 
-  const requestConfig: RequestInit = {
-    method: config.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: config.data ? JSON.stringify(config.data) : undefined
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
   }
 
-  return fetch(url.toString(), requestConfig).then(async (response) => {
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
-    }
+  // Add JWT authorization header
+  const jwt = await getJwt()
+  if (jwt) {
+    headers['Authorization'] = `Bearer ${jwt}`
+  }
 
-    const contentType = response.headers.get('content-type')
-    if (contentType?.includes('application/json')) {
-      return response.json()
-    }
+  const requestConfig: RequestInit = {
+    method: config.method || 'GET',
+    headers,
+    body: config.data ? JSON.stringify(config.data) : undefined,
+  }
 
-    return (await response.text()) as unknown as T
-  })
+  const response = await fetch(url.toString(), requestConfig)
+
+  // Handle 401 (JWT expired AND refresh also failed)
+  if (response.status === 401) {
+    await clearAuthState()
+    throw new Error('Unauthorized')
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`)
+  }
+
+  const contentType = response.headers.get('content-type')
+  if (contentType?.includes('application/json')) {
+    return response.json()
+  }
+
+  return (await response.text()) as unknown as T
 }
 
 export default customInstance

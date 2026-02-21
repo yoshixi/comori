@@ -29,7 +29,7 @@ module.exports = ({ config }) => {
     extra: {
       ...config.extra,
       // API URL from environment variable, defaults to localhost
-      apiUrl: localEnv.API_URL || process.env.API_URL || 'http://localhost:3000',
+      apiUrl: localEnv.API_URL || process.env.API_URL || 'http://localhost:8787',
     },
   };
 };

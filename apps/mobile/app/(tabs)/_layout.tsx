@@ -1,11 +1,26 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { useColorScheme } from 'nativewind';
 import { CalendarDays, CheckSquare, Settings } from 'lucide-react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { NAV_THEME } from '@/lib/theme';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function TabLayout() {
   const { colorScheme } = useColorScheme();
   const theme = NAV_THEME[colorScheme ?? 'light'];
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <Tabs

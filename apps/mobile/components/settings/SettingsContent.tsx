@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { View, Alert, Linking } from 'react-native';
-import { Moon, Sun, Server, Info, ExternalLink } from 'lucide-react-native';
+import { Moon, Sun, Server, Info, ExternalLink, LogOut, User } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
@@ -11,14 +11,23 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useGetApiHealth } from '@/gen/api/endpoints/shuchuAPI.gen';
 import { API_BASE_URL } from '@/lib/api/mutator';
+import { useAuth } from '@/hooks/useAuth';
 
 export function SettingsContent() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [apiUrl, setApiUrl] = useState(API_BASE_URL);
   const { data: healthData, error: healthError, isLoading } = useGetApiHealth();
+  const { user, signOut } = useAuth();
 
   const isDarkMode = colorScheme === 'dark';
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+
+  const handleSignOut = useCallback(() => {
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
+    ]);
+  }, [signOut]);
 
   const handleTestConnection = useCallback(() => {
     if (healthData) {
@@ -34,6 +43,33 @@ export function SettingsContent() {
 
   return (
     <View className="gap-4">
+      {/* Account */}
+      {user && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Account</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <View className="gap-3">
+              <View className="flex-row items-center gap-3">
+                <User size={20} className="text-muted-foreground" />
+                <View className="flex-1">
+                  <Text className="font-medium">{user.name}</Text>
+                  <Text className="text-sm text-muted-foreground">{user.email}</Text>
+                </View>
+              </View>
+              <Separator />
+              <Button variant="destructive" onPress={handleSignOut}>
+                <View className="flex-row items-center gap-2">
+                  <LogOut size={16} color="white" />
+                  <Text>Sign Out</Text>
+                </View>
+              </Button>
+            </View>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Appearance */}
       <Card>
         <CardHeader>

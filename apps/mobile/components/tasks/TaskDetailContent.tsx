@@ -73,7 +73,7 @@ export function TaskDetailContent({ taskId }: TaskDetailContentProps) {
     value: title,
     onSave: (value) => handleSave({ title: value }),
     delay: 800,
-    enabled: !!task && title !== task.title,
+    enabled: !!task && title.trim().length > 0 && title !== task.title,
   });
 
   const { isPending: isDescriptionPending } = useAutoSave({

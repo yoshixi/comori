@@ -1,38 +1,90 @@
-import { useState, useCallback } from 'react';
-import { View, Alert, Linking, ActivityIndicator, Pressable } from 'react-native';
+import { useState, useCallback, useMemo } from 'react';
+import { View, Alert, ActivityIndicator, Pressable } from 'react-native';
 import {
-  Moon, Sun, Server, Info, ExternalLink, LogOut, User,
-  Plus, Trash2, RefreshCw, Calendar,
+  LogOut, User, ChevronDown, ChevronRight, Link,
+  CalendarDays, Plus, RefreshCw, Trash2, CheckCircle,
+  Moon, Sun,
 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import Constants from 'expo-constants';
 import { Text } from '@/components/ui/text';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useGetApiHealth } from '@/gen/api/endpoints/shuchuAPI.gen';
-import { API_BASE_URL } from '@/lib/api/mutator';
 import { useAuth } from '@/hooks/useAuth';
 import { useCalendarSettings } from '@/hooks/useCalendarSettings';
 import { linkGoogleAccount } from '@/lib/oauth';
 
+// ---------------------------------------------------------------------------
+// Collapsible Section — matches Electron's CollapsibleSection pattern
+// ---------------------------------------------------------------------------
+
+function CollapsibleSection({
+  title,
+  icon,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View className="border border-border rounded-lg overflow-hidden">
+      <Pressable
+        onPress={() => setOpen(!open)}
+        className="flex-row items-center justify-between px-5 py-4"
+      >
+        <View className="flex-row items-center gap-2">
+          {icon}
+          <Text className="text-sm font-medium">{title}</Text>
+        </View>
+        {open ? (
+          <ChevronDown size={16} className="text-muted-foreground" />
+        ) : (
+          <ChevronRight size={16} className="text-muted-foreground" />
+        )}
+      </Pressable>
+      {open && <View className="px-5 pb-5">{children}</View>}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Calendar color dot
+// ---------------------------------------------------------------------------
+
+function CalendarColorDot({ color }: { color?: string | null }) {
+  return (
+    <View
+      className="w-3 h-3 rounded-full"
+      style={{ backgroundColor: color ?? '#6366f1' }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
 export function SettingsContent() {
   const { colorScheme, toggleColorScheme } = useColorScheme();
-  const [apiUrl, setApiUrl] = useState(API_BASE_URL);
-  const { data: healthData, error: healthError, isLoading } = useGetApiHealth();
   const { user, signOut } = useAuth();
-
-  const isDarkMode = colorScheme === 'dark';
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
+  const isDarkMode = colorScheme === 'dark';
 
   // Google Accounts & Calendar state
   const [selectedAccountId, setSelectedAccountId] = useState<string | undefined>();
   const [isLinking, setIsLinking] = useState(false);
-  const [isSyncing, setIsSyncing] = useState<string | null>(null);
+  const [linkStatus, setLinkStatus] = useState<'success' | 'error' | null>(null);
+  const [addingCalendarId, setAddingCalendarId] = useState<string | null>(null);
+  const [syncingCalendarId, setSyncingCalendarId] = useState<string | null>(null);
+  const [removingCalendarId, setRemovingCalendarId] = useState<string | null>(null);
 
   const {
+    isLoading: isCalendarLoading,
     googleAccounts,
     availableCalendars,
     syncedCalendars,
@@ -43,6 +95,27 @@ export function SettingsContent() {
     refresh,
   } = useCalendarSettings(selectedAccountId);
 
+  // Derive effective selected account for UI highlighting
+  const effectiveAccountId = selectedAccountId ?? googleAccounts[0]?.accountId;
+
+  const accountOptions = useMemo(
+    () =>
+      googleAccounts.map((account, index) => ({
+        id: account.accountId,
+        label: account.email
+          ? account.email
+          : `Account ${index + 1}`,
+      })),
+    [googleAccounts]
+  );
+
+  const accountLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    accountOptions.forEach((o) => map.set(o.id, o.label));
+    return map;
+  }, [accountOptions]);
+
+  // Handlers
   const handleSignOut = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -50,360 +123,387 @@ export function SettingsContent() {
     ]);
   }, [signOut]);
 
-  const handleTestConnection = useCallback(() => {
-    if (healthData) {
-      Alert.alert('Connection Successful', `API is running: ${healthData.message}`);
-    } else if (healthError) {
-      Alert.alert('Connection Failed', 'Could not connect to the API server.');
-    }
-  }, [healthData, healthError]);
-
-  const handleOpenDocs = useCallback(() => {
-    Linking.openURL(`${API_BASE_URL}/api/doc`);
-  }, []);
-
   const handleLinkGoogle = useCallback(async () => {
+    setLinkStatus(null);
     setIsLinking(true);
     try {
       await linkGoogleAccount();
+      setLinkStatus('success');
       await refresh();
-    } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to link Google account');
+    } catch {
+      setLinkStatus('error');
     } finally {
       setIsLinking(false);
     }
   }, [refresh]);
 
-  const handleAddCalendar = useCallback(async (providerCalendarId: string, name: string) => {
-    try {
-      await addCalendar(providerCalendarId, name);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add calendar');
-    }
-  }, [addCalendar]);
+  const handleAddCalendar = useCallback(
+    async (providerCalendarId: string, name: string, providerAccountId: string) => {
+      const key = `${providerAccountId}:${providerCalendarId}`;
+      setAddingCalendarId(key);
+      try {
+        await addCalendar(providerCalendarId, name);
+      } catch {
+        Alert.alert('Error', 'Failed to add calendar');
+      } finally {
+        setAddingCalendarId(null);
+      }
+    },
+    [addCalendar]
+  );
 
-  const handleRemoveCalendar = useCallback(async (calendarId: string, name: string) => {
-    Alert.alert('Remove Calendar', `Remove "${name}" from synced calendars?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await removeCalendar(calendarId);
-          } catch {
-            Alert.alert('Error', 'Failed to remove calendar');
-          }
-        },
-      },
-    ]);
-  }, [removeCalendar]);
+  const handleSyncCalendar = useCallback(
+    async (calendarId: string) => {
+      setSyncingCalendarId(calendarId);
+      try {
+        await syncCalendar(calendarId);
+      } catch {
+        Alert.alert('Error', 'Failed to sync calendar');
+      } finally {
+        setSyncingCalendarId(null);
+      }
+    },
+    [syncCalendar]
+  );
 
-  const handleSyncCalendar = useCallback(async (calendarId: string) => {
-    setIsSyncing(calendarId);
-    try {
-      await syncCalendar(calendarId);
-    } catch {
-      Alert.alert('Error', 'Failed to sync calendar');
-    } finally {
-      setIsSyncing(null);
-    }
-  }, [syncCalendar]);
+  const handleRemoveCalendar = useCallback(
+    async (calendarId: string, name: string) => {
+      setRemovingCalendarId(calendarId);
+      try {
+        await removeCalendar(calendarId);
+      } catch {
+        Alert.alert('Error', 'Failed to remove calendar');
+      } finally {
+        setRemovingCalendarId(null);
+      }
+    },
+    [removeCalendar]
+  );
 
-  // Auto-select first account if none selected
-  if (!selectedAccountId && googleAccounts.length > 0) {
-    setSelectedAccountId(googleAccounts[0].accountId);
-  }
+  const handleToggleEnabled = useCallback(
+    async (calendarId: string, enabled: boolean) => {
+      try {
+        await toggleCalendarEnabled(calendarId, enabled);
+      } catch {
+        Alert.alert('Error', 'Failed to toggle calendar');
+      }
+    },
+    [toggleCalendarEnabled]
+  );
 
   return (
-    <View className="gap-4">
-      {/* Account */}
-      {user && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <View className="gap-3">
-              <View className="flex-row items-center gap-3">
-                <User size={20} className="text-muted-foreground" />
-                <View className="flex-1">
-                  <Text className="font-medium">{user.name}</Text>
-                  <Text className="text-sm text-muted-foreground">{user.email}</Text>
-                </View>
-              </View>
-              <Separator />
-              <Button variant="destructive" onPress={handleSignOut}>
-                <View className="flex-row items-center gap-2">
-                  <LogOut size={16} color="white" />
-                  <Text>Sign Out</Text>
-                </View>
-              </Button>
-            </View>
-          </CardContent>
-        </Card>
-      )}
+    <View className="gap-6">
+      {/* Page Header */}
+      <View>
+        <Text className="text-2xl font-semibold">Account</Text>
+        <Text className="mt-1 text-muted-foreground">
+          Manage your account and preferences.
+        </Text>
+      </View>
 
-      {/* Google Accounts */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Google Accounts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View className="gap-3">
-            {googleAccounts.map((account) => (
-              <Pressable
-                key={account.id}
-                onPress={() => setSelectedAccountId(account.accountId)}
-                className={`flex-row items-center gap-3 p-2 rounded ${
-                  selectedAccountId === account.accountId ? 'bg-primary/10' : ''
-                }`}
-              >
-                <View
-                  className="w-3 h-3 rounded-full"
-                  style={{
-                    backgroundColor: selectedAccountId === account.accountId ? '#4285F4' : '#ccc',
-                  }}
-                />
-                <Text className="text-sm flex-1">{account.email || account.accountId}</Text>
-              </Pressable>
-            ))}
-            {googleAccounts.length === 0 && (
-              <Text className="text-sm text-muted-foreground">No Google accounts linked</Text>
-            )}
-            <Button onPress={handleLinkGoogle} variant="outline" disabled={isLinking}>
+      {/* Profile */}
+      {user && (
+        <View className="border border-border rounded-lg px-5 py-4">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-3 flex-1">
+              <User size={20} className="text-muted-foreground" />
+              <View className="flex-1">
+                <Text className="text-sm font-medium" numberOfLines={1}>
+                  {user.name}
+                </Text>
+                <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+                  {user.email}
+                </Text>
+              </View>
+            </View>
+            <Button variant="ghost" size="sm" onPress={handleSignOut}>
               <View className="flex-row items-center gap-2">
-                {isLinking ? (
-                  <ActivityIndicator size="small" />
-                ) : (
-                  <Plus size={16} className="text-foreground" />
-                )}
-                <Text>Link Google Account</Text>
+                <LogOut size={16} className="text-muted-foreground" />
+                <Text className="text-sm">Sign Out</Text>
               </View>
             </Button>
           </View>
-        </CardContent>
-      </Card>
+        </View>
+      )}
 
-      {/* Calendars */}
-      {googleAccounts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendars</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <View className="gap-4">
-              {/* Account selector (if multiple) */}
-              {googleAccounts.length > 1 && (
-                <View className="gap-1">
-                  <Text className="text-sm text-muted-foreground">Account</Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {googleAccounts.map((account) => (
-                      <Pressable
-                        key={account.id}
-                        onPress={() => setSelectedAccountId(account.accountId)}
-                        className={`px-3 py-1 rounded-full border ${
-                          selectedAccountId === account.accountId
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border'
-                        }`}
-                      >
-                        <Text className="text-xs">
-                          {account.email || account.accountId}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
+      {/* Appearance */}
+      <View className="border border-border rounded-lg px-5 py-4">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-3">
+            {isDarkMode ? (
+              <Moon size={20} className="text-muted-foreground" />
+            ) : (
+              <Sun size={20} className="text-muted-foreground" />
+            )}
+            <View>
+              <Text className="text-sm font-medium">Appearance</Text>
+              <Text className="text-xs text-muted-foreground">
+                {isDarkMode ? 'Dark mode enabled' : 'Light mode enabled'}
+              </Text>
+            </View>
+          </View>
+          <Switch checked={isDarkMode} onCheckedChange={toggleColorScheme} />
+        </View>
+      </View>
+
+      {/* Google Accounts — collapsible */}
+      <CollapsibleSection
+        title="Google Accounts"
+        icon={<Link size={20} className="text-muted-foreground" />}
+      >
+        <View className="gap-3">
+          <Text className="text-sm text-muted-foreground">
+            Link Google accounts to import calendars.
+          </Text>
+          <View className="gap-1">
+            {isCalendarLoading ? (
+              <Text className="text-xs text-muted-foreground">
+                Loading linked accounts...
+              </Text>
+            ) : googleAccounts.length === 0 ? (
+              <Text className="text-xs text-muted-foreground">
+                No Google accounts linked yet.
+              </Text>
+            ) : (
+              googleAccounts.map((account, index) => (
+                <Text key={account.id} className="text-xs text-muted-foreground">
+                  {account.email
+                    ? account.email
+                    : `Account ${index + 1} \u2022 ${account.accountId.slice(-6)}`}
+                </Text>
+              ))
+            )}
+          </View>
+          <Button size="sm" onPress={handleLinkGoogle} disabled={isLinking}>
+            <View className="flex-row items-center gap-2">
+              {isLinking ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text className="text-sm text-primary-foreground">
+                  Link Google Account
+                </Text>
               )}
+            </View>
+          </Button>
+          {linkStatus === 'success' && (
+            <Text className="text-xs text-green-600">
+              Account linked successfully.
+            </Text>
+          )}
+          {linkStatus === 'error' && (
+            <Text className="text-xs text-red-600">
+              Link failed. Please try again.
+            </Text>
+          )}
+        </View>
+      </CollapsibleSection>
 
-              {/* Synced Calendars */}
-              {syncedCalendars.length > 0 && (
-                <View className="gap-2">
-                  <Text className="text-sm font-medium">Synced Calendars</Text>
-                  {syncedCalendars.map((cal) => (
-                    <View key={cal.id} className="flex-row items-center gap-2">
-                      <View
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: cal.color || '#4285F4' }}
-                      />
-                      <Text className="text-sm flex-1" numberOfLines={1}>
-                        {cal.name}
-                      </Text>
-                      <Switch
-                        checked={cal.isEnabled}
-                        onCheckedChange={(enabled) =>
-                          toggleCalendarEnabled(cal.id, enabled)
-                        }
-                      />
-                      <Pressable
-                        onPress={() => handleSyncCalendar(cal.id)}
-                        disabled={isSyncing === cal.id}
-                        className="p-1"
-                      >
-                        {isSyncing === cal.id ? (
-                          <ActivityIndicator size="small" />
-                        ) : (
-                          <RefreshCw size={14} className="text-muted-foreground" />
-                        )}
-                      </Pressable>
-                      <Pressable
-                        onPress={() => handleRemoveCalendar(cal.id, cal.name)}
-                        className="p-1"
-                      >
-                        <Trash2 size={14} className="text-destructive" />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
+      {/* Google Calendar Connection Status */}
+      <View className="border border-border rounded-lg px-5 py-4">
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-row items-center gap-3 flex-1">
+            <CalendarDays size={20} className="text-muted-foreground" />
+            <View className="flex-1">
+              <Text className="text-sm font-medium">Google Calendar</Text>
+              <Text className="text-xs text-muted-foreground">
+                {isCalendarLoading
+                  ? 'Checking connection...'
+                  : googleAccounts.length > 0
+                    ? `Connected (${googleAccounts.length} account${googleAccounts.length === 1 ? '' : 's'})`
+                    : 'Not connected'}
+              </Text>
+            </View>
+          </View>
+          {googleAccounts.length > 0 ? (
+            <View className="flex-row items-center gap-1">
+              <CheckCircle size={16} color="#16a34a" />
+              <Text className="text-sm text-green-600">Connected</Text>
+            </View>
+          ) : (
+            <Text className="text-xs text-muted-foreground">
+              Link a Google account above
+            </Text>
+          )}
+        </View>
 
-              {/* Available Calendars */}
-              {availableCalendars.filter((c) => !c.isAlreadyAdded).length > 0 && (
-                <View className="gap-2">
-                  <Text className="text-sm font-medium">Available Calendars</Text>
-                  {availableCalendars
-                    .filter((c) => !c.isAlreadyAdded)
-                    .map((cal) => (
-                      <View
-                        key={cal.providerCalendarId}
-                        className="flex-row items-center gap-2"
-                      >
-                        <View
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: cal.color || '#4285F4' }}
-                        />
-                        <Text className="text-sm flex-1" numberOfLines={1}>
-                          {cal.name}
-                        </Text>
+        {/* Account selector */}
+        {googleAccounts.length > 0 && (
+          <View className="mt-4 gap-2">
+            <Text className="text-sm text-muted-foreground">Linked account</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {accountOptions.map((account) => (
+                <Pressable
+                  key={account.id}
+                  onPress={() => setSelectedAccountId(account.id)}
+                  className={`px-3 py-1.5 rounded-lg border ${
+                    effectiveAccountId === account.id
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border'
+                  }`}
+                >
+                  <Text
+                    className={`text-xs ${
+                      effectiveAccountId === account.id ? 'font-medium' : ''
+                    }`}
+                    numberOfLines={1}
+                  >
+                    {account.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Available Calendars — collapsible */}
+      {googleAccounts.length > 0 && effectiveAccountId && (
+        <CollapsibleSection
+          title="Available Calendars"
+          icon={<Plus size={20} className="text-muted-foreground" />}
+          defaultOpen={syncedCalendars.length === 0}
+        >
+          {isCalendarLoading ? (
+            <Text className="text-sm text-muted-foreground py-2">
+              Loading calendars...
+            </Text>
+          ) : availableCalendars.length === 0 ? (
+            <Text className="text-sm text-muted-foreground py-2">
+              No calendars found in your Google account.
+            </Text>
+          ) : (
+            <View>
+              {availableCalendars.map((cal) => {
+                const key = `${cal.providerAccountId}:${cal.providerCalendarId}`;
+                return (
+                  <View
+                    key={key}
+                    className="flex-row items-center gap-3 py-2.5 border-b border-border/50 last:border-b-0"
+                  >
+                    {/* Action on left */}
+                    <View className="w-16">
+                      {cal.isAlreadyAdded ? (
+                        <View className="flex-row items-center gap-1">
+                          <CheckCircle size={12} color="#16a34a" />
+                          <Text className="text-xs text-green-600">Added</Text>
+                        </View>
+                      ) : (
                         <Button
                           size="sm"
                           variant="outline"
                           onPress={() =>
-                            handleAddCalendar(cal.providerCalendarId, cal.name)
+                            handleAddCalendar(
+                              cal.providerCalendarId,
+                              cal.name,
+                              cal.providerAccountId
+                            )
                           }
+                          disabled={addingCalendarId === key}
                         >
                           <View className="flex-row items-center gap-1">
                             <Plus size={12} className="text-foreground" />
                             <Text className="text-xs">Add</Text>
                           </View>
                         </Button>
-                      </View>
-                    ))}
-                </View>
-              )}
-
-              {syncedCalendars.length === 0 &&
-                availableCalendars.filter((c) => !c.isAlreadyAdded).length === 0 && (
-                  <Text className="text-sm text-muted-foreground">
-                    Select an account to see available calendars
-                  </Text>
-                )}
+                      )}
+                    </View>
+                    {/* Calendar info */}
+                    <CalendarColorDot color={cal.color} />
+                    <View className="flex-1">
+                      <Text className="text-sm font-medium" numberOfLines={1}>
+                        {cal.name}
+                        {cal.isPrimary && (
+                          <Text className="text-xs text-muted-foreground">
+                            {' '}
+                            (Primary)
+                          </Text>
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
-          </CardContent>
-        </Card>
+          )}
+        </CollapsibleSection>
       )}
 
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
-              {isDarkMode ? (
-                <Moon size={20} className="text-foreground" />
-              ) : (
-                <Sun size={20} className="text-foreground" />
-              )}
-              <Text>Dark Mode</Text>
-            </View>
-            <Switch checked={isDarkMode} onCheckedChange={toggleColorScheme} />
+      {/* Synced Calendars — collapsible */}
+      {googleAccounts.length > 0 && effectiveAccountId && syncedCalendars.length > 0 && (
+        <CollapsibleSection
+          title="Synced Calendars"
+          icon={<CalendarDays size={20} className="text-muted-foreground" />}
+          defaultOpen
+        >
+          <View>
+            {syncedCalendars.map((cal) => {
+              const lastSynced = cal.lastSyncedAt
+                ? new Date(cal.lastSyncedAt).toLocaleString()
+                : 'Never';
+              const calAccountLabel =
+                accountLabelById.get(cal.providerAccountId) ??
+                cal.providerAccountId;
+
+              return (
+                <View
+                  key={cal.id}
+                  className="flex-row items-center justify-between py-3 border-b border-border/50 last:border-b-0"
+                >
+                  <View className="flex-row items-center gap-3 flex-1 min-w-0">
+                    <CalendarColorDot color={cal.color} />
+                    <View className="flex-1 min-w-0">
+                      <Text className="text-sm font-medium" numberOfLines={1}>
+                        {cal.name}
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">
+                        Last synced: {lastSynced}
+                      </Text>
+                      {googleAccounts.length > 1 && (
+                        <Text className="text-xs text-muted-foreground">
+                          Account: {calAccountLabel}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    <Switch
+                      checked={cal.isEnabled}
+                      onCheckedChange={(enabled) =>
+                        handleToggleEnabled(cal.id, enabled)
+                      }
+                    />
+                    <Pressable
+                      onPress={() => handleSyncCalendar(cal.id)}
+                      disabled={syncingCalendarId === cal.id}
+                      className="p-1.5"
+                    >
+                      {syncingCalendarId === cal.id ? (
+                        <ActivityIndicator size="small" />
+                      ) : (
+                        <RefreshCw size={14} className="text-muted-foreground" />
+                      )}
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleRemoveCalendar(cal.id, cal.name)}
+                      disabled={removingCalendarId === cal.id}
+                      className="p-1.5"
+                    >
+                      <Trash2 size={14} className="text-muted-foreground" />
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-        </CardContent>
-      </Card>
+        </CollapsibleSection>
+      )}
 
-      {/* API Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle>API Configuration</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View className="gap-4">
-            <View>
-              <Text className="text-sm text-muted-foreground mb-2">API URL</Text>
-              <Input
-                value={apiUrl}
-                onChangeText={setApiUrl}
-                placeholder="http://localhost:3000"
-                editable={false}
-              />
-              <Text className="text-xs text-muted-foreground mt-1">
-                Configure in app.json or environment variables
-              </Text>
-            </View>
-
-            <View className="flex-row items-center gap-2">
-              <View className="flex-row items-center gap-2 flex-1">
-                <Server size={16} className="text-muted-foreground" />
-                <Text className="text-sm">
-                  Status:{' '}
-                  {isLoading ? (
-                    <Text className="text-muted-foreground">Checking...</Text>
-                  ) : healthData ? (
-                    <Text className="text-green-600">Connected</Text>
-                  ) : (
-                    <Text className="text-destructive">Disconnected</Text>
-                  )}
-                </Text>
-              </View>
-              <Button onPress={handleTestConnection} variant="outline" size="sm">
-                <Text>Test</Text>
-              </Button>
-            </View>
-
-            <Button onPress={handleOpenDocs} variant="outline">
-              <View className="flex-row items-center gap-2">
-                <ExternalLink size={16} className="text-foreground" />
-                <Text>Open API Docs</Text>
-              </View>
-            </Button>
-          </View>
-        </CardContent>
-      </Card>
-
-      {/* About */}
-      <Card>
-        <CardHeader>
-          <CardTitle>About</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <View className="gap-3">
-            <View className="flex-row items-center gap-3">
-              <Info size={20} className="text-muted-foreground" />
-              <View>
-                <Text className="font-medium">Shuchu Mobile</Text>
-                <Text className="text-sm text-muted-foreground">
-                  Task management with focus tracking
-                </Text>
-              </View>
-            </View>
-
-            <Separator />
-
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-muted-foreground">Version</Text>
-              <Text className="text-sm">{appVersion}</Text>
-            </View>
-
-            <View className="flex-row justify-between">
-              <Text className="text-sm text-muted-foreground">Platform</Text>
-              <Text className="text-sm">Expo / React Native</Text>
-            </View>
-          </View>
-        </CardContent>
-      </Card>
+      {/* About — minimal footer */}
+      <View className="pt-2 items-center">
+        <Text className="text-sm text-muted-foreground">
+          Shuchu v{appVersion} — Focus-driven task management
+        </Text>
+      </View>
     </View>
   );
 }

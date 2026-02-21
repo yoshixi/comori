@@ -47,25 +47,28 @@ export function useCalendarSettings(
     [accountsData?.accounts]
   )
 
+  // Default to first account when none is explicitly selected
+  const effectiveAccountId = providerAccountId ?? googleAccounts[0]?.accountId
+
   const { data: statusData, isLoading: isStatusLoading } = useGetApiOauthGoogleStatus(
-    providerAccountId ? { accountId: providerAccountId } : undefined,
+    effectiveAccountId ? { accountId: effectiveAccountId } : undefined,
     {
-      swr: { enabled: Boolean(providerAccountId) },
+      swr: { enabled: Boolean(effectiveAccountId) },
     }
   )
 
   const isGoogleConnected = useMemo(() => {
-    if (providerAccountId) {
+    if (effectiveAccountId) {
       return statusData?.connected === true
     }
     return googleAccounts.length > 0
-  }, [googleAccounts.length, providerAccountId, statusData?.connected])
+  }, [googleAccounts.length, effectiveAccountId, statusData?.connected])
 
   const { data: availableData, isLoading: isAvailableLoading } =
     useGetApiCalendarsAvailable(
-      { accountId: providerAccountId || '' },
+      { accountId: effectiveAccountId || '' },
       {
-        swr: { enabled: Boolean(providerAccountId && isGoogleConnected) },
+        swr: { enabled: Boolean(effectiveAccountId) },
       }
     )
 
@@ -73,39 +76,39 @@ export function useCalendarSettings(
 
   const syncedCalendars = useMemo(() => {
     const calendars = syncedData?.calendars ?? []
-    if (!providerAccountId) return calendars
+    if (!effectiveAccountId) return calendars
     return calendars.filter(
-      (calendar) => calendar.providerAccountId === providerAccountId
+      (calendar) => calendar.providerAccountId === effectiveAccountId
     )
-  }, [providerAccountId, syncedData?.calendars])
+  }, [effectiveAccountId, syncedData?.calendars])
 
   const refresh = useCallback(async () => {
     await Promise.all([
       mutate(getGetApiOauthGoogleAccountsKey()),
-      providerAccountId
-        ? mutate(getGetApiOauthGoogleStatusKey({ accountId: providerAccountId }))
+      effectiveAccountId
+        ? mutate(getGetApiOauthGoogleStatusKey({ accountId: effectiveAccountId }))
         : Promise.resolve(),
-      providerAccountId
-        ? mutate(getGetApiCalendarsAvailableKey({ accountId: providerAccountId }))
+      effectiveAccountId
+        ? mutate(getGetApiCalendarsAvailableKey({ accountId: effectiveAccountId }))
         : Promise.resolve(),
       mutate(getGetApiCalendarsKey()),
       mutate(getGetApiEventsKey()),
     ])
-  }, [mutate, providerAccountId])
+  }, [mutate, effectiveAccountId])
 
   const addCalendar = useCallback(
     async (providerCalendarId: string, name: string) => {
-      if (!providerAccountId) {
+      if (!effectiveAccountId) {
         throw new Error('No provider account selected')
       }
       await postApiCalendars({
-        providerAccountId,
+        providerAccountId: effectiveAccountId,
         providerCalendarId,
         name,
       })
       await refresh()
     },
-    [providerAccountId, refresh]
+    [effectiveAccountId, refresh]
   )
 
   const removeCalendar = useCallback(

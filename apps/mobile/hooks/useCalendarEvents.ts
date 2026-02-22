@@ -6,7 +6,7 @@ import {
 } from '@/gen/api/endpoints/shuchuAPI.gen'
 import type { CalendarEvent, Calendar } from '@/gen/api/schemas'
 
-const STORAGE_KEY = 'shuchu:visible-calendar-ids'
+const STORAGE_KEY = 'comori:visible-calendar-ids'
 
 interface UseCalendarEventsOptions {
   startDate: Date

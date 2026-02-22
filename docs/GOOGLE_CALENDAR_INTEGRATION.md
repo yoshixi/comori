@@ -1,17 +1,17 @@
 ---
 title: "Google Calendar Integration"
-brief_description: "This document describes the Google Calendar integration feature for the Shuchu application."
+brief_description: "This document describes the Google Calendar integration feature for the Comori application."
 created_at: "2026-01-31"
 update_at: "2026-02-14"
 ---
 
 # Google Calendar Integration
 
-This document describes the Google Calendar integration feature for the Shuchu application.
+This document describes the Google Calendar integration feature for the Comori application.
 
 ## Overview
 
-The Google Calendar integration allows users to connect their Google Calendar account and import calendar events into Shuchu. This enables users to see their scheduled events alongside their tasks.
+The Google Calendar integration allows users to connect their Google Calendar account and import calendar events into Comori. This enables users to see their scheduled events alongside their tasks.
 
 **Key Features:**
 - OAuth 2.0 authentication with Google (via better-auth)
@@ -136,7 +136,7 @@ Returned when listing available calendars from Google.
   name: string;               // Calendar display name
   color?: string;             // Calendar color
   isPrimary?: boolean;        // Whether primary calendar
-  isAlreadyAdded: boolean;    // Whether already added to Shuchu
+  isAlreadyAdded: boolean;    // Whether already added to Comori
 }
 ```
 
@@ -617,7 +617,7 @@ Returns 200 OK to Google
 │                      ONGOING SYNC                                │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  Google Calendar ←──────────────────────→ Shuchu Backend        │
+│  Google Calendar ←──────────────────────→ Comori Backend        │
 │       │                                        │                 │
 │       │  (User modifies event)                 │                 │
 │       │                                        │                 │
@@ -710,7 +710,7 @@ A dropdown in the CalendarView toolbar to toggle calendar visibility:
 **Features:**
 - Shows "Calendars (X/Y)" indicating visible/total count
 - Lists all synced calendars with toggle checkmarks
-- Visibility state persisted in localStorage (`shuchu:visible-calendar-ids`)
+- Visibility state persisted in localStorage (`comori:visible-calendar-ids`)
 - Unchecking a calendar hides its events from the view
 
 **Code Location:** `CalendarFilterDropdown.tsx`
@@ -749,7 +749,7 @@ apps/electron/src/renderer/src/
 
 1. **Grayish events:** Calendar events use neutral gray colors to clearly distinguish them from tasks (which use primary colors). This helps users quickly identify what's a task vs. an imported event.
 
-2. **Read-only events:** Events are non-interactive since they're managed in Google Calendar. Users can see them for reference but cannot modify them in Shuchu.
+2. **Read-only events:** Events are non-interactive since they're managed in Google Calendar. Users can see them for reference but cannot modify them in Comori.
 
 3. **Visibility persistence:** Calendar visibility preferences are stored in localStorage so they persist across sessions.
 

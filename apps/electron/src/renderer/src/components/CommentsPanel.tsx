@@ -52,7 +52,7 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({ taskId, onCommentC
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
         rows={3}
-        placeholder="Log progress, blockers, or quick thoughts..."
+        placeholder="How's it going? Jot down progress or thoughts..."
       />
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">

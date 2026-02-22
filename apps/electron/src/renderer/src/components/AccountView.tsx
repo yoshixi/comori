@@ -33,14 +33,14 @@ function NotificationStatusBadge({ status }: { status: NotificationPermissionSta
   switch (status) {
     case 'granted':
       return (
-        <div className="flex items-center gap-1.5 text-green-600">
+        <div className="flex items-center gap-1.5 text-success">
           <CheckCircle className="h-4 w-4" />
           <span className="text-sm font-medium">Enabled</span>
         </div>
       )
     case 'denied':
       return (
-        <div className="flex items-center gap-1.5 text-red-600">
+        <div className="flex items-center gap-1.5 text-destructive">
           <XCircle className="h-4 w-4" />
           <span className="text-sm font-medium">Disabled</span>
         </div>
@@ -154,7 +154,7 @@ export function AccountView(): React.JSX.Element {
 
   return (
     <div className="p-8 overflow-auto flex-1 min-h-0">
-      <h2 className="text-2xl font-semibold tracking-tight">Account</h2>
+      <h2 className="text-2xl font-semibold tracking-tight">Your Space</h2>
       <p className="mt-2 text-muted-foreground">
         Manage your account and preferences.
       </p>
@@ -236,10 +236,10 @@ export function AccountView(): React.JSX.Element {
               {isLinkingGoogle ? 'Linking...' : 'Link Google Account'}
             </Button>
             {linkStatus === 'success' && (
-              <p className="text-xs text-green-600">Account linked. Refresh Settings to select it.</p>
+              <p className="text-xs text-success">Account linked. Refresh Settings to select it.</p>
             )}
             {linkStatus === 'error' && (
-              <p className="text-xs text-red-600">Link failed. Please try again.</p>
+              <p className="text-xs text-destructive">Link failed. Please try again.</p>
             )}
           </div>
         </CollapsibleSection>
@@ -272,7 +272,7 @@ export function AccountView(): React.JSX.Element {
 
         {/* About — minimal footer */}
         <div className="pt-2 text-center text-sm text-muted-foreground">
-          Shuchu — Focus-driven task management
+          Comori — Your cozy focus companion
         </div>
       </div>
     </div>

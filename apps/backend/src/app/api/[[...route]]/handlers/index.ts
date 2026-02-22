@@ -19,7 +19,7 @@ export const healthHandler: RouteHandler<typeof healthRoute, AppBindings> = (c) 
   return c.json(
     {
       status: 'ok',
-      message: 'Shuchu API is running',
+      message: 'Comori API is running',
       timestamp: new Date().toISOString()
     },
     200

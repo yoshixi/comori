@@ -48,7 +48,9 @@
       "Bash(git fetch:*)",
       "Bash(git merge:*)",
       "Bash(xcode-select:*)",
-      "Bash(pnpm:*)"
+      "Bash(pnpm:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(git branch:*)"
     ]
   }
 }

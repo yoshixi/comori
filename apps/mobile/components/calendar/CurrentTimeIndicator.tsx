@@ -34,8 +34,8 @@ export function CurrentTimeIndicator({ hourHeight, offsetLeft }: CurrentTimeIndi
       }}
       pointerEvents="none"
     >
-      <View className="h-2 w-2 rounded-full bg-red-500" />
-      <View className="flex-1 h-[1px] bg-red-500" />
+      <View className="h-2 w-2 rounded-full bg-destructive" />
+      <View className="flex-1 h-[1px] bg-destructive" />
     </View>
   );
 }

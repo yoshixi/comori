@@ -44,7 +44,7 @@ export class TrayManager {
     const icon = nativeImage.createFromPath(iconPath)
 
     this.tray = new Tray(icon)
-    this.tray.setToolTip('Shuchu - No active timers')
+    this.tray.setToolTip('Comori - No active timers')
     this.updateContextMenu()
 
     this.tray.on('click', () => {
@@ -174,7 +174,7 @@ export class TrayManager {
     }
 
     menuItems.push({
-      label: 'Show Shuchu',
+      label: 'Show Comori',
       click: () => this.showMainWindow()
     })
 
@@ -260,7 +260,7 @@ export class TrayManager {
     if (process.platform === 'darwin') {
       this.tray.setTitle('')
     }
-    this.tray.setToolTip('Shuchu - No active timers')
+    this.tray.setToolTip('Comori - No active timers')
   }
 
   private calculateElapsed(startTime: string): number {

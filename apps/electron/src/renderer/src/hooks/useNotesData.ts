@@ -30,16 +30,19 @@ export interface UseNotesDataReturn {
   handleCreateNote: (text: string) => void
   handleUpdateNote: (noteId: number, text: string) => void
   handleDeleteNote: (noteId: number) => Promise<void>
+  handleArchiveNote: (noteId: number) => Promise<void>
   handleConvertToTask: (noteId: number, schedule?: { startAt?: string; endAt?: string }) => Promise<void>
 }
 
-export function useNotesData(): UseNotesDataReturn {
+export function useNotesData(options?: { includeArchived?: boolean }): UseNotesDataReturn {
   const {
     data: notesResponse,
     error: notesError,
     isLoading: notesLoading,
     mutate: mutateNotes
-  } = useGetApiNotes()
+  } = useGetApiNotes(
+    options?.includeArchived ? { includeArchived: 'true' } : undefined
+  )
 
   const notes = notesResponse?.notes ?? []
 
@@ -147,6 +150,28 @@ export function useNotesData(): UseNotesDataReturn {
     }
   }, [mutateNotes])
 
+  const handleArchiveNote = useCallback(async (noteId: number): Promise<void> => {
+    // Optimistic remove from list
+    mutateNotes(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          notes: currentData.notes.filter((n) => n.id !== noteId),
+          total: currentData.total - 1
+        }
+      },
+      { revalidate: false }
+    )
+
+    try {
+      await putApiNotesId(noteId, { archivedAt: new Date().toISOString() })
+    } catch (error) {
+      console.error('Failed to archive note:', error)
+      await mutateNotes()
+    }
+  }, [mutateNotes])
+
   const handleConvertToTask = useCallback(async (noteId: number, schedule?: { startAt?: string; endAt?: string }): Promise<void> => {
     // Optimistic remove from list
     mutateNotes(
@@ -180,6 +205,7 @@ export function useNotesData(): UseNotesDataReturn {
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
+    handleArchiveNote,
     handleConvertToTask
   }
 }

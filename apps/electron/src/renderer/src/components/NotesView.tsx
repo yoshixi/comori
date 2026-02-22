@@ -1,6 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowRightLeft, Trash2 } from 'lucide-react'
+import { Archive, ArrowRightLeft, Trash2 } from 'lucide-react'
 import { Button } from './ui/button'
+import { Switch } from './ui/switch'
+import { Label } from './ui/label'
 import { Dialog, DialogContent } from './ui/dialog'
 import { TaskTimeRangePicker } from './TaskTimeRangePicker'
 import { useNotesData } from '../hooks/useNotesData'
@@ -61,11 +63,13 @@ function NoteCard({
   note,
   onUpdate,
   onDelete,
+  onArchive,
   onConvertToTask
 }: {
   note: Note
   onUpdate: (noteId: number, text: string) => void
   onDelete: (noteId: number) => void
+  onArchive: (noteId: number) => void
   onConvertToTask: (note: Note) => void
 }): React.JSX.Element {
   const merged = mergeNoteText(note)
@@ -94,8 +98,10 @@ function NoteCard({
   const dateStr = updatedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   const timeStr = updatedDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 
+  const isArchived = !!note.archivedAt
+
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-2">
+    <div className={`rounded-lg border bg-card p-4 space-y-2 ${isArchived ? 'opacity-50' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           {isEditing ? (
@@ -106,14 +112,24 @@ function NoteCard({
               onBlur={handleBlur}
               rows={1}
               className="w-full resize-none bg-transparent text-sm focus-visible:outline-none [&::first-line]:font-semibold"
-              autoFocus
             />
           ) : (
             <button
               className="text-sm text-left w-full cursor-text"
               onClick={() => {
+                const text = mergeNoteText(note)
+                setEditValue(text)
                 setIsEditing(true)
-                setEditValue(mergeNoteText(note))
+                // Resize textarea and place cursor at the end after render
+                requestAnimationFrame(() => {
+                  const el = textareaRef.current
+                  if (el) {
+                    el.style.height = 'auto'
+                    el.style.height = `${el.scrollHeight}px`
+                    el.focus()
+                    el.setSelectionRange(text.length, text.length)
+                  }
+                })
               }}
             >
               <span className="font-semibold line-clamp-1">{note.title}</span>
@@ -136,6 +152,15 @@ function NoteCard({
           <Button
             variant="ghost"
             size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => onArchive(note.id)}
+            title="Archive note"
+          >
+            <Archive className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
             onClick={() => onDelete(note.id)}
             title="Delete note"
@@ -153,6 +178,8 @@ function NoteCard({
 }
 
 export function NotesView(): React.JSX.Element {
+  const [showArchived, setShowArchived] = useState(false)
+
   const {
     notes,
     notesLoading,
@@ -160,8 +187,9 @@ export function NotesView(): React.JSX.Element {
     handleCreateNote,
     handleUpdateNote,
     handleDeleteNote,
+    handleArchiveNote,
     handleConvertToTask
-  } = useNotesData()
+  } = useNotesData({ includeArchived: showArchived })
 
   // Conversion dialog state
   const [convertingNote, setConvertingNote] = useState<Note | null>(null)
@@ -212,6 +240,17 @@ export function NotesView(): React.JSX.Element {
       <main className="flex min-h-0 flex-1 flex-col gap-6">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Notes</h2>
+          <div className="flex items-center justify-between w-[130px] h-8 rounded-md border border-input px-3">
+            <Label htmlFor="notes-show-archived" className="text-sm cursor-pointer">
+              Archived
+            </Label>
+            <Switch
+              id="notes-show-archived"
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+              className="scale-75"
+            />
+          </div>
         </div>
 
         {/* Composer */}
@@ -243,6 +282,7 @@ export function NotesView(): React.JSX.Element {
                   note={note}
                   onUpdate={handleUpdateNote}
                   onDelete={handleDeleteNote}
+                  onArchive={handleArchiveNote}
                   onConvertToTask={openConvertDialog}
                 />
               ))

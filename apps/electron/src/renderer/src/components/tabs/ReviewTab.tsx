@@ -4,10 +4,12 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from 'recharts'
+import { Info } from 'lucide-react'
 import { Badge } from '../ui/badge'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../ui/tooltip'
 import {
   Table,
   TableBody,
@@ -50,8 +52,14 @@ export function ReviewTab({
     <div className="space-y-6">
       {/* Daily Hours Chart */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           Daily Hours (Last 14 Days)
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>Total hours tracked per day from timer sessions</TooltipContent>
+          </Tooltip>
         </h3>
         <div className="rounded-lg border bg-card p-4">
           {dailyData.every((d) => d.hours === 0) ? (
@@ -75,7 +83,7 @@ export function ReviewTab({
                   width={30}
                   tickFormatter={(v: number) => `${v}h`}
                 />
-                <Tooltip
+                <RechartsTooltip
                   formatter={(value) => [`${value}h`, 'Hours']}
                   labelFormatter={(label) => formatDateLabel(String(label))}
                 />
@@ -88,8 +96,14 @@ export function ReviewTab({
 
       {/* Tag Breakdown */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           Time by Tag
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>Timer hours split by tag over the last 14 days</TooltipContent>
+          </Tooltip>
         </h3>
         <div className="rounded-lg border bg-card p-4">
           {tagData.length === 0 ? (
@@ -114,7 +128,7 @@ export function ReviewTab({
                   axisLine={false}
                   width={80}
                 />
-                <Tooltip formatter={(value) => [`${value}h`, 'Hours']} />
+                <RechartsTooltip formatter={(value) => [`${value}h`, 'Hours']} />
                 <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -124,8 +138,14 @@ export function ReviewTab({
 
       {/* Task Time Summary Table */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
           Task Summary
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent>Total time and session count per task over the last 14 days</TooltipContent>
+          </Tooltip>
         </h3>
         {taskSummaries.length === 0 ? (
           <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">

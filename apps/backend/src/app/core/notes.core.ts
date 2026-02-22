@@ -50,6 +50,10 @@ export const UpdateNoteModel = z.object({
   content: z.string().optional().nullable().openapi({
     description: 'Content of the note',
     example: 'We should definitely use OAuth2'
+  }),
+  archivedAt: z.iso.datetime().optional().nullable().openapi({
+    description: 'Set to an ISO 8601 timestamp to archive, or null to unarchive',
+    example: '2024-06-01T12:00:00.000Z'
   })
 }).openapi('UpdateNote')
 

@@ -18,4 +18,9 @@ export interface UpdateNote {
    * @nullable
    */
   content?: string | null
+  /**
+   * Set to an ISO 8601 timestamp to archive, or null to unarchive
+   * @nullable
+   */
+  archivedAt?: string | null
 }

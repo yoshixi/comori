@@ -21,6 +21,7 @@ export interface CreateNote {
 export interface UpdateNote {
   title?: string
   content?: string | null
+  archivedAt?: string | null
 }
 
 // Convert database note to API note
@@ -104,6 +105,10 @@ export async function updateNote(db: DB, userId: number, noteId: number, data: U
 
   if (data.content !== undefined) {
     updateData.content = data.content === null ? null : (data.content.trim() || null)
+  }
+
+  if (data.archivedAt !== undefined) {
+    updateData.archivedAt = data.archivedAt === null ? null : new Date(data.archivedAt)
   }
 
   const result = await db

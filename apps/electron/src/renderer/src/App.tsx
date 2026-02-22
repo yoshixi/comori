@@ -22,6 +22,7 @@ import { useIsNarrow } from './hooks/use-mobile'
 import { useTasksData } from './hooks/useTasksData'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
+import { NotesView } from './components/NotesView'
 import { startOfDay, addDays } from './lib/calendar-utils'
 
 // Keyboard shortcut definitions
@@ -318,6 +319,8 @@ function App(): React.JSX.Element {
           <AccountView />
         ) : currentView === 'settings' ? (
           <SettingsView />
+        ) : currentView === 'notes' ? (
+          <NotesView />
         ) : currentView === 'calendar' ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden p-8">
             <main className="flex min-h-0 flex-1 flex-col gap-6">

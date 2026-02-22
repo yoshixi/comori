@@ -304,11 +304,20 @@ export const TaskTimeRangePicker: React.FC<TaskTimeRangePickerProps> = ({
   }
 
   const handleColumnMouseDown = (
-    _event: React.MouseEvent<HTMLDivElement>,
-    _dayIndex: number
+    event: React.MouseEvent<HTMLDivElement>,
+    dayIndex: number
   ): void => {
-    // Disabled: clicking on empty area should not create a new selection
-    // Users should only modify the schedule by dragging the existing selection (move/resize)
+    // Click on empty area creates a new 1-hour selection at the clicked time
+    const rect = event.currentTarget.getBoundingClientRect()
+    const offsetY = event.clientY - rect.top
+    const clickedSlot = clamp(Math.floor(offsetY / slotHeight), 0, slotCount - 1)
+    const durationSlots = Math.round(60 / slotMinutes) // 1 hour
+    const endSlot = Math.min(clickedSlot + durationSlots, slotCount)
+
+    const baseDate = addDays(activeBase, viewMode === 'day' ? 0 : dayIndex)
+    const startDate = dateForSlot(baseDate, clickedSlot, slotMinutes)
+    const endDate = dateForSlot(baseDate, endSlot, slotMinutes)
+    onChange({ startAt: startDate.toISOString(), endAt: endDate.toISOString() })
   }
 
   const derivedSelection = useMemo(() => {

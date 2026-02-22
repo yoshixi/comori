@@ -167,6 +167,25 @@ export const calendarWatchChannelsTable = sqliteTable('calendar_watch_channels',
   uniqueCalendarChannel: unique().on(table.calendarId, table.providerType),
 }));
 
+// Notes table
+export const notesTable = sqliteTable('notes', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  content: text('content'),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
+// Note-Task Conversions table (tracks which note was converted to which task)
+export const noteTaskConversionsTable = sqliteTable('note_task_conversions', {
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  noteId: integer('note_id', { mode: 'number' }).notNull().references(() => notesTable.id, { onDelete: 'cascade' }),
+  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+});
+
 // Indexes
 export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
 export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
@@ -181,6 +200,11 @@ export const calendarEventsEndAtIdx = index('calendar_events_end_at_idx').on(cal
 export const calendarWatchChannelsCalendarIdIdx = index('calendar_watch_channels_calendar_id_idx').on(calendarWatchChannelsTable.calendarId);
 export const calendarWatchChannelsChannelIdIdx = index('calendar_watch_channels_channel_id_idx').on(calendarWatchChannelsTable.channelId);
 export const calendarWatchChannelsExpiresAtIdx = index('calendar_watch_channels_expires_at_idx').on(calendarWatchChannelsTable.expiresAt);
+
+export const notesUserIdIdx = index('notes_user_id_idx').on(notesTable.userId);
+export const notesUpdatedAtIdx = index('notes_updated_at_idx').on(notesTable.updatedAt);
+export const noteTaskConversionsNoteIdIdx = index('note_task_conversions_note_id_idx').on(noteTaskConversionsTable.noteId);
+export const noteTaskConversionsTaskIdIdx = index('note_task_conversions_task_id_idx').on(noteTaskConversionsTable.taskId);
 
 // Type exports
 export type InsertUser = typeof usersTable.$inferInsert;
@@ -207,3 +231,7 @@ export type InsertCalendarEvent = typeof calendarEventsTable.$inferInsert;
 export type SelectCalendarEvent = typeof calendarEventsTable.$inferSelect;
 export type InsertCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferInsert;
 export type SelectCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferSelect;
+export type InsertNote = typeof notesTable.$inferInsert;
+export type SelectNote = typeof notesTable.$inferSelect;
+export type InsertNoteTaskConversion = typeof noteTaskConversionsTable.$inferInsert;
+export type SelectNoteTaskConversion = typeof noteTaskConversionsTable.$inferSelect;

@@ -31,12 +31,14 @@ export function UpcomingTab({
   onFilterTagIdsChange
 }: UpcomingTabProps): React.JSX.Element {
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showUnscheduled, setShowUnscheduled] = useState(true)
 
   const { data: tasksResponse, isLoading } = useGetApiTasks({
-    scheduled: 'true' as const,
+    scheduled: showUnscheduled ? undefined : ('true' as const),
     completed: showCompleted ? undefined : ('false' as const),
     sortBy: 'startAt' as const,
     order: 'asc' as const,
+    nullsLast: showUnscheduled ? ('true' as const) : undefined,
     tags: filterTagIds.length ? filterTagIds : undefined
   })
   const tasks = tasksResponse?.tasks ?? []
@@ -53,6 +55,17 @@ export function UpcomingTab({
           placeholder="Filter by tags"
           className="w-48"
         />
+        <div className="flex items-center justify-between w-[150px] h-8 rounded-md border border-input px-3">
+          <Label htmlFor="upcoming-show-unscheduled" className="text-sm cursor-pointer">
+            Unscheduled
+          </Label>
+          <Switch
+            id="upcoming-show-unscheduled"
+            checked={showUnscheduled}
+            onCheckedChange={setShowUnscheduled}
+            className="scale-75"
+          />
+        </div>
         <div className="flex items-center justify-between w-[140px] h-8 rounded-md border border-input px-3">
           <Label htmlFor="upcoming-show-completed" className="text-sm cursor-pointer">
             Completed

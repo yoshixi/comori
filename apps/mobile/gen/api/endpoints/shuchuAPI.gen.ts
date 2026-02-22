@@ -18,7 +18,10 @@ import type {
   CalendarListResponse,
   CalendarResponse,
   CalendarSyncResponse,
+  ConvertNoteToTaskRequest,
+  ConvertNoteToTaskResponse,
   CreateCalendar,
+  CreateNote,
   CreateTag,
   CreateTask,
   CreateTaskComment,
@@ -27,10 +30,13 @@ import type {
   ErrorResponse,
   GetApiCalendarsAvailableParams,
   GetApiEventsParams,
+  GetApiNotesParams,
   GetApiOauthGoogleStatusParams,
   GetApiTasksParams,
   GetApiTimersParams,
   HealthResponse,
+  NoteListResponse,
+  NoteResponse,
   OAuthAccountsResponse,
   OAuthDisconnectResponse,
   OAuthStatusResponse,
@@ -45,6 +51,7 @@ import type {
   TimerListResponse,
   TimerResponse,
   UpdateCalendar,
+  UpdateNote,
   UpdateTag,
   UpdateTask,
   UpdateTaskComment,
@@ -1861,6 +1868,289 @@ export const useGetApiCalendarsIdWatch = <TError = ErrorResponse | ErrorResponse
   const swrFn = () => getApiCalendarsIdWatch(id);
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Retrieve all notes for the current user. By default, archived notes are excluded.
+ * @summary Get all notes
+ */
+export const getApiNotes = (params?: GetApiNotesParams) => {
+  return customInstance<NoteListResponse>({ url: `/api/notes`, method: 'GET', params });
+};
+
+export const getGetApiNotesKey = (params?: GetApiNotesParams) =>
+  [`/api/notes`, ...(params ? [params] : [])] as const;
+
+export type GetApiNotesQueryResult = NonNullable<Awaited<ReturnType<typeof getApiNotes>>>;
+export type GetApiNotesQueryError = ErrorResponse;
+
+/**
+ * @summary Get all notes
+ */
+export const useGetApiNotes = <TError = ErrorResponse>(
+  params?: GetApiNotesParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiNotes>>, TError> & {
+      swrKey?: Key;
+      enabled?: boolean;
+    };
+  }
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const isEnabled = swrOptions?.enabled !== false;
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiNotesKey(params) : null));
+  const swrFn = () => getApiNotes(params);
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Create a new note
+ * @summary Create a note
+ */
+export const postApiNotes = (createNote: CreateNote) => {
+  return customInstance<NoteResponse>({
+    url: `/api/notes`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data: createNote,
+  });
+};
+
+export const getPostApiNotesMutationFetcher = () => {
+  return (_: Key, { arg }: { arg: CreateNote }) => {
+    return postApiNotes(arg);
+  };
+};
+export const getPostApiNotesMutationKey = () => [`/api/notes`] as const;
+
+export type PostApiNotesMutationResult = NonNullable<Awaited<ReturnType<typeof postApiNotes>>>;
+export type PostApiNotesMutationError = ErrorResponse | ErrorResponse;
+
+/**
+ * @summary Create a note
+ */
+export const usePostApiNotes = <TError = ErrorResponse | ErrorResponse>(options?: {
+  swr?: SWRMutationConfiguration<
+    Awaited<ReturnType<typeof postApiNotes>>,
+    TError,
+    Key,
+    CreateNote,
+    Awaited<ReturnType<typeof postApiNotes>>
+  > & { swrKey?: string };
+}) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiNotesMutationKey();
+  const swrFn = getPostApiNotesMutationFetcher();
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Retrieve a specific note by ID
+ * @summary Get a note
+ */
+export const getApiNotesId = (id: number) => {
+  return customInstance<NoteResponse>({ url: `/api/notes/${id}`, method: 'GET' });
+};
+
+export const getGetApiNotesIdKey = (id: number) => [`/api/notes/${id}`] as const;
+
+export type GetApiNotesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiNotesId>>>;
+export type GetApiNotesIdQueryError = ErrorResponse | ErrorResponse;
+
+/**
+ * @summary Get a note
+ */
+export const useGetApiNotesId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiNotesId>>, TError> & {
+      swrKey?: Key;
+      enabled?: boolean;
+    };
+  }
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const isEnabled = swrOptions?.enabled !== false && !!id;
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiNotesIdKey(id) : null));
+  const swrFn = () => getApiNotesId(id);
+
+  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Update an existing note by ID
+ * @summary Update a note
+ */
+export const putApiNotesId = (id: number, updateNote: UpdateNote) => {
+  return customInstance<NoteResponse>({
+    url: `/api/notes/${id}`,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    data: updateNote,
+  });
+};
+
+export const getPutApiNotesIdMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: UpdateNote }) => {
+    return putApiNotesId(id, arg);
+  };
+};
+export const getPutApiNotesIdMutationKey = (id: number) => [`/api/notes/${id}`] as const;
+
+export type PutApiNotesIdMutationResult = NonNullable<Awaited<ReturnType<typeof putApiNotesId>>>;
+export type PutApiNotesIdMutationError = ErrorResponse | ErrorResponse | ErrorResponse;
+
+/**
+ * @summary Update a note
+ */
+export const usePutApiNotesId = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof putApiNotesId>>,
+      TError,
+      Key,
+      UpdateNote,
+      Awaited<ReturnType<typeof putApiNotesId>>
+    > & { swrKey?: string };
+  }
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const swrKey = swrOptions?.swrKey ?? getPutApiNotesIdMutationKey(id);
+  const swrFn = getPutApiNotesIdMutationFetcher(id);
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Delete a note by ID
+ * @summary Delete a note
+ */
+export const deleteApiNotesId = (id: number) => {
+  return customInstance<NoteResponse>({ url: `/api/notes/${id}`, method: 'DELETE' });
+};
+
+export const getDeleteApiNotesIdMutationFetcher = (id: number) => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiNotesId(id);
+  };
+};
+export const getDeleteApiNotesIdMutationKey = (id: number) => [`/api/notes/${id}`] as const;
+
+export type DeleteApiNotesIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiNotesId>>
+>;
+export type DeleteApiNotesIdMutationError = ErrorResponse | ErrorResponse;
+
+/**
+ * @summary Delete a note
+ */
+export const useDeleteApiNotesId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof deleteApiNotesId>>,
+      TError,
+      Key,
+      Arguments,
+      Awaited<ReturnType<typeof deleteApiNotesId>>
+    > & { swrKey?: string };
+  }
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiNotesIdMutationKey(id);
+  const swrFn = getDeleteApiNotesIdMutationFetcher(id);
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions);
+
+  return {
+    swrKey,
+    ...query,
+  };
+};
+
+/**
+ * Atomically creates a task from the note, records the conversion, and archives the note.
+ * @summary Convert a note to a task
+ */
+export const postApiNotesIdTaskConversions = (
+  id: number,
+  convertNoteToTaskRequest: ConvertNoteToTaskRequest
+) => {
+  return customInstance<ConvertNoteToTaskResponse>({
+    url: `/api/notes/${id}/task_conversions`,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    data: convertNoteToTaskRequest,
+  });
+};
+
+export const getPostApiNotesIdTaskConversionsMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: ConvertNoteToTaskRequest }) => {
+    return postApiNotesIdTaskConversions(id, arg);
+  };
+};
+export const getPostApiNotesIdTaskConversionsMutationKey = (id: number) =>
+  [`/api/notes/${id}/task_conversions`] as const;
+
+export type PostApiNotesIdTaskConversionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>
+>;
+export type PostApiNotesIdTaskConversionsMutationError = ErrorResponse | ErrorResponse;
+
+/**
+ * @summary Convert a note to a task
+ */
+export const usePostApiNotesIdTaskConversions = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
+  options?: {
+    swr?: SWRMutationConfiguration<
+      Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>,
+      TError,
+      Key,
+      ConvertNoteToTaskRequest,
+      Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>
+    > & { swrKey?: string };
+  }
+) => {
+  const { swr: swrOptions } = options ?? {};
+
+  const swrKey = swrOptions?.swrKey ?? getPostApiNotesIdTaskConversionsMutationKey(id);
+  const swrFn = getPostApiNotesIdTaskConversionsMutationFetcher(id);
+
+  const query = useSWRMutation(swrKey, swrFn, swrOptions);
 
   return {
     swrKey,

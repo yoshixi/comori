@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import { CalendarDays, CheckSquare, Settings } from 'lucide-react-native';
+import { CalendarDays, CheckSquare, Settings, StickyNote } from 'lucide-react-native';
 import { ActivityIndicator, View } from 'react-native';
 import { NAV_THEME } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +49,13 @@ export default function TabLayout() {
         options={{
           title: 'Calendar',
           tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="notes"
+        options={{
+          title: 'Notes',
+          tabBarIcon: ({ color, size }) => <StickyNote color={color} size={size} />,
         }}
       />
       <Tabs.Screen

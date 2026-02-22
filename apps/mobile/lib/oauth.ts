@@ -7,7 +7,7 @@ import { setSessionToken, getJwt, getSessionToken } from './auth'
  * Sign in with Google OAuth using the system browser.
  * Opens the mobile-oauth endpoint, which redirects to Google.
  * On completion, Google redirects back through mobile-auth-callback,
- * which deep-links to shuchu://auth-callback?session_token=...
+ * which deep-links to comori://auth-callback?session_token=...
  */
 export async function signInWithGoogle(): Promise<void> {
   const redirectUrl = Linking.createURL('auth-callback')
@@ -38,7 +38,7 @@ export async function signInWithGoogle(): Promise<void> {
 /**
  * Link a Google account to the current user session.
  * Opens the mobile-link endpoint, which redirects to Google for account linking.
- * On completion, redirects back to shuchu://link-callback?linked=1
+ * On completion, redirects back to comori://link-callback?linked=1
  */
 export async function linkGoogleAccount(): Promise<void> {
   const redirectUrl = Linking.createURL('link-callback')

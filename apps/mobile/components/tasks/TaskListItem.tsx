@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { View, Pressable, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Check, Circle, Clock } from 'lucide-react-native';
+import { Check, Clock } from 'lucide-react-native';
 import { useSWRConfig } from 'swr';
 import type { Task, TaskTimer } from '@/gen/api/schemas';
-import { putApiTasksId } from '@/gen/api/endpoints/shuchuAPI.gen';
+import { putApiTasksId } from '@/gen/api/endpoints/comoriAPI.gen';
 import { Text } from '@/components/ui/text';
 import { Badge } from '@/components/ui/badge';
 import { useTimer } from '@/hooks/useTimer';
@@ -126,7 +126,7 @@ export function TaskListItem({ task, activeTimer, onPress }: TaskListItemProps) 
     return (
       <Pressable
         onPress={handleComplete}
-        className="bg-green-500 justify-center items-center rounded-lg mb-2 px-6"
+        className="bg-green-700 justify-center items-center rounded-lg mb-2 px-6"
       >
         <Animated.View
           style={{ transform: [{ scale }], opacity }}
@@ -160,7 +160,7 @@ export function TaskListItem({ task, activeTimer, onPress }: TaskListItemProps) 
     return (
       <Pressable
         onPress={handleComplete}
-        className="bg-green-500 justify-center items-center rounded-lg mb-2 px-6"
+        className="bg-green-700 justify-center items-center rounded-lg mb-2 px-6"
       >
         <Animated.View
           style={{ transform: [{ scale }], opacity }}
@@ -203,15 +203,6 @@ export function TaskListItem({ task, activeTimer, onPress }: TaskListItemProps) 
           disabled={isHiding}
           className="flex-row items-start gap-3 py-3 px-3 bg-card rounded-lg mb-2 border border-border active:opacity-70"
         >
-          <Pressable onPress={handleComplete} hitSlop={8} className="mt-0.5">
-            {isCompleted ? (
-              <View className="h-5 w-5 rounded-full bg-primary items-center justify-center">
-                <Check size={12} color="white" />
-              </View>
-            ) : (
-              <Circle size={20} className="text-muted-foreground" />
-            )}
-          </Pressable>
           <View className="flex-1">
             <Text
               className={`font-medium ${isCompleted ? 'line-through text-muted-foreground' : ''}`}
@@ -243,8 +234,8 @@ export function TaskListItem({ task, activeTimer, onPress }: TaskListItemProps) 
           </View>
 
           {isRunning && (
-            <View className="bg-green-100 dark:bg-green-900 px-2 py-1 rounded">
-              <Text className="text-green-700 dark:text-green-300 text-sm font-mono">
+            <View className="bg-green-200 dark:bg-green-900 px-2 py-1 rounded">
+              <Text className="text-green-800 dark:text-green-300 text-sm font-mono">
                 {formattedTime}
               </Text>
             </View>

@@ -1,15 +1,15 @@
 ---
-title: "Shuchu - Product Concept"
-brief_description: "Shuchu - Product Concept"
+title: "Comori - Product Concept"
+brief_description: "Comori - Product Concept"
 created_at: "2026-02-12"
 update_at: "2026-02-12"
 ---
 
-# Shuchu - Product Concept
+# Comori - Product Concept
 
 ## One-liner
 
-Shuchu makes it incredibly easy to track your planned vs. actual progress for short-term personal tasks.
+Comori makes it incredibly easy to track your planned vs. actual progress for short-term personal tasks.
 
 ## The Problem
 
@@ -35,7 +35,7 @@ The distance from "I want to work on this" to "a timer is running" must be exact
 
 ### 3. Short-term focus
 
-Shuchu is optimized for today and this week. It is not a backlog, a roadmap, or a project management tool. Tasks have start times and durations, not sprints or milestones. The planning horizon is hours to days, not weeks to months.
+Comori is optimized for today and this week. It is not a backlog, a roadmap, or a project management tool. Tasks have start times and durations, not sprints or milestones. The planning horizon is hours to days, not weeks to months.
 
 ### 4. Lightweight structure, rich signal
 
@@ -47,7 +47,7 @@ You should be able to answer "how did my day/week go?" in under 5 seconds. Chart
 
 ## The Three Modes
 
-Shuchu organizes work into three distinct modes, each optimized for a different mindset:
+Comori organizes work into three distinct modes, each optimized for a different mindset:
 
 ### Calendar - Visual Planning
 
@@ -80,7 +80,7 @@ The sidebar provides persistent context regardless of which view you're in. Acti
 4. **Stop**: When you finish or switch tasks, stop the timer. The actual duration is recorded.
 5. **Review**: At the end of the day or week, the Review tab shows your actual hours against your planned blocks. The calendar shows planned blocks alongside timer-derived actual time. The gap between plan and reality becomes visible.
 
-## What Shuchu Is Not
+## What Comori Is Not
 
 - **Not a team tool.** No shared projects, no assignments, no permissions. Single-user by design.
 - **Not a project manager.** No Gantt charts, no dependencies, no status workflows. Tasks are flat.

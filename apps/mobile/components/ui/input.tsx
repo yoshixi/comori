@@ -13,7 +13,7 @@ const Input = React.forwardRef<TextInput, InputProps>(
       <TextInput
         ref={ref}
         className={cn(
-          'web:flex native:h-12 web:h-10 web:w-full rounded-md border border-input bg-background px-3 py-2',
+          'web:flex native:h-12 web:h-10 web:w-full rounded-xl border border-input bg-background px-3 py-2',
           'text-base text-foreground placeholder:text-muted-foreground',
           'web:ring-offset-background web:focus-visible:outline-none web:focus-visible:ring-2 web:focus-visible:ring-ring web:focus-visible:ring-offset-2',
           'native:text-lg native:leading-[1.25]',
@@ -42,7 +42,7 @@ const TextArea = React.forwardRef<TextInput, TextAreaProps>(
         numberOfLines={rows}
         textAlignVertical="top"
         className={cn(
-          'web:flex web:w-full rounded-md border border-input bg-background px-3 py-2',
+          'web:flex web:w-full rounded-xl border border-input bg-background px-3 py-2',
           'text-base text-foreground placeholder:text-muted-foreground',
           'web:ring-offset-background web:focus-visible:outline-none web:focus-visible:ring-2 web:focus-visible:ring-ring web:focus-visible:ring-offset-2',
           'native:text-lg native:leading-[1.25]',

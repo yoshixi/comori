@@ -337,7 +337,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.shuchu.app')
+  electronApp.setAppUserModelId('com.comori.app')
 
   // Setup CSP based on environment configuration
   setupContentSecurityPolicy()

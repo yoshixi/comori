@@ -112,7 +112,7 @@ function TaskCard({ task, timer, onStopTimer, onOpenDetail, isCollapsed }: TaskC
     return (
       <div className="flex flex-col items-center gap-1 py-2">
         <div className="relative">
-          <Circle className="h-3 w-3 text-red-500 fill-red-500 animate-pulse" />
+          <Circle className="h-3 w-3 text-timer-active fill-timer-active animate-breathe" />
         </div>
         <span className="text-[10px] font-mono text-muted-foreground">{elapsed}</span>
       </div>
@@ -124,7 +124,7 @@ function TaskCard({ task, timer, onStopTimer, onOpenDetail, isCollapsed }: TaskC
       {/* Header: Task name + Timer */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Circle className="h-2.5 w-2.5 text-red-500 fill-red-500 animate-pulse shrink-0" />
+          <Circle className="h-2.5 w-2.5 text-timer-active fill-timer-active animate-breathe shrink-0" />
           <span className="text-sm font-medium truncate">{task.title}</span>
         </div>
         <span className="text-sm font-mono text-muted-foreground shrink-0">{elapsed}</span>
@@ -136,7 +136,7 @@ function TaskCard({ task, timer, onStopTimer, onOpenDetail, isCollapsed }: TaskC
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="What are you working on?"
+          placeholder="What would you like to focus on?"
           rows={2}
           className="text-xs resize-none"
         />
@@ -200,8 +200,8 @@ function TaskCard({ task, timer, onStopTimer, onOpenDetail, isCollapsed }: TaskC
           onClick={onStopTimer}
           className="h-7 text-xs flex-1"
         >
-          <Square className="h-3 w-3 mr-1 text-red-500" />
-          Stop
+          <Square className="h-3 w-3 mr-1 text-destructive" />
+          Pause
         </Button>
         <Button
           size="sm"
@@ -239,8 +239,8 @@ export function InProgressPanel({
     return (
       <div className="border-t px-2 py-2">
         <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-red-500/10">
-            <Circle className="h-3 w-3 text-red-500 fill-red-500 animate-pulse" />
+          <div className="flex items-center justify-center w-8 h-8 rounded-md bg-timer-active-bg">
+            <Circle className="h-3 w-3 text-timer-active fill-timer-active animate-breathe" />
           </div>
           <span className="text-[10px] font-medium">{activeTasks.length}</span>
         </div>
@@ -275,8 +275,8 @@ export function InProgressPanel({
           ) : (
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           )}
-          <span className="text-xs font-semibold uppercase tracking-wider">In Progress</span>
-          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-red-500/10 text-red-600 text-[10px] font-medium">
+          <span className="text-xs font-semibold uppercase tracking-wider">Focusing Now</span>
+          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-timer-active-bg text-timer-active text-[10px] font-medium">
             {activeTasks.length}
           </span>
         </div>

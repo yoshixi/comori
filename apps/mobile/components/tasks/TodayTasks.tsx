@@ -44,8 +44,8 @@ export function TodayTasks({
         </View>
       ) : (
         <View className="py-6 items-center justify-center bg-muted/30 rounded-lg border border-dashed border-border">
-          <Text className="text-muted-foreground text-sm">No tasks scheduled for today</Text>
-          <Text className="text-muted-foreground text-xs mt-1">Use Quick Start or + to add one</Text>
+          <Text className="text-muted-foreground text-sm">Nothing planned for today yet</Text>
+          <Text className="text-muted-foreground text-xs mt-1">Use Quick Start to begin a focus session</Text>
         </View>
       )}
     </View>

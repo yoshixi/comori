@@ -130,7 +130,7 @@ export class NotificationScheduler {
       if (currentStatus === 'not-determined') {
         // Show a test notification to trigger the permission prompt
         const notification = new Notification({
-          title: 'Shuchu Notifications',
+          title: 'Comori Notifications',
           body: 'Notifications are now enabled for task reminders',
           silent: true
         })

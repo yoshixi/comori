@@ -63,7 +63,7 @@ Running `pnpm run orval:generate` emits the client under `src/renderer/src/gen/a
 ```
 src/renderer/src/gen/api/
 ├── endpoints/
-│   └── shuchuAPI.gen.ts   # SWR hooks + request helpers
+│   └── comoriAPI.gen.ts   # SWR hooks + request helpers
 └── schemas/
     ├── *.ts               # DTO + schema typings
     └── index.ts

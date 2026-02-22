@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Circle, Play, Plus, Square, Trash2 } from 'lucide-react'
+import { Circle, Play, Square, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -158,7 +158,7 @@ export function NowTab({
             disabled={!quickTitle.trim()}
             className="shrink-0"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Play className="h-4 w-4 mr-1" />
             Start
           </Button>
         </div>

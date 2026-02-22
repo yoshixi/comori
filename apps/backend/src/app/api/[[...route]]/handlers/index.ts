@@ -12,6 +12,7 @@ export * from './google-auth'
 export * from './calendars'
 export * from './events'
 export * from './webhooks'
+export * from './notes'
 
 // Health check handler
 export const healthHandler: RouteHandler<typeof healthRoute, AppBindings> = (c) => {

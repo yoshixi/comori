@@ -1,6 +1,6 @@
 import type { Task } from '../gen/api'
 
-export type DateGroup = 'Today' | 'Tomorrow' | 'This Week' | 'Later'
+export type DateGroup = 'Today' | 'Tomorrow' | 'This Week' | 'Later' | 'Unscheduled'
 
 export interface GroupedTasks {
   label: DateGroup
@@ -22,12 +22,13 @@ export function groupTasksByDate(tasks: Task[]): GroupedTasks[] {
     Today: [],
     Tomorrow: [],
     'This Week': [],
-    Later: []
+    Later: [],
+    Unscheduled: []
   }
 
   for (const task of tasks) {
     if (!task.startAt) {
-      groups.Later.push(task)
+      groups.Unscheduled.push(task)
       continue
     }
 
@@ -43,7 +44,7 @@ export function groupTasksByDate(tasks: Task[]): GroupedTasks[] {
     }
   }
 
-  const order: DateGroup[] = ['Today', 'Tomorrow', 'This Week', 'Later']
+  const order: DateGroup[] = ['Today', 'Tomorrow', 'This Week', 'Later', 'Unscheduled']
   return order
     .filter((label) => groups[label].length > 0)
     .map((label) => ({ label, tasks: groups[label] }))

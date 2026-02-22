@@ -41,6 +41,13 @@ export default function RootLayout() {
                   headerShown: false,
                 }}
               />
+              <Stack.Screen
+                name="note/[id]"
+                options={{
+                  presentation: 'modal',
+                  headerShown: false,
+                }}
+              />
             </Stack>
             <PortalHost />
           </ThemeProvider>

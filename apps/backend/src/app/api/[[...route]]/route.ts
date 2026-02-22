@@ -50,7 +50,14 @@ import {
   listEventsRoute,
   getEventRoute,
   // Webhook routes
-  googleCalendarWebhookRoute
+  googleCalendarWebhookRoute,
+  // Note routes
+  listNotesRoute,
+  getNoteRoute,
+  createNoteRoute,
+  updateNoteRoute,
+  deleteNoteRoute,
+  convertNoteToTaskRoute
 } from './routes'
 
 // Import handlers from local handlers directory
@@ -99,7 +106,14 @@ import {
   listEventsHandler,
   getEventHandler,
   // Webhook handlers
-  googleCalendarWebhookHandler
+  googleCalendarWebhookHandler,
+  // Note handlers
+  listNotesHandler,
+  getNoteHandler,
+  createNoteHandler,
+  updateNoteHandler,
+  deleteNoteHandler,
+  convertNoteToTaskHandler
 } from './handlers'
 
 const app = new OpenAPIHono<AppBindings>().basePath('/api')
@@ -520,6 +534,14 @@ app.openapi(getEventRoute, getEventHandler)
 app.openapi(watchCalendarRoute, watchCalendarHandler)
 app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
 app.openapi(getWatchStatusRoute, getWatchStatusHandler)
+
+// Register note routes
+app.openapi(listNotesRoute, listNotesHandler)
+app.openapi(getNoteRoute, getNoteHandler)
+app.openapi(createNoteRoute, createNoteHandler)
+app.openapi(updateNoteRoute, updateNoteHandler)
+app.openapi(deleteNoteRoute, deleteNoteHandler)
+app.openapi(convertNoteToTaskRoute, convertNoteToTaskHandler)
 
 // Register webhook routes
 app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)

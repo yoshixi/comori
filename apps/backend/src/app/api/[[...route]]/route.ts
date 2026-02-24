@@ -551,8 +551,8 @@ app.doc('/doc', {
   openapi: '3.0.0',
   info: {
     version: '1.0.0',
-    title: 'Comori API',
-    description: 'API for the Comori task management application with OpenAPI documentation'
+    title: 'Techo API',
+    description: 'API for the Techo task management application with OpenAPI documentation'
   }
 })
 console.log(`starting the server`)

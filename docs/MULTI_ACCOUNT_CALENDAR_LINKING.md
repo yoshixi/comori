@@ -10,7 +10,7 @@ update_at: "2026-02-19"
 This document describes how the app links and syncs Google calendars across multiple Google accounts.
 
 ## Goals
-- Allow a single Comori user to connect multiple Google accounts.
+- Allow a single Techo user to connect multiple Google accounts.
 - Keep calendars and events scoped to the Google account that owns them.
 - Avoid repeated calls to Google userinfo by storing the provider email at link time.
 

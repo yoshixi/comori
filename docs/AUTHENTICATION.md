@@ -1,13 +1,13 @@
 ---
 title: "Authentication"
-brief_description: "Comori uses a **hybrid session + JWT** architecture. A long-lived session token (~7 days) is exchanged for a short-lived JWT (~15 min) that is sent with every API request. The JWT is verified server-side with zero database access (HMAC-SHA256 via `jose`)."
+brief_description: "Techo uses a **hybrid session + JWT** architecture. A long-lived session token (~7 days) is exchanged for a short-lived JWT (~15 min) that is sent with every API request. The JWT is verified server-side with zero database access (HMAC-SHA256 via `jose`)."
 created_at: "2026-02-21"
 update_at: "2026-02-21"
 ---
 
 # Authentication
 
-Comori uses a **hybrid session + JWT** architecture. A long-lived session token (managed by better-auth defaults) is exchanged for a short-lived JWT (~15 min) that is sent with every API request. The JWT is verified server-side with zero database access (HMAC-SHA256 via `jose`).
+Techo uses a **hybrid session + JWT** architecture. A long-lived session token (managed by better-auth defaults) is exchanged for a short-lived JWT (~15 min) that is sent with every API request. The JWT is verified server-side with zero database access (HMAC-SHA256 via `jose`).
 
 ## Token Architecture
 
@@ -61,7 +61,7 @@ Both Electron and Mobile follow the same core pattern:
 | **JWT cache** | In-memory variable | In-memory variable |
 | **Auth client library** | `better-auth/client` (`createAuthClient`) | Raw `fetch` calls to auth endpoints |
 | **OAuth mechanism** | System browser + loopback HTTP server on `127.0.0.1` | `expo-web-browser` (`openAuthSessionAsync`) + deep link |
-| **OAuth redirect target** | `http://127.0.0.1:<port>/callback?session_token=...` | `<app-deep-link>?session_token=...` (e.g. `exp+comori://auth-callback` in dev, `comori://auth-callback` in prod) |
+| **OAuth redirect target** | `http://127.0.0.1:<port>/callback?session_token=...` | `<app-deep-link>?session_token=...` (e.g. `exp+techoo://auth-callback` in dev, `techoo://auth-callback` in prod) |
 | **OAuth server endpoints** | `GET /api/desktop-oauth?provider=...&port=...` → `GET /api/desktop-auth-callback?port=...` | `GET /api/mobile-oauth?provider=...&redirect_uri=...` → `GET /api/mobile-auth-callback?redirect_uri=...` |
 | **Main process auth** | JWT forwarded via IPC (`auth:token-update`) to tray/notifications | N/A |
 | **Auth guard** | `AuthGate` component wrapping `App` | Expo Router `Redirect` in `(tabs)/_layout.tsx` |
@@ -105,7 +105,7 @@ Mobile App                              Server                         System Br
   |-- openAuthSessionAsync() ------------->|                                |
   |   url: /mobile-oauth                   |                                |
   |     ?provider=google                   |                                |
-  |     &redirect_uri=exp+comori://...     |                                |
+  |     &redirect_uri=exp+techoo://...     |                                |
   |                                        | GET /mobile-oauth              |
   |                                        |<-------------------------------|
   |                                        |-- internal auth.handler()      |
@@ -124,7 +124,7 @@ Mobile App                              Server                         System Br
   |<-- JWT                                 |                                |
 ```
 
-**Why `redirect_uri` is passed dynamically:** Expo's deep link URL varies by environment — `exp+comori://auth-callback` in Expo Go, `comori://auth-callback` in production builds. The mobile app passes its actual URL via `Linking.createURL()` so the backend redirects to the correct scheme.
+**Why `redirect_uri` is passed dynamically:** Expo's deep link URL varies by environment — `exp+techoo://auth-callback` in Expo Go, `techoo://auth-callback` in production builds. The mobile app passes its actual URL via `Linking.createURL()` so the backend redirects to the correct scheme.
 
 **Why `openAuthSessionAsync`?** It uses `ASWebAuthenticationSession` (iOS) / Chrome Custom Tabs (Android), which intercepts the redirect to the app's URL scheme and returns it to the app without Safari needing to actually "open" the deep link.
 

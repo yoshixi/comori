@@ -98,7 +98,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center">
           <CharacterIllustration mood="idle" size="lg" className="mx-auto" />
-          <h1 className="text-xl font-semibold tracking-tight">Welcome to Comori</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Welcome to Techo</h1>
         </CardHeader>
 
         <CardContent>

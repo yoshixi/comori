@@ -272,7 +272,7 @@ export function AccountView(): React.JSX.Element {
 
         {/* About — minimal footer */}
         <div className="pt-2 text-center text-sm text-muted-foreground">
-          Comori — Your cozy focus companion
+          Techo — Your cozy focus companion
         </div>
       </div>
     </div>

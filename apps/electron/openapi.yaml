@@ -1078,6 +1078,22 @@ paths:
       description: Retrieve all tasks
       parameters:
         - schema:
+            type: array
+            items:
+              type: integer
+              minimum: 0
+              exclusiveMinimum: true
+              description: Numeric ID
+              example: 1
+            description: Filter tasks by IDs (comma-separated)
+            example:
+              - 1
+              - 2
+          required: false
+          description: Filter tasks by IDs (comma-separated)
+          name: ids
+          in: query
+        - schema:
             type: string
             enum:
               - "true"
@@ -1616,6 +1632,24 @@ paths:
           required: false
           description: IDs of the tasks to get timers for
           name: taskIds
+          in: query
+        - schema:
+            type: string
+            format: date-time
+            description: Filter timers with startTime >= this timestamp
+            example: 2024-01-01T00:00:00.000Z
+          required: false
+          description: Filter timers with startTime >= this timestamp
+          name: startTimeFrom
+          in: query
+        - schema:
+            type: string
+            format: date-time
+            description: Filter timers with startTime < this timestamp
+            example: 2024-01-15T00:00:00.000Z
+          required: false
+          description: Filter timers with startTime < this timestamp
+          name: startTimeTo
           in: query
       responses:
         "200":

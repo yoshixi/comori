@@ -146,6 +146,15 @@ export const TaskResponseModel = z.object({
 const BooleanQueryParam = z.enum(['true', 'false']).transform(v => v === 'true')
 
 export const TaskQueryParamsModel = z.object({
+  ids: z.preprocess((value) => {
+    if (typeof value === 'string') {
+      return value.includes(',') ? value.split(',').map((item) => item.trim()) : [value]
+    }
+    return value
+  }, z.array(IdSchema).optional()).openapi({
+    description: 'Filter tasks by IDs (comma-separated)',
+    example: [1, 2]
+  }),
   completed: BooleanQueryParam.optional().openapi({
     description: 'Filter tasks by completion status',
     example: false

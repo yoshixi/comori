@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray, isNull } from 'drizzle-orm'
+import { eq, and, desc, inArray, isNull, gte, lt } from 'drizzle-orm'
 import { taskTimersTable, tasksTable, type InsertTaskTimer, type SelectTaskTimer } from '../db/schema/schema'
 import { type DB } from './common.db'
 import { formatTimestamp, parseISOToDate, getCurrentTimestamp } from './common.core'
@@ -56,6 +56,38 @@ export async function getAllTimersByTaskIds(db: DB, userId: number, taskIds: num
     .from(taskTimersTable)
     .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
     .where(and(eq(tasksTable.userId, userId), inArray(taskTimersTable.taskId, uniqueIds)))
+    .orderBy(desc(taskTimersTable.createdAt))
+
+  return dbTimers.map(r => convertDbTimerToApi(r.timer))
+}
+
+export interface ListTimersParams {
+  taskIds?: number[]
+  startTimeFrom?: string
+  startTimeTo?: string
+}
+
+export async function listTimers(db: DB, userId: number, params: ListTimersParams): Promise<TaskTimer[]> {
+  const conditions = [eq(tasksTable.userId, userId)]
+
+  if (params.taskIds && params.taskIds.length > 0) {
+    const uniqueIds = Array.from(new Set(params.taskIds))
+    conditions.push(inArray(taskTimersTable.taskId, uniqueIds))
+  }
+
+  if (params.startTimeFrom) {
+    conditions.push(gte(taskTimersTable.startTime, parseISOToDate(params.startTimeFrom)))
+  }
+
+  if (params.startTimeTo) {
+    conditions.push(lt(taskTimersTable.startTime, parseISOToDate(params.startTimeTo)))
+  }
+
+  const dbTimers = await db
+    .select({ timer: taskTimersTable })
+    .from(taskTimersTable)
+    .innerJoin(tasksTable, eq(taskTimersTable.taskId, tasksTable.id))
+    .where(and(...conditions))
     .orderBy(desc(taskTimersTable.createdAt))
 
   return dbTimers.map(r => convertDbTimerToApi(r.timer))

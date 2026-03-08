@@ -40,7 +40,15 @@ export const ListTimersQueryParamsModel = z
       .openapi({
         description: 'IDs of the tasks to get timers for',
         example: [1, 2]
-      })
+      }),
+    startTimeFrom: z.iso.datetime().optional().openapi({
+      description: 'Filter timers with startTime >= this timestamp',
+      example: '2024-01-01T00:00:00.000Z'
+    }),
+    startTimeTo: z.iso.datetime().optional().openapi({
+      description: 'Filter timers with startTime < this timestamp',
+      example: '2024-01-15T00:00:00.000Z'
+    })
   })
   .openapi('ListTimersQueryParams')
 

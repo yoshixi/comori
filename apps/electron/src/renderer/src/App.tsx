@@ -24,6 +24,7 @@ import { CalendarView, type ViewMode } from './components/CalendarView'
 import { TaskTimeRangePicker } from './components/TaskTimeRangePicker'
 import { useIsNarrow } from './hooks/use-mobile'
 import { useTasksData } from './hooks/useTasksData'
+import type { ReviewPeriod } from './components/review/PeriodSelector'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
 import { PlanningPanel } from './components/planning/PlanningPanel'
@@ -130,6 +131,15 @@ function App(): React.JSX.Element {
   const [sortBy] = useState<'createdAt' | 'startAt'>('startAt')
   const [upcomingShowCompleted, setUpcomingShowCompleted] = useState(false)
   const [upcomingShowUnscheduled, setUpcomingShowUnscheduled] = useState(true)
+  const [reviewPeriod, setReviewPeriod] = useState<ReviewPeriod>(() => {
+    const saved = localStorage.getItem('comori-review-period')
+    if (saved === 'today' || saved === 'yesterday' || saved === 'week' || saved === '14days') return saved
+    return 'today'
+  })
+  const handleReviewPeriodChange = useCallback((p: ReviewPeriod) => {
+    setReviewPeriod(p)
+    localStorage.setItem('comori-review-period', p)
+  }, [])
   const [calendarViewMode, setCalendarViewMode] = useState<ViewMode>('day')
   const [calendarDraft, setCalendarDraft] = useState<{
     title: string
@@ -168,7 +178,8 @@ function App(): React.JSX.Element {
     sortBy,
     upcomingShowCompleted,
     upcomingShowUnscheduled,
-    isPlanningOpen
+    isPlanningOpen,
+    reviewPeriod
   })
 
   const {
@@ -556,6 +567,8 @@ function App(): React.JSX.Element {
             onUpcomingShowUnscheduledChange={setUpcomingShowUnscheduled}
             carryoverCount={tasksData.carryoverTasks.length}
             onPlanToday={() => setIsPlanningOpen(true)}
+            reviewPeriod={reviewPeriod}
+            onReviewPeriodChange={handleReviewPeriodChange}
           />
         )}
       </SidebarInset>

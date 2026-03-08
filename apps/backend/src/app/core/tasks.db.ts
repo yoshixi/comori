@@ -132,6 +132,7 @@ export function convertDbTaskToApi(dbTask: SelectTask, tags: Tag[] = []): Task {
 }
 
 type TaskFilterOptions = {
+  ids?: number[]
   completed?: boolean
   hasActiveTimer?: boolean
   scheduled?: boolean
@@ -159,6 +160,11 @@ export async function getAllTasks(db: DB, userId: number, filters?: TaskFilterOp
 
   // Build base conditions
   const baseConditions: ReturnType<typeof eq>[] = [eq(tasksTable.userId, userId)]
+
+  // Filter by specific task IDs
+  if (filters?.ids && filters.ids.length > 0) {
+    baseConditions.push(inArray(tasksTable.id, filters.ids))
+  }
 
   // If tag filtering is requested
   if (filters?.tags && filters.tags.length > 0) {

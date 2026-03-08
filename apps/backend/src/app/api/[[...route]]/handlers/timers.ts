@@ -10,8 +10,7 @@ import {
 } from '../routes/timers'
 import { getDb } from '../../../core/common.db'
 import {
-  getAllTimers,
-  getAllTimersByTaskIds,
+  listTimers,
   getTimersByTaskId,
   getTimerById,
   createTimer,
@@ -25,19 +24,8 @@ export const listTimersHandler: RouteHandler<typeof listTimersRoute, AppBindings
     const db = getDb()
     const user = c.get('user')
 
-    const { taskIds } = c.req.valid('query')
-    if (taskIds) {
-      const timers = await getAllTimersByTaskIds(db, user.id, taskIds)
-      return c.json(
-        {
-          timers: timers,
-          total: timers.length
-        },
-        200
-      )
-    }
-
-    const timers = await getAllTimers(db, user.id)
+    const { taskIds, startTimeFrom, startTimeTo } = c.req.valid('query')
+    const timers = await listTimers(db, user.id, { taskIds, startTimeFrom, startTimeTo })
 
     return c.json(
       {

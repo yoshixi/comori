@@ -318,6 +318,18 @@ function App(): React.JSX.Element {
     }
   }, [tasksData])
 
+  const handleCreateTodayTask = useCallback((title: string) => {
+    const today = new Date()
+    today.setHours(9, 0, 0, 0)
+    tasksData.handleCreateTask({
+      title,
+      description: '',
+      dueDate: '',
+      startAt: today.toISOString(),
+      tagIds: []
+    })
+  }, [tasksData])
+
   const handleTaskSelect = useCallback((task: Task) => {
     setSelectedTask(task)
     const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
@@ -426,10 +438,12 @@ function App(): React.JSX.Element {
       {isPlanningOpen && (
         <PlanningPanel
           carryoverTasks={tasksData.carryoverTasks}
+          todayTasks={tasksData.nowTodayTasks}
           onMoveToToday={handleCarryoverMoveToToday}
           onSkip={handleCarryoverSkip}
           onComplete={tasksData.handleToggleTaskCompletion}
           onMoveAllToToday={handleCarryoverMoveAllToToday}
+          onCreateTodayTask={handleCreateTodayTask}
           onClose={() => setIsPlanningOpen(false)}
         />
       )}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { CheckCircle, Circle, Play, Square, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Circle, Play, Square, Trash2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { CharacterIllustration } from '../CharacterIllustration'
 import { Button } from '../ui/button'
@@ -50,6 +50,16 @@ function DurationPicker({ value, onChange }: { value: number; onChange: (minutes
   )
 }
 
+function formatCountdown(endAt: string): { text: string; isOver: boolean } {
+  const remaining = Math.floor((new Date(endAt).getTime() - Date.now()) / 1000)
+  const isOver = remaining < 0
+  const abs = Math.abs(remaining)
+  const m = Math.floor(abs / 60)
+  const h = Math.floor(m / 60)
+  const label = h > 0 ? `${h}h ${m % 60}m` : `${m}m`
+  return { text: isOver ? `over by ${label}` : `~${label} left`, isOver }
+}
+
 function RunningTaskCard({
   task,
   timer,
@@ -64,11 +74,17 @@ function RunningTaskCard({
   onSelect: () => void
 }): React.JSX.Element {
   const [elapsed, setElapsed] = useState(() => formatElapsed(timer.startTime))
+  const [countdown, setCountdown] = useState<{ text: string; isOver: boolean } | null>(
+    () => task.endAt ? formatCountdown(task.endAt) : null
+  )
 
   useEffect(() => {
-    const interval = setInterval(() => setElapsed(formatElapsed(timer.startTime)), 1000)
+    const interval = setInterval(() => {
+      setElapsed(formatElapsed(timer.startTime))
+      if (task.endAt) setCountdown(formatCountdown(task.endAt))
+    }, 1000)
     return () => clearInterval(interval)
-  }, [timer.startTime])
+  }, [timer.startTime, task.endAt])
 
   return (
     <div
@@ -107,6 +123,12 @@ function RunningTaskCard({
         )}
       </div>
       <span className="text-sm font-mono text-muted-foreground shrink-0">{elapsed}</span>
+      {countdown && (
+        <span className={`text-xs shrink-0 ${countdown.isOver ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>
+          {countdown.isOver && <AlertTriangle className="h-3 w-3 inline mr-0.5" />}
+          {countdown.text}
+        </span>
+      )}
     </div>
   )
 }

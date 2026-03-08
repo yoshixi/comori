@@ -367,6 +367,8 @@ function App(): React.JSX.Element {
         activeTimersByTaskId={activeTimersByTaskId}
         onStopTimer={handleStopTimer}
         onOpenTaskDetail={setSelectedTask}
+        onPlanToday={() => setIsPlanningOpen(true)}
+        carryoverCount={tasksData.carryoverTasks.length}
       />
       <SidebarInset>
         {currentView === 'account' ? (

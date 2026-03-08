@@ -489,6 +489,7 @@ function App(): React.JSX.Element {
             filterTagIds={filterTagIds}
             onFilterTagIdsChange={setFilterTagIds}
             onTaskSelect={handleTaskSelect}
+            onToggleCompletion={handleCompleteWithTimerCheck}
             upcomingShowCompleted={upcomingShowCompleted}
             upcomingShowUnscheduled={upcomingShowUnscheduled}
             onUpcomingShowCompletedChange={setUpcomingShowCompleted}
@@ -652,6 +653,7 @@ function App(): React.JSX.Element {
                 setSelectedTask(updated)
                 await mutateBothTaskLists()
               }}
+              onToggleCompletion={handleCompleteWithTimerCheck}
               tasks={allTasks}
             />
           ) : null}

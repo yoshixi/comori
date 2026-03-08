@@ -13,6 +13,7 @@ interface TasksViewProps {
   filterTagIds: number[]
   onFilterTagIdsChange: (ids: number[]) => void
   onTaskSelect: (task: Task) => void
+  onToggleCompletion: (task: Task) => void
   quickCaptureInputRef?: React.RefObject<HTMLInputElement | null>
   upcomingShowCompleted: boolean
   upcomingShowUnscheduled: boolean
@@ -27,6 +28,7 @@ export function TasksView({
   filterTagIds,
   onFilterTagIdsChange,
   onTaskSelect,
+  onToggleCompletion,
   upcomingShowCompleted,
   upcomingShowUnscheduled,
   onUpcomingShowCompletedChange,
@@ -54,7 +56,7 @@ export function TasksView({
               onStartTimer={data.handleStartTimer}
               onStopTimer={data.handleStopTimer}
               onCreateTaskAndStartTimer={data.handleCreateTaskAndStartTimer}
-              onToggleCompletion={data.handleToggleTaskCompletion}
+              onToggleCompletion={onToggleCompletion}
               onDeleteTask={data.handleDeleteTask}
               onTaskSelect={onTaskSelect}
               carryoverCount={carryoverCount}
@@ -73,7 +75,7 @@ export function TasksView({
               onShowUnscheduledChange={onUpcomingShowUnscheduledChange}
               onStartTimer={data.handleStartTimer}
               onStopTimer={data.handleStopTimer}
-              onToggleCompletion={data.handleToggleTaskCompletion}
+              onToggleCompletion={onToggleCompletion}
               onDeleteTask={data.handleDeleteTask}
               onTaskSelect={onTaskSelect}
               filterTagIds={filterTagIds}
@@ -86,7 +88,7 @@ export function TasksView({
               allTasks={data.reviewTasks}
               timers={data.reviewTimers}
               timersByTaskId={data.reviewTimersByTaskId}
-              onToggleCompletion={data.handleToggleTaskCompletion}
+              onToggleCompletion={onToggleCompletion}
               onTaskSelect={onTaskSelect}
             />
           </TabsContent>

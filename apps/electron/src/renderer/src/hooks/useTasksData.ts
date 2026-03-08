@@ -256,18 +256,20 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
   const upcomingTasks = upcomingTasksResponse?.tasks ?? []
 
   // --- Planning: carryover tasks (incomplete, scheduled before today) ---
-  const carryoverTaskQuery = useMemo(() => isPlanningOpen ? ({
+  const carryoverTaskQuery = useMemo(() => ({
     completed: 'false' as const,
     startAtTo: todayRange.startAt,
     scheduled: 'true' as const,
     sortBy: 'startAt' as const,
     order: 'asc' as const,
-  }) : undefined, [isPlanningOpen, todayRange])
+  }), [todayRange])
 
   const {
     data: carryoverTasksResponse,
     mutate: mutateCarryoverTasks
-  } = useGetApiTasks(carryoverTaskQuery)
+  } = useGetApiTasks(carryoverTaskQuery, {
+    swr: { enabled: isPlanningOpen }
+  })
   const carryoverTasks = carryoverTasksResponse?.tasks ?? []
 
   // --- Review tab: tasks from the last 14 days (including completed) ---

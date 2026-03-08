@@ -323,21 +323,38 @@ function App(): React.JSX.Element {
 
   // Planning panel handlers
   const handleCarryoverMoveToToday = useCallback((taskId: number) => {
+    const task = tasksData.carryoverTasks.find(t => t.id === taskId)
     const today = new Date()
     today.setHours(9, 0, 0, 0)
-    tasksData.handleUpdateTaskSchedule(taskId, today.toISOString())
+    const newStartAt = today.toISOString()
+    // Shift endAt by same duration, or clear if no valid range
+    let newEndAt: string | null = null
+    if (task?.startAt && task?.endAt) {
+      const durationMs = new Date(task.endAt).getTime() - new Date(task.startAt).getTime()
+      if (durationMs > 0) {
+        newEndAt = new Date(today.getTime() + durationMs).toISOString()
+      }
+    }
+    tasksData.handleUpdateTaskSchedule(taskId, newStartAt, newEndAt)
   }, [tasksData])
 
   const handleCarryoverSkip = useCallback((taskId: number) => {
-    tasksData.handleUpdateTaskSchedule(taskId, null)
+    tasksData.handleUpdateTaskSchedule(taskId, null, null)
   }, [tasksData])
 
   const handleCarryoverMoveAllToToday = useCallback(() => {
     const today = new Date()
     today.setHours(9, 0, 0, 0)
-    const todayIso = today.toISOString()
     for (const task of tasksData.carryoverTasks) {
-      tasksData.handleUpdateTaskSchedule(task.id, todayIso)
+      const newStartAt = today.toISOString()
+      let newEndAt: string | null = null
+      if (task.startAt && task.endAt) {
+        const durationMs = new Date(task.endAt).getTime() - new Date(task.startAt).getTime()
+        if (durationMs > 0) {
+          newEndAt = new Date(today.getTime() + durationMs).toISOString()
+        }
+      }
+      tasksData.handleUpdateTaskSchedule(task.id, newStartAt, newEndAt)
     }
   }, [tasksData])
 
@@ -364,8 +381,8 @@ function App(): React.JSX.Element {
     const taskTimers = tasksData.timersByTaskId.get(task.id)
 
     // Check for overlong active timer: if planned duration exists and active timer is 2x+ longer
+    const activeTimer = tasksData.activeTimersByTaskId.get(task.id)
     if (taskTimers && taskTimers.length > 0) {
-      const activeTimer = tasksData.activeTimersByTaskId.get(task.id)
       if (activeTimer && task.startAt && task.endAt) {
         const plannedMs = new Date(task.endAt).getTime() - new Date(task.startAt).getTime()
         const recordedMs = Date.now() - new Date(activeTimer.startTime).getTime()
@@ -376,7 +393,10 @@ function App(): React.JSX.Element {
           return
         }
       }
-      // Timers exist and not overlong — just complete
+      // Stop active timer if running, then complete
+      if (activeTimer) {
+        tasksData.handleStopTimer(task.id, activeTimer.id)
+      }
       tasksData.handleToggleTaskCompletion(task)
       return
     }

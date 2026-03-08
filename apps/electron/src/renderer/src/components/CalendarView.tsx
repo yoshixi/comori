@@ -86,6 +86,8 @@ type CalendarViewProps = {
   visibleCalendarIds?: Set<string>
   /** Callback to toggle calendar visibility */
   onToggleCalendarVisibility?: (calendarId: string) => void
+  /** Hide the header bar (navigation, zoom, view mode buttons) */
+  hideHeader?: boolean
   /** Additional CSS classes */
   className?: string
 }
@@ -120,6 +122,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   calendars,
   visibleCalendarIds,
   onToggleCalendarVisibility,
+  hideHeader,
   className
 }) => {
   // ==========================================================================
@@ -585,6 +588,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // ==========================================================================
   return (
     <div className={cn('flex h-full min-h-0 flex-col gap-4', className)}>
+      {!hideHeader && (
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button
@@ -669,6 +673,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           )}
         </div>
       </div>
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col rounded-md border bg-muted/5">
         <div className="flex border-b bg-muted/10 text-xs">

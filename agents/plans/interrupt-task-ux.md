@@ -220,14 +220,18 @@ onCreateTaskAndStartTimer: (title: string, tagIds?: number[], durationMinutes?: 
 
 ## Implementation Phases
 
-### Phase 1: Duration Picker + Auto-Stop
+### Phase 1: Duration Picker + Auto-Stop ✅
 - Add `DurationPicker` component to NowTab input row (left of "Let's Go")
 - Default to 30m, presets: 15m, 30m, 1h + custom input
 - Pass `durationMinutes` to `handleCreateTaskAndStartTimer`
 - Create task with `startAt = now`, `endAt = now + duration`
 - Auto-stop running timer before creating new task
 
-### Phase 2: Countdown Badge (Optional)
+### Phase 2: Countdown Badge ✅
 - Show remaining time on RunningTaskCard based on task's `endAt`
 - Badge turns amber when past `endAt`
-- Electron notification when `endAt` is reached
+
+### Phase 3: Electron Notifications ✅
+- Existing `NotificationScheduler` already handles task end notifications
+- Tasks with `endAt` + active timers automatically get notified 1 minute before ending
+- No additional code changes required — infrastructure covers this out of the box

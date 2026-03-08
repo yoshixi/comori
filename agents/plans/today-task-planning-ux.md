@@ -225,7 +225,7 @@ PlanningPanel (rendered in App.tsx when isPlanningOpen)
 
 ## Implementation Phases
 
-### Phase 1: Carryover Review (MVP)
+### Phase 1: Carryover Review (MVP) ✅
 - Add `isPlanningOpen` state to App.tsx
 - Add carryover SWR cache to useTasksData (conditional on isPlanningOpen)
 - PlanningTrigger button in NowTab with carryover count badge
@@ -233,16 +233,15 @@ PlanningPanel (rendered in App.tsx when isPlanningOpen)
 - Today/Skip/Done actions per task
 - Bulk "Move All to Today" action
 
-### Phase 2: Add Tasks + Today's Plan
+### Phase 2: Add Tasks + Today's Plan ✅
 - AddTaskSection with quick-add input (creates task with startAt=today)
 - TodayPlanSection showing today's scheduled tasks (reuses nowTodayTasks data)
-- TimeSlotEditor for inline time editing
+- DurationPicker for setting task duration
 - `handleUpdateTaskSchedule` handler in useTasksData
 - Time summary footer
 
-### Phase 3: Calendar Context + Polish
-- Show Google Calendar events in TodayPlanSection as context blocks
-- Drag-to-reorder tasks in TodayPlanSection
-- Auto-show planning prompt on first open of the day (localStorage)
-- Keyboard shortcuts for carryover actions
-- Transition animations
+### Phase 3: Calendar Context + Auto-Show ✅
+- Show Google Calendar events in Today's Plan as read-only context blocks (dashed border, muted style)
+- Tasks and events merged into a single timeline sorted by start time
+- Auto-show planning modal on first app open of the day (localStorage `comori:lastPlanDate`)
+- Calendar events fetched when planning panel is open (reuses existing `useCalendarEvents` hook)

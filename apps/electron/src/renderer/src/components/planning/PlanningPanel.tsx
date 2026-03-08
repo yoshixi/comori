@@ -1,20 +1,24 @@
 import React, { useCallback, useState } from 'react'
-import { CheckCircle, ArrowRight, X, CalendarOff, Plus, Clock } from 'lucide-react'
+import { CheckCircle, ArrowRight, X, CalendarOff, Plus } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { DurationPicker } from '../DurationPicker'
-import type { Task } from '../../gen/api'
-import { formatTimeRangeShort } from '../../lib/time'
+import { CalendarView } from '../CalendarView'
+import type { Task, CalendarEvent, TaskTimer } from '../../gen/api'
 
 interface PlanningPanelProps {
   carryoverTasks: Task[]
   todayTasks: Task[]
+  calendarEvents?: CalendarEvent[]
+  activeTimersByTaskId?: Map<number, TaskTimer>
   onMoveToToday: (taskId: number) => void
   onSkip: (taskId: number) => void
   onComplete: (task: Task) => void
   onMoveAllToToday: () => void
-  onCreateTodayTask: (title: string, durationMinutes: number) => void
+  onCreateTodayTask: (title: string, durationMinutes: number, startAt: string) => void
+  onTaskMove?: (task: Task, range: { startAt: string; endAt: string }) => void
+  onTaskSelect?: (task: Task) => void
   onClose: () => void
 }
 
@@ -42,14 +46,34 @@ function formatMinutes(minutes: number): string {
   return `${m}m`
 }
 
+function getNextStartAt(todayTasks: Task[]): string {
+  const now = Date.now()
+  let latestEnd = 0
+  for (const task of todayTasks) {
+    if (task.endAt) {
+      const end = new Date(task.endAt).getTime()
+      if (end > latestEnd) latestEnd = end
+    }
+  }
+  // Use whichever is later: current time or last task's end time
+  if (latestEnd > 0) {
+    return new Date(Math.max(now, latestEnd)).toISOString()
+  }
+  return new Date(now).toISOString()
+}
+
 export function PlanningPanel({
   carryoverTasks,
   todayTasks,
+  calendarEvents = [],
+  activeTimersByTaskId,
   onMoveToToday,
   onSkip,
   onComplete,
   onMoveAllToToday,
   onCreateTodayTask,
+  onTaskMove,
+  onTaskSelect,
   onClose
 }: PlanningPanelProps): React.JSX.Element {
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -57,26 +81,27 @@ export function PlanningPanel({
 
   const handleAddTask = useCallback(() => {
     if (!newTaskTitle.trim()) return
-    onCreateTodayTask(newTaskTitle.trim(), newTaskDuration)
+    const startAt = getNextStartAt(todayTasks)
+    onCreateTodayTask(newTaskTitle.trim(), newTaskDuration, startAt)
     setNewTaskTitle('')
-  }, [newTaskTitle, newTaskDuration, onCreateTodayTask])
+  }, [newTaskTitle, newTaskDuration, onCreateTodayTask, todayTasks])
 
   const summary = computeTimeSummary(todayTasks)
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[80vh] rounded-lg border bg-background shadow-lg overflow-y-auto"
+        className="w-full max-w-5xl max-h-[95vh] rounded-lg border bg-background shadow-lg flex flex-col mx-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-background z-10 rounded-t-lg">
+        <div className="flex items-center justify-between p-4 border-b shrink-0">
           <h2 className="text-lg font-semibold">Plan Your Day</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="p-4 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
           {/* Carryover Section */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -183,46 +208,22 @@ export function PlanningPanel({
             </div>
           </div>
 
-          {/* Today's Plan Section */}
+          {/* Today's Plan - Calendar Timeline */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
               Today's Plan {todayTasks.length > 0 && `(${todayTasks.length})`}
             </h3>
 
-            {todayTasks.length === 0 ? (
-              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                No tasks planned for today yet.
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {todayTasks.map((task) => {
-                  const isCompleted = !!task.completedAt
-                  return (
-                    <div
-                      key={task.id}
-                      className={`flex items-center gap-3 rounded-lg border p-2 ${isCompleted ? 'opacity-50' : ''}`}
-                    >
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <div className="text-xs text-muted-foreground w-28 shrink-0">
-                        {formatTimeRangeShort(task.startAt, task.endAt)}
-                      </div>
-                      <div className={`flex-1 text-sm font-medium truncate ${isCompleted ? 'line-through' : ''}`}>
-                        {task.title}
-                      </div>
-                      {task.tags && task.tags.length > 0 && (
-                        <div className="flex gap-1 shrink-0">
-                          {task.tags.map((tag) => (
-                            <Badge key={tag.id} variant="outline" className="text-xs px-1.5 py-0">
-                              {tag.name}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <CalendarView
+              className="h-[500px] rounded-lg border"
+              tasks={todayTasks}
+              viewMode="day"
+              hideHeader
+              calendarEvents={calendarEvents}
+              activeTimersByTaskId={activeTimersByTaskId}
+              onTaskSelect={onTaskSelect}
+              onTaskMove={onTaskMove}
+            />
 
             {/* Summary */}
             {todayTasks.length > 0 && (

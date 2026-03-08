@@ -135,7 +135,11 @@ function App(): React.JSX.Element {
   } | null>(null)
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
-  const [isPlanningOpen, setIsPlanningOpen] = useState(false)
+  const [isPlanningOpen, setIsPlanningOpen] = useState(() => {
+    const lastPlanDate = localStorage.getItem('comori:lastPlanDate')
+    const today = new Date().toISOString().split('T')[0]
+    return lastPlanDate !== today
+  })
 
   // Sidebar state controlled by window width
   const isNarrow = useIsNarrow()
@@ -182,7 +186,7 @@ function App(): React.JSX.Element {
     return { startDate, endDate }
   }, [])
 
-  // Calendar events data layer
+  // Calendar events data layer — also fetch when planning is open
   const {
     events: calendarEvents,
     calendars,
@@ -191,8 +195,19 @@ function App(): React.JSX.Element {
   } = useCalendarEvents({
     startDate: calendarDateRange.startDate,
     endDate: calendarDateRange.endDate,
-    enabled: currentView === 'calendar'
+    enabled: currentView === 'calendar' || isPlanningOpen
   })
+
+  // Filter calendar events to today only (for planning panel)
+  const todayCalendarEvents = useMemo(() => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    const todayEnd = todayStart + 24 * 60 * 60 * 1000
+    return calendarEvents.filter((event) => {
+      const eventStart = new Date(event.startAt).getTime()
+      return eventStart >= todayStart && eventStart < todayEnd
+    })
+  }, [calendarEvents])
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [focusedTaskIndex, setFocusedTaskIndex] = useState<number>(-1)
@@ -318,14 +333,16 @@ function App(): React.JSX.Element {
     }
   }, [tasksData])
 
-  const handleCreateTodayTask = useCallback((title: string, durationMinutes: number) => {
-    const today = new Date()
-    today.setHours(9, 0, 0, 0)
-    const startAt = today.toISOString()
-    const endAt = new Date(today.getTime() + durationMinutes * 60 * 1000).toISOString()
+  const handleCreateTodayTask = useCallback((title: string, durationMinutes: number, startAt: string) => {
+    const startMs = new Date(startAt).getTime()
+    const endAt = new Date(startMs + durationMinutes * 60 * 1000).toISOString()
     postApiTasks({ title, startAt, endAt })
       .then(() => tasksData.mutateBothTaskLists())
       .catch((error) => console.error('Failed to create today task:', error))
+  }, [tasksData])
+
+  const handlePlanningTaskMove = useCallback(async (task: Task, range: { startAt: string; endAt: string }) => {
+    await tasksData.handleSaveSchedule(task.id, range.startAt, range.endAt)
   }, [tasksData])
 
   const handleTaskSelect = useCallback((task: Task) => {
@@ -437,12 +454,19 @@ function App(): React.JSX.Element {
         <PlanningPanel
           carryoverTasks={tasksData.carryoverTasks}
           todayTasks={tasksData.nowTodayTasks}
+          calendarEvents={todayCalendarEvents}
+          activeTimersByTaskId={activeTimersByTaskId}
           onMoveToToday={handleCarryoverMoveToToday}
           onSkip={handleCarryoverSkip}
           onComplete={tasksData.handleToggleTaskCompletion}
           onMoveAllToToday={handleCarryoverMoveAllToToday}
           onCreateTodayTask={handleCreateTodayTask}
-          onClose={() => setIsPlanningOpen(false)}
+          onTaskMove={handlePlanningTaskMove}
+          onTaskSelect={handleTaskSelect}
+          onClose={() => {
+            setIsPlanningOpen(false)
+            localStorage.setItem('comori:lastPlanDate', new Date().toISOString().split('T')[0])
+          }}
         />
       )}
 

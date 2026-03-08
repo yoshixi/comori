@@ -22,6 +22,7 @@ import { useIsNarrow } from './hooks/use-mobile'
 import { useTasksData } from './hooks/useTasksData'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
+import { PlanningPanel } from './components/planning/PlanningPanel'
 import { NotesView } from './components/NotesView'
 import { startOfDay, addDays } from './lib/calendar-utils'
 
@@ -134,6 +135,7 @@ function App(): React.JSX.Element {
   } | null>(null)
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
+  const [isPlanningOpen, setIsPlanningOpen] = useState(false)
 
   // Sidebar state controlled by window width
   const isNarrow = useIsNarrow()
@@ -153,7 +155,8 @@ function App(): React.JSX.Element {
     filterTagIds,
     sortBy,
     upcomingShowCompleted,
-    upcomingShowUnscheduled
+    upcomingShowUnscheduled,
+    isPlanningOpen
   })
 
   const {
@@ -295,6 +298,26 @@ function App(): React.JSX.Element {
     }
   }
 
+  // Planning panel handlers
+  const handleCarryoverMoveToToday = useCallback((taskId: number) => {
+    const today = new Date()
+    today.setHours(9, 0, 0, 0)
+    tasksData.handleUpdateTaskSchedule(taskId, today.toISOString())
+  }, [tasksData])
+
+  const handleCarryoverSkip = useCallback((taskId: number) => {
+    tasksData.handleUpdateTaskSchedule(taskId, null)
+  }, [tasksData])
+
+  const handleCarryoverMoveAllToToday = useCallback(() => {
+    const today = new Date()
+    today.setHours(9, 0, 0, 0)
+    const todayIso = today.toISOString()
+    for (const task of tasksData.carryoverTasks) {
+      tasksData.handleUpdateTaskSchedule(task.id, todayIso)
+    }
+  }, [tasksData])
+
   const handleTaskSelect = useCallback((task: Task) => {
     setSelectedTask(task)
     const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
@@ -393,9 +416,23 @@ function App(): React.JSX.Element {
             upcomingShowUnscheduled={upcomingShowUnscheduled}
             onUpcomingShowCompletedChange={setUpcomingShowCompleted}
             onUpcomingShowUnscheduledChange={setUpcomingShowUnscheduled}
+            carryoverCount={tasksData.carryoverTasks.length}
+            onPlanToday={() => setIsPlanningOpen(true)}
           />
         )}
       </SidebarInset>
+
+      {/* Planning panel */}
+      {isPlanningOpen && (
+        <PlanningPanel
+          carryoverTasks={tasksData.carryoverTasks}
+          onMoveToToday={handleCarryoverMoveToToday}
+          onSkip={handleCarryoverSkip}
+          onComplete={tasksData.handleToggleTaskCompletion}
+          onMoveAllToToday={handleCarryoverMoveAllToToday}
+          onClose={() => setIsPlanningOpen(false)}
+        />
+      )}
 
       {/* Calendar create task dialog */}
       <Dialog

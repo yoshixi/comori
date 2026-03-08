@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle, Circle, Play, Square, Trash2 } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { CharacterIllustration } from '../CharacterIllustration'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -14,10 +15,12 @@ interface NowTabProps {
   todayTasks: Task[]
   onStartTimer: (taskId: number) => void
   onStopTimer: (taskId: number, timerId: number) => void
-  onCreateTaskAndStartTimer: (title: string, tagIds?: number[]) => void
+  onCreateTaskAndStartTimer: (title: string, tagIds?: number[], durationMinutes?: number) => void
   onToggleCompletion: (task: Task) => void
   onDeleteTask: (taskId: number) => void
   onTaskSelect: (task: Task) => void
+  carryoverCount: number
+  onPlanToday: () => void
 }
 
 function formatElapsed(startTime: string): string {
@@ -30,15 +33,34 @@ function formatElapsed(startTime: string): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
+function DurationPicker({ value, onChange }: { value: number; onChange: (minutes: number) => void }): React.JSX.Element {
+  return (
+    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
+      <SelectTrigger className="h-8 w-20 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="15">15m</SelectItem>
+        <SelectItem value="30">30m</SelectItem>
+        <SelectItem value="60">1h</SelectItem>
+        <SelectItem value="90">1.5h</SelectItem>
+        <SelectItem value="120">2h</SelectItem>
+      </SelectContent>
+    </Select>
+  )
+}
+
 function RunningTaskCard({
   task,
   timer,
   onStop,
+  onComplete,
   onSelect
 }: {
   task: Task
   timer: TaskTimer
   onStop: () => void
+  onComplete: () => void
   onSelect: () => void
 }): React.JSX.Element {
   const [elapsed, setElapsed] = useState(() => formatElapsed(timer.startTime))
@@ -53,6 +75,24 @@ function RunningTaskCard({
       className="flex items-center gap-3 rounded-lg border bg-card p-3 cursor-pointer hover:bg-muted/50 transition-colors"
       onClick={onSelect}
     >
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={(e) => { e.stopPropagation(); onStop() }}
+        className="h-7 shrink-0"
+      >
+        <Square className="h-3 w-3 mr-1 text-destructive" />
+        Pause
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={(e) => { e.stopPropagation(); onComplete() }}
+        className="h-7 shrink-0"
+      >
+        <CheckCircle className="h-3 w-3 mr-1 text-green-700" />
+        Complete
+      </Button>
       <Circle className="h-2.5 w-2.5 text-timer-active fill-timer-active animate-breathe shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{task.title}</div>
@@ -67,15 +107,6 @@ function RunningTaskCard({
         )}
       </div>
       <span className="text-sm font-mono text-muted-foreground shrink-0">{elapsed}</span>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={(e) => { e.stopPropagation(); onStop() }}
-        className="h-7 shrink-0"
-      >
-        <Square className="h-3 w-3 mr-1 text-destructive" />
-        Pause
-      </Button>
     </div>
   )
 }
@@ -89,20 +120,23 @@ export function NowTab({
   onCreateTaskAndStartTimer,
   onToggleCompletion,
   onDeleteTask,
-  onTaskSelect
+  onTaskSelect,
+  carryoverCount,
+  onPlanToday
 }: NowTabProps): React.JSX.Element {
   const [quickTitle, setQuickTitle] = useState('')
   const [quickTagIds, setQuickTagIds] = useState<number[]>([])
+  const [quickDurationMinutes, setQuickDurationMinutes] = useState(30)
   const [showTagPicker, setShowTagPicker] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleQuickCreate = useCallback(() => {
     if (!quickTitle.trim()) return
-    onCreateTaskAndStartTimer(quickTitle.trim(), quickTagIds.length > 0 ? quickTagIds : undefined)
+    onCreateTaskAndStartTimer(quickTitle.trim(), quickTagIds.length > 0 ? quickTagIds : undefined, quickDurationMinutes)
     setQuickTitle('')
     setQuickTagIds([])
     setShowTagPicker(false)
-  }, [quickTitle, quickTagIds, onCreateTaskAndStartTimer])
+  }, [quickTitle, quickTagIds, quickDurationMinutes, onCreateTaskAndStartTimer])
 
   // Running tasks with timers
   const runningTasks = activeTasks.filter((t) => activeTimersByTaskId.has(t.id))
@@ -111,7 +145,22 @@ export function NowTab({
     <div className="space-y-6">
       {/* Quick Capture */}
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Start Something</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Start Something</h3>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onPlanToday}
+            className="text-xs"
+          >
+            Plan Today
+            {carryoverCount > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium h-4 min-w-4 px-1">
+                {carryoverCount}
+              </span>
+            )}
+          </Button>
+        </div>
         <div className="flex items-center gap-2">
           <Input
             ref={inputRef}
@@ -142,6 +191,7 @@ export function NowTab({
               + Tags
             </Button>
           )}
+          <DurationPicker value={quickDurationMinutes} onChange={setQuickDurationMinutes} />
           <Button
             onClick={handleQuickCreate}
             disabled={!quickTitle.trim()}
@@ -173,6 +223,7 @@ export function NowTab({
                   task={task}
                   timer={timer}
                   onStop={() => onStopTimer(task.id, timer.id)}
+                  onComplete={() => onToggleCompletion(task)}
                   onSelect={() => onTaskSelect(task)}
                 />
               )

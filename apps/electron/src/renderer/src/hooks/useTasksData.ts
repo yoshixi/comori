@@ -24,6 +24,8 @@ interface TasksDataOptions {
   // UpcomingTab filter state (lifted from tab)
   upcomingShowCompleted: boolean
   upcomingShowUnscheduled: boolean
+  // Planning panel state
+  isPlanningOpen: boolean
 }
 
 export interface UseTasksDataReturn {
@@ -40,6 +42,9 @@ export interface UseTasksDataReturn {
   // Upcoming tab data
   upcomingTasks: Task[]
   upcomingTasksLoading: boolean
+
+  // Planning data
+  carryoverTasks: Task[]
 
   // Review tab data (unfiltered)
   reviewTasks: Task[]
@@ -78,12 +83,13 @@ export interface UseTasksDataReturn {
     startAt: string
     tagIds: number[]
   }) => void
-  handleCreateTaskAndStartTimer: (title: string, tagIds?: number[]) => void
+  handleCreateTaskAndStartTimer: (title: string, tagIds?: number[], durationMinutes?: number) => void
   handleDeleteTask: (taskId: number) => Promise<void>
   handleToggleTaskCompletion: (task: Task) => void
   handleUpdateTaskTags: (taskId: number, tagIds: number[]) => void
   handleSaveSchedule: (taskId: number, startAt: string | null, endAt: string | null) => Promise<void>
   handleSaveEdit: (taskId: number, field: 'title' | 'description', value: string) => void
+  handleUpdateTaskSchedule: (taskId: number, startAt: string | null, endAt?: string | null) => void
   isTaskActive: (taskId: number) => boolean
 
   // Expanded timer rows
@@ -92,7 +98,7 @@ export interface UseTasksDataReturn {
 }
 
 export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
-  const { currentView, showCompleted, showTodayOnly, showUnscheduled, filterTagIds, sortBy, upcomingShowCompleted, upcomingShowUnscheduled } = options
+  const { currentView, showCompleted, showTodayOnly, showUnscheduled, filterTagIds, sortBy, upcomingShowCompleted, upcomingShowUnscheduled, isPlanningOpen } = options
 
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<number>>(new Set())
@@ -249,6 +255,21 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
   } = useGetApiTasks(upcomingTaskQuery)
   const upcomingTasks = upcomingTasksResponse?.tasks ?? []
 
+  // --- Planning: carryover tasks (incomplete, scheduled before today) ---
+  const carryoverTaskQuery = useMemo(() => isPlanningOpen ? ({
+    completed: 'false' as const,
+    startAtTo: todayRange.startAt,
+    scheduled: 'true' as const,
+    sortBy: 'startAt' as const,
+    order: 'asc' as const,
+  }) : undefined, [isPlanningOpen, todayRange])
+
+  const {
+    data: carryoverTasksResponse,
+    mutate: mutateCarryoverTasks
+  } = useGetApiTasks(carryoverTaskQuery)
+  const carryoverTasks = carryoverTasksResponse?.tasks ?? []
+
   // --- Review tab: tasks from the last 14 days (including completed) ---
   const reviewDateRange = useMemo(() => {
     const now = new Date()
@@ -277,9 +298,10 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
       mutateSidebarActiveTasks(),
       mutateReviewTasks(),
       mutateNowTodayTasks(),
-      mutateUpcomingTasks()
+      mutateUpcomingTasks(),
+      mutateCarryoverTasks()
     ])
-  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks, mutateReviewTasks, mutateNowTodayTasks, mutateUpcomingTasks])
+  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks, mutateReviewTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateCarryoverTasks])
 
   // Timers — include review task IDs so we get timer data for the Review tab
   const taskIds = useMemo(() => {
@@ -288,8 +310,9 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     for (const task of reviewTasks) idSet.add(task.id)
     for (const task of nowTodayTasks) idSet.add(task.id)
     for (const task of upcomingTasks) idSet.add(task.id)
+    for (const task of carryoverTasks) idSet.add(task.id)
     return Array.from(idSet)
-  }, [allTasks, reviewTasks, nowTodayTasks, upcomingTasks])
+  }, [allTasks, reviewTasks, nowTodayTasks, upcomingTasks, carryoverTasks])
   const shouldFetchTimer = useMemo(() => taskIds.length > 0, [taskIds])
 
   const {
@@ -562,10 +585,15 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
       })
   }, [mutateInactiveTasks, mutateBothTaskLists])
 
-  const handleCreateTaskAndStartTimer = useCallback((title: string, tagIds?: number[]) => {
+  const handleCreateTaskAndStartTimer = useCallback((title: string, tagIds?: number[], durationMinutes?: number) => {
     if (!title.trim()) return
 
-    const now = new Date().toISOString()
+    const now = new Date()
+    const startAt = now.toISOString()
+    const endAt = durationMinutes
+      ? new Date(now.getTime() + durationMinutes * 60 * 1000).toISOString()
+      : undefined
+
     const tempId = -Date.now()
 
     const optimisticTask: Task = {
@@ -573,14 +601,37 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
       title: title.trim(),
       description: '',
       dueDate: null,
-      startAt: now,
+      startAt,
+      endAt: endAt ?? null,
       completedAt: null,
       tags: [],
-      createdAt: now,
-      updatedAt: now
+      createdAt: startAt,
+      updatedAt: startAt
     }
 
-    // Optimistically add to active tasks (it will have a timer)
+    // Auto-stop any running timers first (optimistic)
+    const runningEntries = Array.from(activeTimersByTaskId.entries())
+    for (const [runningTaskId] of runningEntries) {
+      const runningTask = activeTasks.find(t => t.id === runningTaskId)
+      if (runningTask) {
+        mutateActiveTasks(
+          (currentData) => {
+            if (!currentData) return currentData
+            return { ...currentData, tasks: currentData.tasks.filter((t) => t.id !== runningTaskId), total: currentData.total - 1 }
+          },
+          { revalidate: false }
+        )
+        mutateInactiveTasks(
+          (currentData) => {
+            if (!currentData) return currentData
+            return { ...currentData, tasks: [runningTask, ...currentData.tasks], total: currentData.total + 1 }
+          },
+          { revalidate: false }
+        )
+      }
+    }
+
+    // Optimistically add new task to active tasks
     mutateActiveTasks(
       (currentData) => {
         if (!currentData) return currentData
@@ -593,13 +644,19 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
       { revalidate: false }
     )
 
-    postApiTasks({
-      title: title.trim(),
-      startAt: now,
-      tagIds: tagIds && tagIds.length > 0 ? tagIds : undefined
-    })
+    // Stop running timers, then create task and start timer
+    const stopPromises = runningEntries.map(([, timer]) =>
+      putApiTimersId(timer.id, { endTime: new Date().toISOString() })
+    )
+
+    Promise.all(stopPromises)
+      .then(() => postApiTasks({
+        title: title.trim(),
+        startAt,
+        endAt,
+        tagIds: tagIds && tagIds.length > 0 ? tagIds : undefined
+      }))
       .then((response) => {
-        // Replace optimistic task with real one
         mutateActiveTasks(
           (currentData) => {
             if (!currentData) return currentData
@@ -610,7 +667,6 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
           },
           { revalidate: false }
         )
-        // Start timer for the new task
         return postApiTimers({ taskId: response.task.id, startTime: new Date().toISOString() })
       })
       .then(() => {
@@ -632,7 +688,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
         )
         mutateBothTaskLists()
       })
-  }, [mutateActiveTasks, mutateTimers, mutateBothTaskLists])
+  }, [activeTasks, activeTimersByTaskId, mutateActiveTasks, mutateInactiveTasks, mutateTimers, mutateBothTaskLists])
 
   const handleDeleteTask = useCallback(async (taskId: number): Promise<void> => {
     if (!confirm('Are you sure you want to delete this task?')) return
@@ -643,6 +699,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     optimisticRemove(mutateNowTodayTasks, taskId)
     optimisticRemove(mutateUpcomingTasks, taskId)
     optimisticRemove(mutateReviewTasks, taskId)
+    optimisticRemove(mutateCarryoverTasks, taskId)
 
     try {
       await deleteApiTasksId(taskId)
@@ -651,7 +708,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
       console.error('Failed to delete task:', error)
       mutateBothTaskLists()
     }
-  }, [mutateActiveTasks, mutateInactiveTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateReviewTasks, mutateBothTaskLists, optimisticRemove])
+  }, [mutateActiveTasks, mutateInactiveTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateReviewTasks, mutateCarryoverTasks, mutateBothTaskLists, optimisticRemove])
 
   const handleToggleTaskCompletion = useCallback((task: Task) => {
     const newCompletedAt = task.completedAt ? null : new Date().toISOString()
@@ -673,11 +730,31 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     mutateNowTodayTasks(optimisticCompletionUpdate, { revalidate: false })
     mutateUpcomingTasks(optimisticCompletionUpdate, { revalidate: false })
     mutateReviewTasks(optimisticCompletionUpdate, { revalidate: false })
+    mutateCarryoverTasks(optimisticCompletionUpdate, { revalidate: false })
 
     putApiTasksId(task.id, { completedAt: newCompletedAt })
       .then(() => mutateBothTaskLists())
       .catch((error) => { console.error('Failed to update task completion:', error); mutateBothTaskLists() })
-  }, [activeTasks, mutateActiveTasks, mutateInactiveTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateReviewTasks, mutateBothTaskLists])
+  }, [activeTasks, mutateActiveTasks, mutateInactiveTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateReviewTasks, mutateCarryoverTasks, mutateBothTaskLists])
+
+  const handleUpdateTaskSchedule = useCallback((taskId: number, startAt: string | null, endAt?: string | null) => {
+    const optimisticUpdate = (currentData: typeof activeTasksResponse) => {
+      if (!currentData) return currentData
+      return {
+        ...currentData,
+        tasks: currentData.tasks.map(t =>
+          t.id === taskId ? { ...t, startAt, endAt: endAt !== undefined ? endAt : t.endAt } : t
+        )
+      }
+    }
+    mutateCarryoverTasks(optimisticUpdate, { revalidate: false })
+    mutateNowTodayTasks(optimisticUpdate, { revalidate: false })
+    mutateUpcomingTasks(optimisticUpdate, { revalidate: false })
+
+    putApiTasksId(taskId, { startAt, endAt: endAt !== undefined ? endAt : undefined })
+      .then(() => mutateBothTaskLists())
+      .catch((error) => { console.error('Failed to update task schedule:', error); mutateBothTaskLists() })
+  }, [mutateCarryoverTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateBothTaskLists])
 
   const handleUpdateTaskTags = useCallback((taskId: number, tagIds: number[]) => {
     putApiTasksId(taskId, { tagIds })
@@ -716,6 +793,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     nowTodayTasks,
     upcomingTasks,
     upcomingTasksLoading: upcomingTasksLoading,
+    carryoverTasks,
     reviewTasks,
     reviewTimers: timers,
     reviewTimersByTaskId,
@@ -742,6 +820,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     handleUpdateTaskTags,
     handleSaveSchedule,
     handleSaveEdit,
+    handleUpdateTaskSchedule,
     isTaskActive,
     expandedTaskIds,
     toggleTaskExpansion

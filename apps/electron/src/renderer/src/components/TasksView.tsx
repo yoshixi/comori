@@ -18,6 +18,8 @@ interface TasksViewProps {
   upcomingShowUnscheduled: boolean
   onUpcomingShowCompletedChange: (value: boolean) => void
   onUpcomingShowUnscheduledChange: (value: boolean) => void
+  carryoverCount: number
+  onPlanToday: () => void
 }
 
 export function TasksView({
@@ -28,7 +30,9 @@ export function TasksView({
   upcomingShowCompleted,
   upcomingShowUnscheduled,
   onUpcomingShowCompletedChange,
-  onUpcomingShowUnscheduledChange
+  onUpcomingShowUnscheduledChange,
+  carryoverCount,
+  onPlanToday
 }: TasksViewProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TasksTab>('now')
 
@@ -53,6 +57,8 @@ export function TasksView({
               onToggleCompletion={data.handleToggleTaskCompletion}
               onDeleteTask={data.handleDeleteTask}
               onTaskSelect={onTaskSelect}
+              carryoverCount={carryoverCount}
+              onPlanToday={onPlanToday}
             />
           </TabsContent>
 

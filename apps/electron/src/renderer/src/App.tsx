@@ -318,16 +318,14 @@ function App(): React.JSX.Element {
     }
   }, [tasksData])
 
-  const handleCreateTodayTask = useCallback((title: string) => {
+  const handleCreateTodayTask = useCallback((title: string, durationMinutes: number) => {
     const today = new Date()
     today.setHours(9, 0, 0, 0)
-    tasksData.handleCreateTask({
-      title,
-      description: '',
-      dueDate: '',
-      startAt: today.toISOString(),
-      tagIds: []
-    })
+    const startAt = today.toISOString()
+    const endAt = new Date(today.getTime() + durationMinutes * 60 * 1000).toISOString()
+    postApiTasks({ title, startAt, endAt })
+      .then(() => tasksData.mutateBothTaskLists())
+      .catch((error) => console.error('Failed to create today task:', error))
   }, [tasksData])
 
   const handleTaskSelect = useCallback((task: Task) => {

@@ -3,6 +3,7 @@ import { CheckCircle, ArrowRight, X, CalendarOff, Plus, Clock } from 'lucide-rea
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
+import { DurationPicker } from '../DurationPicker'
 import type { Task } from '../../gen/api'
 import { formatTimeRangeShort } from '../../lib/time'
 
@@ -13,7 +14,7 @@ interface PlanningPanelProps {
   onSkip: (taskId: number) => void
   onComplete: (task: Task) => void
   onMoveAllToToday: () => void
-  onCreateTodayTask: (title: string) => void
+  onCreateTodayTask: (title: string, durationMinutes: number) => void
   onClose: () => void
 }
 
@@ -52,12 +53,13 @@ export function PlanningPanel({
   onClose
 }: PlanningPanelProps): React.JSX.Element {
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDuration, setNewTaskDuration] = useState(30)
 
   const handleAddTask = useCallback(() => {
     if (!newTaskTitle.trim()) return
-    onCreateTodayTask(newTaskTitle.trim())
+    onCreateTodayTask(newTaskTitle.trim(), newTaskDuration)
     setNewTaskTitle('')
-  }, [newTaskTitle, onCreateTodayTask])
+  }, [newTaskTitle, newTaskDuration, onCreateTodayTask])
 
   const summary = computeTimeSummary(todayTasks)
 
@@ -169,6 +171,7 @@ export function PlanningPanel({
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddTask() }}
                 className="flex-1"
               />
+              <DurationPicker value={newTaskDuration} onChange={setNewTaskDuration} />
               <Button
                 size="sm"
                 onClick={handleAddTask}

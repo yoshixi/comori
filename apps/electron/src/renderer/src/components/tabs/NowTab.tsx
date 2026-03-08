@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle, Circle, Play, Square, Trash2 } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
+import { DurationPicker } from '../DurationPicker'
 import { CharacterIllustration } from '../CharacterIllustration'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -31,23 +31,6 @@ function formatElapsed(startTime: string): string {
   const s = elapsed % 60
   if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-function DurationPicker({ value, onChange }: { value: number; onChange: (minutes: number) => void }): React.JSX.Element {
-  return (
-    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-      <SelectTrigger className="h-8 w-20 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="15">15m</SelectItem>
-        <SelectItem value="30">30m</SelectItem>
-        <SelectItem value="60">1h</SelectItem>
-        <SelectItem value="90">1.5h</SelectItem>
-        <SelectItem value="120">2h</SelectItem>
-      </SelectContent>
-    </Select>
-  )
 }
 
 function formatCountdown(endAt: string): { text: string; isOver: boolean } {

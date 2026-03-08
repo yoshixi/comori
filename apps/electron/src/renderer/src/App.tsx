@@ -7,7 +7,10 @@ import { Label } from './components/ui/label'
 import { TagCombobox } from './components/TagCombobox'
 import {
   postApiTasks,
-  type Task
+  postApiTimers,
+  putApiTimersId,
+  type Task,
+  type CalendarEvent
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
 import { AppSidebar, type View } from './components/Sidebar'
@@ -23,6 +26,7 @@ import { useTasksData } from './hooks/useTasksData'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
 import { PlanningPanel } from './components/planning/PlanningPanel'
+import { TimerFillDialog } from './components/TimerFillDialog'
 import { NotesView } from './components/NotesView'
 import { startOfDay, addDays } from './lib/calendar-utils'
 
@@ -135,6 +139,7 @@ function App(): React.JSX.Element {
   } | null>(null)
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
+  const [timerFillTask, setTimerFillTask] = useState<Task | null>(null)
   const [isPlanningOpen, setIsPlanningOpen] = useState(() => {
     const lastPlanDate = localStorage.getItem('comori:lastPlanDate')
     const today = new Date().toISOString().split('T')[0]
@@ -345,6 +350,49 @@ function App(): React.JSX.Element {
     await tasksData.handleSaveSchedule(task.id, range.startAt, range.endAt)
   }, [tasksData])
 
+  // Wrap completion to check for timer records
+  const handleCompleteWithTimerCheck = useCallback((task: Task) => {
+    // If task is being un-completed, just toggle
+    if (task.completedAt) {
+      tasksData.handleToggleTaskCompletion(task)
+      return
+    }
+    // Check if task has any timer records
+    const taskTimers = tasksData.timersByTaskId.get(task.id)
+    if (taskTimers && taskTimers.length > 0) {
+      tasksData.handleToggleTaskCompletion(task)
+      return
+    }
+    // No timers — show fill dialog
+    setTimerFillTask(task)
+  }, [tasksData])
+
+  const handleTimerFillConfirm = useCallback(async (taskId: number, startTime: string, endTime: string) => {
+    try {
+      const response = await postApiTimers({ taskId, startTime })
+      await putApiTimersId(response.timer.id, { endTime })
+      await tasksData.mutateTimers()
+    } catch (error) {
+      console.error('Failed to create timer:', error)
+    }
+    // Complete the task
+    if (timerFillTask) {
+      tasksData.handleToggleTaskCompletion(timerFillTask)
+    }
+    setTimerFillTask(null)
+  }, [tasksData, timerFillTask])
+
+  const handleTimerFillSkip = useCallback((task: Task) => {
+    tasksData.handleToggleTaskCompletion(task)
+    setTimerFillTask(null)
+  }, [tasksData])
+
+  const handleCalendarEventConvert = useCallback((event: CalendarEvent) => {
+    postApiTasks({ title: event.title, startAt: event.startAt, endAt: event.endAt })
+      .then(() => tasksData.mutateBothTaskLists())
+      .catch((error) => console.error('Failed to convert calendar event to task:', error))
+  }, [tasksData])
+
   const handleTaskSelect = useCallback((task: Task) => {
     setSelectedTask(task)
     const index = allTasksForNavigation.findIndex((t) => t.id === task.id)
@@ -460,12 +508,13 @@ function App(): React.JSX.Element {
           activeTimersByTaskId={activeTimersByTaskId}
           onMoveToToday={handleCarryoverMoveToToday}
           onSkip={handleCarryoverSkip}
-          onComplete={tasksData.handleToggleTaskCompletion}
+          onComplete={handleCompleteWithTimerCheck}
           onMoveAllToToday={handleCarryoverMoveAllToToday}
           onCreateTodayTask={handleCreateTodayTask}
           onTaskMove={handlePlanningTaskMove}
           onTaskSelect={handleTaskSelect}
           onTaskDelete={handleDeleteTask}
+          onCalendarEventConvert={handleCalendarEventConvert}
           onClose={() => {
             setIsPlanningOpen(false)
             localStorage.setItem('comori:lastPlanDate', new Date().toISOString().split('T')[0])
@@ -642,6 +691,14 @@ function App(): React.JSX.Element {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Timer fill dialog - shown when completing task without timer records */}
+      <TimerFillDialog
+        task={timerFillTask}
+        onConfirm={handleTimerFillConfirm}
+        onSkip={handleTimerFillSkip}
+        onCancel={() => setTimerFillTask(null)}
+      />
     </SidebarProvider>
   )
 }

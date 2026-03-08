@@ -20,6 +20,7 @@ interface PlanningPanelProps {
   onTaskMove?: (task: Task, range: { startAt: string; endAt: string }) => void
   onTaskSelect?: (task: Task) => void
   onTaskDelete?: (taskId: number) => void
+  onCalendarEventConvert?: (event: CalendarEvent) => void
   onClose: () => void
 }
 
@@ -76,6 +77,7 @@ export function PlanningPanel({
   onTaskMove,
   onTaskSelect,
   onTaskDelete,
+  onCalendarEventConvert,
   onClose
 }: PlanningPanelProps): React.JSX.Element {
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -226,6 +228,7 @@ export function PlanningPanel({
               onTaskSelect={onTaskSelect}
               onTaskMove={onTaskMove}
               onTaskDelete={onTaskDelete ? (task) => onTaskDelete(task.id) : undefined}
+              onCalendarEventConvert={onCalendarEventConvert}
             />
 
             {/* Summary */}

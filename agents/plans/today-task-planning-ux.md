@@ -245,3 +245,8 @@ PlanningPanel (rendered in App.tsx when isPlanningOpen)
 - Tasks and events merged into a single timeline sorted by start time
 - Auto-show planning modal on first app open of the day (localStorage `comori:lastPlanDate`)
 - Calendar events fetched when planning panel is open (reuses existing `useCalendarEvents` hook)
+
+### Phase 4: Calendar Event Conversion + Timer Fill-out ✅
+- One-click convert calendar event to task: hover on calendar event shows + button, creates task with same title/time
+- Timer fill-out dialog when completing task without timer records: pre-fills startAt/endAt, user can confirm or skip
+- Delete task button on planning calendar timeline

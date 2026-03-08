@@ -86,6 +86,8 @@ type CalendarViewProps = {
   visibleCalendarIds?: Set<string>
   /** Callback to toggle calendar visibility */
   onToggleCalendarVisibility?: (calendarId: string) => void
+  /** Callback when user clicks convert-to-task on a calendar event */
+  onCalendarEventConvert?: (event: CalendarEvent) => void
   /** Hide the header bar (navigation, zoom, view mode buttons) */
   hideHeader?: boolean
   /** Additional CSS classes */
@@ -122,6 +124,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   calendars,
   visibleCalendarIds,
   onToggleCalendarVisibility,
+  onCalendarEventConvert,
   hideHeader,
   className
 }) => {
@@ -905,7 +908,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       </button>
                     )
                   })}
-                  {/* Calendar events (read-only, from Google Calendar) - grayish to distinguish from tasks */}
+                  {/* Calendar events (from Google Calendar) - grayish to distinguish from tasks */}
                   {dayEvents.map((eventItem) => {
                     const top = eventItem.startSlot * slotHeight
                     const height = Math.max(1, (eventItem.endSlot - eventItem.startSlot) * slotHeight)
@@ -915,7 +918,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     return (
                       <div
                         key={eventItem.event.id}
-                        className="absolute rounded-md px-2 py-1 text-left text-xs pointer-events-none bg-slate-200/60 dark:bg-slate-700/50 border-l-[3px] border-slate-400 dark:border-slate-500"
+                        className={cn(
+                          "absolute rounded-md px-2 py-1 text-left text-xs bg-slate-200/60 dark:bg-slate-700/50 border-l-[3px] border-slate-400 dark:border-slate-500 group/event",
+                          !onCalendarEventConvert && "pointer-events-none"
+                        )}
                         style={{
                           top,
                           height,
@@ -923,17 +929,32 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           width: `${width}%`
                         }}
                       >
-                        <div className="font-medium line-clamp-1 text-slate-600 dark:text-slate-300">
-                          {eventItem.event.title}
-                        </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                          {formatTimeRange(eventItem.startDate, eventItem.endDate)}
-                        </div>
-                        {eventItem.calendar && (
-                          <div className="text-[9px] text-slate-400 dark:text-slate-500 truncate">
-                            {eventItem.calendar.name}
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium line-clamp-1 text-slate-600 dark:text-slate-300">
+                              {eventItem.event.title}
+                            </div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                              {formatTimeRange(eventItem.startDate, eventItem.endDate)}
+                            </div>
+                            {eventItem.calendar && (
+                              <div className="text-[9px] text-slate-400 dark:text-slate-500 truncate">
+                                {eventItem.calendar.name}
+                              </div>
+                            )}
                           </div>
-                        )}
+                          {onCalendarEventConvert && (
+                            <button
+                              type="button"
+                              onClick={() => onCalendarEventConvert(eventItem.event)}
+                              className="shrink-0 rounded p-0.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 opacity-0 group-hover/event:opacity-100 transition-opacity"
+                              aria-label="Convert to task"
+                              title="Convert to task"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )
                   })}

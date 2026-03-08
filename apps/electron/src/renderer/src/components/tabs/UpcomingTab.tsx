@@ -34,7 +34,7 @@ export function UpcomingTab({
   const [showCompleted, setShowCompleted] = useState(false)
   const [showUnscheduled, setShowUnscheduled] = useState(true)
 
-  const { data: tasksResponse, isLoading } = useGetApiTasks({
+  const { data: tasksResponse, isLoading, mutate: mutateLocalTasks } = useGetApiTasks({
     scheduled: showUnscheduled ? undefined : ('true' as const),
     completed: showCompleted ? undefined : ('false' as const),
     sortBy: 'startAt' as const,
@@ -43,6 +43,20 @@ export function UpcomingTab({
     tags: filterTagIds.length ? filterTagIds : undefined
   })
   const tasks = tasksResponse?.tasks ?? []
+
+  const handleToggleCompletion = (task: Task): void => {
+    mutateLocalTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: currentData.tasks.filter((t) => t.id !== task.id)
+        }
+      },
+      { revalidate: false }
+    )
+    onToggleCompletion(task)
+  }
 
   const groups: GroupedTasks[] = useMemo(() => groupTasksByDate(tasks), [tasks])
 
@@ -139,7 +153,7 @@ export function UpcomingTab({
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={(e) => { e.stopPropagation(); onToggleCompletion(task) }}
+                  onClick={(e) => { e.stopPropagation(); handleToggleCompletion(task) }}
                   className={`h-7 w-7 shrink-0 ${isCompleted ? 'opacity-50' : 'hover:bg-green-200'}`}
                   title={isCompleted ? 'Mark incomplete' : 'Mark complete'}
                 >

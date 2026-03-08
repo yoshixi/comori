@@ -106,7 +106,7 @@ export function NowTab({
 
   // Today's schedule: inactive, scheduled tasks for today
   const todayRange = getTodayRange()
-  const { data: todayTasksResponse } = useGetApiTasks({
+  const { data: todayTasksResponse, mutate: mutateTodayTasks } = useGetApiTasks({
     hasActiveTimer: 'false' as const,
     scheduled: 'true' as const,
     startAtFrom: todayRange.startAt,
@@ -117,6 +117,20 @@ export function NowTab({
     tags: filterTagIds.length ? filterTagIds : undefined
   })
   const todayTasks = todayTasksResponse?.tasks ?? []
+
+  const handleToggleCompletion = useCallback((task: Task) => {
+    mutateTodayTasks(
+      (currentData) => {
+        if (!currentData) return currentData
+        return {
+          ...currentData,
+          tasks: currentData.tasks.filter((t) => t.id !== task.id)
+        }
+      },
+      { revalidate: false }
+    )
+    onToggleCompletion(task)
+  }, [mutateTodayTasks, onToggleCompletion])
 
   // Running tasks with timers
   const runningTasks = activeTasks.filter((t) => activeTimersByTaskId.has(t.id))
@@ -225,7 +239,7 @@ export function NowTab({
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={(e) => { e.stopPropagation(); onToggleCompletion(task) }}
+                  onClick={(e) => { e.stopPropagation(); handleToggleCompletion(task) }}
                   className="h-7 w-7 hover:bg-green-200 shrink-0"
                   title="Mark complete"
                 >

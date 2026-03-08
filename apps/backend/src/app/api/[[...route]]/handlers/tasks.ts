@@ -16,9 +16,9 @@ export const listTasksHandler: RouteHandler<typeof listTasksRoute, AppBindings> 
     const db = getDb()
     const user = c.get('user')
     // Validate and extract query parameters using the TaskQueryParamsModel schema
-    const { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags } = c.req.valid('query')
+    const { ids, completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags } = c.req.valid('query')
 
-    const tasks = await getAllTasks(db, user.id, { completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
+    const tasks = await getAllTasks(db, user.id, { ids, completed, hasActiveTimer, scheduled, startAtFrom, startAtTo, sortBy, order, nullsLast, tags })
 
     return c.json(
       {

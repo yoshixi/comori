@@ -11,8 +11,28 @@ import {
   type TaskTimer
 } from '../gen/api'
 import { normalizeDateTime, normalizeDueDate, getTodayRange } from '../lib/time'
+import type { ReviewPeriod } from '../components/review/PeriodSelector'
 
 type View = 'tasks' | 'calendar' | 'notes' | 'account' | 'settings'
+
+function getReviewDateRange(period: ReviewPeriod): { from: string; to: string } {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const tomorrow = new Date(today.getTime() + 86400000)
+  switch (period) {
+    case 'today':
+      return { from: today.toISOString(), to: tomorrow.toISOString() }
+    case 'yesterday':
+      return { from: new Date(today.getTime() - 86400000).toISOString(), to: today.toISOString() }
+    case 'week': {
+      const dayOfWeek = now.getDay()
+      const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+      return { from: new Date(today.getTime() - mondayOffset * 86400000).toISOString(), to: tomorrow.toISOString() }
+    }
+    case '14days':
+      return { from: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13).toISOString(), to: tomorrow.toISOString() }
+  }
+}
 
 interface TasksDataOptions {
   currentView: View
@@ -26,6 +46,7 @@ interface TasksDataOptions {
   upcomingShowUnscheduled: boolean
   // Planning panel state
   isPlanningOpen: boolean
+  reviewPeriod: ReviewPeriod
 }
 
 export interface UseTasksDataReturn {
@@ -98,7 +119,7 @@ export interface UseTasksDataReturn {
 }
 
 export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
-  const { currentView, showCompleted, showTodayOnly, showUnscheduled, filterTagIds, sortBy, upcomingShowCompleted, upcomingShowUnscheduled, isPlanningOpen } = options
+  const { currentView, showCompleted, showTodayOnly, showUnscheduled, filterTagIds, sortBy, upcomingShowCompleted, upcomingShowUnscheduled, isPlanningOpen, reviewPeriod } = options
 
   const [currentTime, setCurrentTime] = useState(Date.now())
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<number>>(new Set())
@@ -272,57 +293,23 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
   })
   const carryoverTasks = carryoverTasksResponse?.tasks ?? []
 
-  // --- Review tab: tasks from the last 14 days (including completed) ---
-  const reviewDateRange = useMemo(() => {
-    const now = new Date()
-    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13)
-    return { startAtFrom: from.toISOString() }
-  }, [currentTime])
-  const reviewTaskQuery = useMemo(
-    () => ({
-      startAtFrom: reviewDateRange.startAtFrom,
-      sortBy: 'startAt' as const,
-      order: 'asc' as const
-    }),
-    [reviewDateRange]
-  )
-  const {
-    data: reviewTasksResponse,
-    mutate: mutateReviewTasks
-  } = useGetApiTasks(reviewTaskQuery)
-  const reviewTasks = reviewTasksResponse?.tasks ?? []
-
-  // Revalidate all task caches from server
-  const mutateBothTaskLists = useCallback(() => {
-    return Promise.all([
-      mutateActiveTasks(),
-      mutateInactiveTasks(),
-      mutateSidebarActiveTasks(),
-      mutateReviewTasks(),
-      mutateNowTodayTasks(),
-      mutateUpcomingTasks(),
-      mutateCarryoverTasks()
-    ])
-  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks, mutateReviewTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateCarryoverTasks])
-
-  // Timers — include review task IDs so we get timer data for the Review tab
-  const taskIds = useMemo(() => {
+  // --- Timers for active tasks (non-review) ---
+  const activeTaskIds = useMemo(() => {
     const idSet = new Set<number>()
     for (const task of allTasks) idSet.add(task.id)
-    for (const task of reviewTasks) idSet.add(task.id)
     for (const task of nowTodayTasks) idSet.add(task.id)
     for (const task of upcomingTasks) idSet.add(task.id)
     for (const task of carryoverTasks) idSet.add(task.id)
     return Array.from(idSet)
-  }, [allTasks, reviewTasks, nowTodayTasks, upcomingTasks, carryoverTasks])
-  const shouldFetchTimer = useMemo(() => taskIds.length > 0, [taskIds])
+  }, [allTasks, nowTodayTasks, upcomingTasks, carryoverTasks])
+  const shouldFetchTimer = useMemo(() => activeTaskIds.length > 0, [activeTaskIds])
 
   const {
     data: timersResponse,
     error: timersError,
     isLoading: timersLoading,
     mutate: mutateTimers
-  } = useGetApiTimers(taskIds.length ? { taskIds } : undefined, {
+  } = useGetApiTimers(activeTaskIds.length ? { taskIds: activeTaskIds } : undefined, {
     swr: { enabled: shouldFetchTimer }
   })
   const timers = timersResponse?.timers ?? []
@@ -363,17 +350,66 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     return map
   }, [timers])
 
-  // Review-specific timer grouping (uses all timers, grouped by review task IDs)
+  // --- Review tab: timers-first approach ---
+  // 1. Fetch timers by date range (the primary data source for review)
+  const reviewDateRange = useMemo(() => getReviewDateRange(reviewPeriod), [reviewPeriod, currentTime])
+  const reviewTimerQuery = useMemo(
+    () => ({
+      startTimeFrom: reviewDateRange.from,
+      startTimeTo: reviewDateRange.to
+    }),
+    [reviewDateRange]
+  )
+  const {
+    data: reviewTimersResponse,
+    mutate: mutateReviewTimers
+  } = useGetApiTimers(reviewTimerQuery)
+  const reviewTimers = reviewTimersResponse?.timers ?? []
+
+  // 2. Fetch tasks for the task IDs found in review timers
+  //    We need task metadata (title, tags) to display in the review UI
+  const reviewTaskIdsFromTimers = useMemo(() => {
+    const idSet = new Set<number>()
+    for (const timer of reviewTimers) idSet.add(timer.taskId)
+    return Array.from(idSet)
+  }, [reviewTimers])
+
+  const reviewTaskQuery = useMemo(
+    () => reviewTaskIdsFromTimers.length > 0
+      ? { ids: reviewTaskIdsFromTimers }
+      : undefined,
+    [reviewTaskIdsFromTimers]
+  )
+  const {
+    data: reviewTasksResponse,
+    mutate: mutateReviewTasks
+  } = useGetApiTasks(reviewTaskQuery ?? {}, {
+    swr: { enabled: reviewTaskIdsFromTimers.length > 0 }
+  })
+  const reviewTasks = reviewTasksResponse?.tasks ?? []
+
+  // 3. Group review timers by task ID
   const reviewTimersByTaskId = useMemo(() => {
     const map = new Map<number, TaskTimer[]>()
-    const reviewTaskIds = new Set(reviewTasks.map((t) => t.id))
-    timers.forEach((timer) => {
-      if (!reviewTaskIds.has(timer.taskId)) return
+    reviewTimers.forEach((timer) => {
       const existing = map.get(timer.taskId) || []
       map.set(timer.taskId, [...existing, timer])
     })
     return map
-  }, [timers, reviewTasks])
+  }, [reviewTimers])
+
+  const mutateBothTaskLists = useCallback(() => {
+    return Promise.all([
+      mutateActiveTasks(),
+      mutateInactiveTasks(),
+      mutateSidebarActiveTasks(),
+      mutateReviewTimers(),
+      mutateReviewTasks(),
+      mutateNowTodayTasks(),
+      mutateUpcomingTasks(),
+      mutateCarryoverTasks()
+    ])
+  }, [mutateActiveTasks, mutateInactiveTasks, mutateSidebarActiveTasks, mutateReviewTimers, mutateReviewTasks, mutateNowTodayTasks, mutateUpcomingTasks, mutateCarryoverTasks])
 
   // Sync active timer states to main process
   useEffect(() => {
@@ -797,7 +833,7 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     upcomingTasksLoading: upcomingTasksLoading,
     carryoverTasks,
     reviewTasks,
-    reviewTimers: timers,
+    reviewTimers,
     reviewTimersByTaskId,
     tasksLoading,
     tasksError,

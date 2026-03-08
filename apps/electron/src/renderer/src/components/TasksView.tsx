@@ -5,6 +5,7 @@ import { UpcomingTab } from './tabs/UpcomingTab'
 import { ReviewTab } from './tabs/ReviewTab'
 import type { UseTasksDataReturn } from '../hooks/useTasksData'
 import type { Task } from '../gen/api'
+import type { ReviewPeriod } from './review/PeriodSelector'
 
 export type TasksTab = 'now' | 'upcoming' | 'review'
 
@@ -21,6 +22,8 @@ interface TasksViewProps {
   onUpcomingShowUnscheduledChange: (value: boolean) => void
   carryoverCount: number
   onPlanToday: () => void
+  reviewPeriod: ReviewPeriod
+  onReviewPeriodChange: (period: ReviewPeriod) => void
 }
 
 export function TasksView({
@@ -34,7 +37,9 @@ export function TasksView({
   onUpcomingShowCompletedChange,
   onUpcomingShowUnscheduledChange,
   carryoverCount,
-  onPlanToday
+  onPlanToday,
+  reviewPeriod,
+  onReviewPeriodChange
 }: TasksViewProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<TasksTab>('now')
 
@@ -90,6 +95,8 @@ export function TasksView({
               timersByTaskId={data.reviewTimersByTaskId}
               onToggleCompletion={onToggleCompletion}
               onTaskSelect={onTaskSelect}
+              period={reviewPeriod}
+              onPeriodChange={onReviewPeriodChange}
             />
           </TabsContent>
         </Tabs>

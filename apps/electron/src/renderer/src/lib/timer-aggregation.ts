@@ -16,7 +16,7 @@ export interface TaskTimerSummary {
   sessionCount: number
 }
 
-function timerDurationMs(timer: TaskTimer): number {
+export function timerDurationMs(timer: TaskTimer): number {
   const start = new Date(timer.startTime).getTime()
   const end = timer.endTime ? new Date(timer.endTime).getTime() : Date.now()
   return Math.max(0, end - start)
@@ -108,4 +108,48 @@ export function formatDurationShort(ms: number): string {
   const minutes = totalMinutes % 60
   if (hours > 0) return `${hours}h ${minutes}m`
   return `${minutes}m`
+}
+
+export interface SessionTimelineEntry {
+  timer: TaskTimer
+  task: Task
+  durationMs: number
+}
+
+export function getSessionTimeline(
+  timers: TaskTimer[],
+  tasks: Task[],
+  dateStart: Date,
+  dateEnd: Date
+): SessionTimelineEntry[] {
+  const taskMap = new Map<number, Task>()
+  for (const task of tasks) taskMap.set(task.id, task)
+
+  return timers
+    .filter((timer) => {
+      const start = new Date(timer.startTime)
+      return start >= dateStart && start < dateEnd && taskMap.has(timer.taskId)
+    })
+    .map((timer) => ({
+      timer,
+      task: taskMap.get(timer.taskId)!,
+      durationMs: timerDurationMs(timer)
+    }))
+    .sort((a, b) => new Date(b.timer.startTime).getTime() - new Date(a.timer.startTime).getTime())
+}
+
+export function getTotalMs(timers: TaskTimer[], dateStart: Date, dateEnd: Date): number {
+  return timers
+    .filter((t) => {
+      const start = new Date(t.startTime)
+      return start >= dateStart && start < dateEnd
+    })
+    .reduce((sum, t) => sum + timerDurationMs(t), 0)
+}
+
+export function getSessionCount(timers: TaskTimer[], dateStart: Date, dateEnd: Date): number {
+  return timers.filter((t) => {
+    const start = new Date(t.startTime)
+    return start >= dateStart && start < dateEnd
+  }).length
 }

@@ -587,8 +587,8 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
         if (!currentData) return currentData
         return {
           ...currentData,
-          tasks: currentData.tasks.map((t) =>
-            t.id === task.id ? { ...t, completedAt: newCompletedAt } : t
+          tasks: currentData.tasks.filter((t) =>
+            t.id !== task.id
           )
         }
       },

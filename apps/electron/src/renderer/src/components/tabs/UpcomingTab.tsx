@@ -45,12 +45,20 @@ export function UpcomingTab({
   const tasks = tasksResponse?.tasks ?? []
 
   const handleToggleCompletion = (task: Task): void => {
+    const nextCompletedAt = task.completedAt ? null : new Date().toISOString()
     mutateLocalTasks(
       (currentData) => {
         if (!currentData) return currentData
         return {
           ...currentData,
-          tasks: currentData.tasks.filter((t) => t.id !== task.id)
+          tasks: currentData.tasks.map((t) =>
+            t.id === task.id
+              ? {
+                  ...t,
+                  completedAt: nextCompletedAt
+                }
+              : t
+          )
         }
       },
       { revalidate: false }

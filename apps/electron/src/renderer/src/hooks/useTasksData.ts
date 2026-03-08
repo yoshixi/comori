@@ -582,23 +582,21 @@ export function useTasksData(options: TasksDataOptions): UseTasksDataReturn {
     const isInActiveList = activeTasks.some(t => t.id === task.id)
     const mutateTargetList = isInActiveList ? mutateActiveTasks : mutateInactiveTasks
 
-    mutateTargetList(
-      (currentData) => {
-        if (!currentData) return currentData
-        return {
-          ...currentData,
-          tasks: currentData.tasks.filter((t) =>
-            t.id !== task.id
-          )
-        }
-      },
-      { revalidate: false }
-    )
+    const optimisticUpdate = (currentData: typeof activeTasksResponse) => {
+      if (!currentData) return currentData
+      return {
+        ...currentData,
+        tasks: currentData.tasks.filter((t) => t.id !== task.id)
+      }
+    }
+
+    mutateTargetList(optimisticUpdate, { revalidate: false })
+    mutateReviewTasks(optimisticUpdate, { revalidate: false })
 
     putApiTasksId(task.id, { completedAt: newCompletedAt })
       .then(() => mutateBothTaskLists())
       .catch((error) => { console.error('Failed to update task completion:', error); mutateBothTaskLists() })
-  }, [activeTasks, mutateActiveTasks, mutateInactiveTasks, mutateBothTaskLists])
+  }, [activeTasks, mutateActiveTasks, mutateInactiveTasks, mutateReviewTasks, mutateBothTaskLists])
 
   const handleUpdateTaskTags = useCallback((taskId: number, tagIds: number[]) => {
     putApiTasksId(taskId, { tagIds })

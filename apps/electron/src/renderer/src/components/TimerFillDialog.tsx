@@ -2,22 +2,45 @@ import React, { useState, useMemo } from 'react'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog'
 import { formatDateTimeInput } from '../lib/time'
-import type { Task } from '../gen/api'
+import type { Task, TaskTimer } from '../gen/api'
+
+export type TimerFillMode = 'no-timer' | 'overlong-timer'
 
 interface TimerFillDialogProps {
   task: Task | null
+  mode: TimerFillMode
+  /** The overlong active timer to correct (only set when mode is 'overlong-timer') */
+  activeTimer?: TaskTimer | null
   onConfirm: (taskId: number, startTime: string, endTime: string) => void
   onSkip: (task: Task) => void
   onCancel: () => void
 }
 
-export function TimerFillDialog({ task, onConfirm, onSkip, onCancel }: TimerFillDialogProps): React.JSX.Element {
+function formatDuration(ms: number): string {
+  const minutes = Math.round(ms / 60000)
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
+}
+
+export function TimerFillDialog({ task, mode, activeTimer, onConfirm, onSkip, onCancel }: TimerFillDialogProps): React.JSX.Element {
   const defaults = useMemo(() => {
     if (!task) return { start: '', end: '' }
+
+    if (mode === 'overlong-timer' && activeTimer) {
+      // Pre-fill with timer's start and task's planned endAt (or now)
+      const start = formatDateTimeInput(activeTimer.startTime)
+      const end = task.endAt ? formatDateTimeInput(task.endAt) : formatDateTimeInput(new Date().toISOString())
+      return { start, end }
+    }
+
+    // No timer mode — use task's start/end
     const start = task.startAt ? formatDateTimeInput(task.startAt) : formatDateTimeInput(new Date().toISOString())
     const end = task.endAt ? formatDateTimeInput(task.endAt) : formatDateTimeInput(new Date().toISOString())
     return { start, end }
-  }, [task])
+  }, [task, mode, activeTimer])
 
   const [startTime, setStartTime] = useState(defaults.start)
   const [endTime, setEndTime] = useState(defaults.end)
@@ -27,6 +50,16 @@ export function TimerFillDialog({ task, onConfirm, onSkip, onCancel }: TimerFill
     setStartTime(defaults.start)
     setEndTime(defaults.end)
   }, [defaults])
+
+  const overlongInfo = useMemo(() => {
+    if (mode !== 'overlong-timer' || !activeTimer || !task?.startAt || !task?.endAt) return null
+    const plannedMs = new Date(task.endAt).getTime() - new Date(task.startAt).getTime()
+    const recordedMs = Date.now() - new Date(activeTimer.startTime).getTime()
+    return {
+      planned: formatDuration(plannedMs),
+      recorded: formatDuration(recordedMs)
+    }
+  }, [mode, activeTimer, task])
 
   if (!task) return <Dialog open={false}><DialogContent><DialogHeader><DialogTitle /></DialogHeader></DialogContent></Dialog>
 
@@ -40,9 +73,13 @@ export function TimerFillDialog({ task, onConfirm, onSkip, onCancel }: TimerFill
     <Dialog open={!!task} onOpenChange={(open) => { if (!open) onCancel() }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Record Time</DialogTitle>
+          <DialogTitle>
+            {mode === 'overlong-timer' ? 'Adjust Recorded Time' : 'Record Time'}
+          </DialogTitle>
           <DialogDescription>
-            This task has no timer records. Would you like to log time spent?
+            {mode === 'overlong-timer'
+              ? `The running timer (${overlongInfo?.recorded}) is much longer than planned (${overlongInfo?.planned}). Would you like to correct the end time?`
+              : 'This task has no timer records. Would you like to log time spent?'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
@@ -70,10 +107,10 @@ export function TimerFillDialog({ task, onConfirm, onSkip, onCancel }: TimerFill
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="ghost" size="sm" onClick={() => onSkip(task)}>
-            Skip
+            {mode === 'overlong-timer' ? 'Keep as-is' : 'Skip'}
           </Button>
           <Button size="sm" onClick={handleConfirm}>
-            Record & Complete
+            {mode === 'overlong-timer' ? 'Fix & Complete' : 'Record & Complete'}
           </Button>
         </DialogFooter>
       </DialogContent>

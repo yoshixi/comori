@@ -10,6 +10,7 @@ import {
   postApiTimers,
   putApiTimersId,
   type Task,
+  type TaskTimer,
   type CalendarEvent
 } from './gen/api'
 import { TaskSideMenu } from './components/TaskSideMenu'
@@ -26,7 +27,7 @@ import { useTasksData } from './hooks/useTasksData'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { TasksView } from './components/TasksView'
 import { PlanningPanel } from './components/planning/PlanningPanel'
-import { TimerFillDialog } from './components/TimerFillDialog'
+import { TimerFillDialog, type TimerFillMode } from './components/TimerFillDialog'
 import { NotesView } from './components/NotesView'
 import { startOfDay, addDays } from './lib/calendar-utils'
 
@@ -140,6 +141,8 @@ function App(): React.JSX.Element {
   const [isCreatingCalendarTask, setIsCreatingCalendarTask] = useState(false)
   const [calendarCreateError, setCalendarCreateError] = useState<string | null>(null)
   const [timerFillTask, setTimerFillTask] = useState<Task | null>(null)
+  const [timerFillMode, setTimerFillMode] = useState<TimerFillMode>('no-timer')
+  const [timerFillActiveTimer, setTimerFillActiveTimer] = useState<TaskTimer | null>(null)
   const [isPlanningOpen, setIsPlanningOpen] = useState(() => {
     const lastPlanDate = localStorage.getItem('comori:lastPlanDate')
     const today = new Date().toISOString().split('T')[0]
@@ -350,41 +353,66 @@ function App(): React.JSX.Element {
     await tasksData.handleSaveSchedule(task.id, range.startAt, range.endAt)
   }, [tasksData])
 
-  // Wrap completion to check for timer records
+  // Wrap completion to check for timer records or overlong timers
   const handleCompleteWithTimerCheck = useCallback((task: Task) => {
     // If task is being un-completed, just toggle
     if (task.completedAt) {
       tasksData.handleToggleTaskCompletion(task)
       return
     }
-    // Check if task has any timer records
+
     const taskTimers = tasksData.timersByTaskId.get(task.id)
+
+    // Check for overlong active timer: if planned duration exists and active timer is 2x+ longer
     if (taskTimers && taskTimers.length > 0) {
+      const activeTimer = tasksData.activeTimersByTaskId.get(task.id)
+      if (activeTimer && task.startAt && task.endAt) {
+        const plannedMs = new Date(task.endAt).getTime() - new Date(task.startAt).getTime()
+        const recordedMs = Date.now() - new Date(activeTimer.startTime).getTime()
+        if (plannedMs > 0 && recordedMs >= plannedMs * 2) {
+          setTimerFillTask(task)
+          setTimerFillMode('overlong-timer')
+          setTimerFillActiveTimer(activeTimer)
+          return
+        }
+      }
+      // Timers exist and not overlong — just complete
       tasksData.handleToggleTaskCompletion(task)
       return
     }
+
     // No timers — show fill dialog
     setTimerFillTask(task)
+    setTimerFillMode('no-timer')
+    setTimerFillActiveTimer(null)
   }, [tasksData])
 
   const handleTimerFillConfirm = useCallback(async (taskId: number, startTime: string, endTime: string) => {
     try {
-      const response = await postApiTimers({ taskId, startTime })
-      await putApiTimersId(response.timer.id, { endTime })
+      if (timerFillMode === 'overlong-timer' && timerFillActiveTimer) {
+        // Update the existing timer's start and end time
+        await putApiTimersId(timerFillActiveTimer.id, { startTime, endTime })
+      } else {
+        // Create a new completed timer
+        const response = await postApiTimers({ taskId, startTime })
+        await putApiTimersId(response.timer.id, { endTime })
+      }
       await tasksData.mutateTimers()
     } catch (error) {
-      console.error('Failed to create timer:', error)
+      console.error('Failed to update timer:', error)
     }
     // Complete the task
     if (timerFillTask) {
       tasksData.handleToggleTaskCompletion(timerFillTask)
     }
     setTimerFillTask(null)
-  }, [tasksData, timerFillTask])
+    setTimerFillActiveTimer(null)
+  }, [tasksData, timerFillTask, timerFillMode, timerFillActiveTimer])
 
   const handleTimerFillSkip = useCallback((task: Task) => {
     tasksData.handleToggleTaskCompletion(task)
     setTimerFillTask(null)
+    setTimerFillActiveTimer(null)
   }, [tasksData])
 
   const handleCalendarEventConvert = useCallback((event: CalendarEvent) => {
@@ -697,9 +725,11 @@ function App(): React.JSX.Element {
       {/* Timer fill dialog - shown when completing task without timer records */}
       <TimerFillDialog
         task={timerFillTask}
+        mode={timerFillMode}
+        activeTimer={timerFillActiveTimer}
         onConfirm={handleTimerFillConfirm}
         onSkip={handleTimerFillSkip}
-        onCancel={() => setTimerFillTask(null)}
+        onCancel={() => { setTimerFillTask(null); setTimerFillActiveTimer(null) }}
       />
     </SidebarProvider>
   )

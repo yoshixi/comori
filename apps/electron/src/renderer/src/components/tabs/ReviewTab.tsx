@@ -31,7 +31,7 @@ import {
 } from '../../lib/timer-aggregation'
 import { PeriodSelector, type ReviewPeriod } from '../review/PeriodSelector'
 import { StatCard } from '../review/StatCard'
-import { SessionTimeline } from '../review/SessionTimeline'
+import { DayTimeline } from '../review/DayTimeline'
 
 interface ReviewTabProps {
   allTasks: Task[]
@@ -138,7 +138,7 @@ export function ReviewTab({
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Sessions
           </h3>
-          <SessionTimeline
+          <DayTimeline
             sessions={sessions}
             onTaskSelect={onTaskSelect}
             showLiveIndicator={period === 'today'}

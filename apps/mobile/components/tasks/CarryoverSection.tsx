@@ -60,6 +60,9 @@ export function CarryoverSection({ tasks, onComplete }: CarryoverSectionProps) {
     [revalidateTasks]
   );
 
+  // "Skip" clears the schedule entirely (sets startAt/endAt to null),
+  // moving the task to the "Other Tasks" (unscheduled) bucket. The task
+  // remains incomplete so the user can reschedule it later.
   const handleSkip = useCallback(
     async (task: Task) => {
       setLoadingTaskId(task.id);

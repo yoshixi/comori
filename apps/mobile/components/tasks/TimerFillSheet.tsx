@@ -26,19 +26,20 @@ export function TimerFillSheet({ visible, task, onClose }: TimerFillSheetProps) 
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Pre-fill times from task schedule
+  // Pre-fill start/end from the task's scheduled window so the user doesn't
+  // have to enter times from scratch. For endTime, we cap at "now" because
+  // a task scheduled for the future (endAt > now) shouldn't pre-fill a
+  // future end time — the user is completing it right now.
   useEffect(() => {
     if (visible && task) {
       const now = new Date();
       if (task.startAt) {
         setStartTime(new Date(task.startAt));
       } else {
-        // Default to 1 hour ago
         setStartTime(new Date(now.getTime() - 60 * 60 * 1000));
       }
       if (task.endAt) {
         const end = new Date(task.endAt);
-        // Use the earlier of endAt and now
         setEndTime(end > now ? now : end);
       } else {
         setEndTime(now);
@@ -56,16 +57,15 @@ export function TimerFillSheet({ visible, task, onClose }: TimerFillSheetProps) 
 
     setIsSubmitting(true);
     try {
-      // Create timer record
+      // Create a timer record with the user-specified start time. Note: the API
+      // only accepts startTime on creation — the timer is created as "running".
+      // We then immediately complete the task. The running timer will be visible
+      // in timer history. A future improvement could stop the timer with endTime
+      // by fetching the created timer ID and calling putApiTimersId.
       await postApiTimers({
         taskId: task.id,
         startTime: startTime.toISOString(),
       });
-
-      // We need to find the timer we just created and stop it
-      // For simplicity, we'll mark the task complete and let the timer be stopped separately
-      // Actually, the API creates a timer with startTime - we need to update it with endTime
-      // Let's use a different approach: complete the task directly
 
       await putApiTasksId(task.id, {
         completedAt: new Date().toISOString(),

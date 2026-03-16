@@ -38,7 +38,11 @@ export function QuickStartTask({ activeTimers = [] }: QuickStartTaskProps) {
       const now = new Date();
       const endAt = new Date(now.getTime() + durationMinutes * 60 * 1000);
 
-      // Stop all running timers first
+      // Stop all running timers before starting a new focus session.
+      // This prevents multiple timers from running simultaneously — the user
+      // can only focus on one task at a time. We re-filter for !endTime here
+      // because the parent's activeTimers list may include stale entries
+      // between SWR revalidations.
       if (activeTimers.length > 0) {
         await Promise.all(
           activeTimers

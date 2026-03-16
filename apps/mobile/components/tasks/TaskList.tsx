@@ -91,7 +91,10 @@ export function TaskList() {
     });
   }, [tasks, activeTimerByTaskId]);
 
-  // Other tasks (not in-progress, not today, not carryover)
+  // Remainder bucket: tasks that don't fit in any of the above sections.
+  // Includes unscheduled tasks and future-scheduled tasks. We exclude carryover
+  // by ID set rather than re-checking dates to stay consistent with the
+  // carryoverTasks filter above (avoids edge cases at day boundaries).
   const otherTasks = useMemo(() => {
     const todayStart = startOfDay(new Date());
     const todayEnd = addDays(todayStart, 1);
@@ -106,7 +109,11 @@ export function TaskList() {
     });
   }, [tasks, activeTimerByTaskId, carryoverTasks]);
 
-  // Check if task has timer records before completing
+  // Gatekeeper for task completion: fetches the task's timer history from the
+  // server (not from the SWR cache, which only has active timers) to decide
+  // whether to show the TimerFillSheet. This makes an extra API call on each
+  // completion, but avoids the complexity of caching per-task timer lists for
+  // every task in the list.
   const handleCompleteWithTimerCheck = useCallback(
     async (task: Task) => {
       try {

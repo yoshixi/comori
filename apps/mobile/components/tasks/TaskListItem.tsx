@@ -40,7 +40,10 @@ export function TaskListItem({ task, activeTimer, onPress, onComplete }: TaskLis
 
   const isCompleted = !!task.completedAt;
 
-  // Calculate countdown info when task has endAt and timer is running
+  // Derive countdown from the task's planned window (startAt→endAt) vs actual elapsed time.
+  // Uses task.startAt as the reference point for planned duration; falls back to the timer's
+  // startTime if the task has no startAt (e.g., created without scheduling).
+  // Returns null when there's no endAt — the task has no planned duration to count against.
   const countdownInfo = useMemo(() => {
     if (!isRunning || !task.endAt || !activeTimer?.startTime) return null;
 
@@ -79,7 +82,10 @@ export function TaskListItem({ task, activeTimer, onPress, onComplete }: TaskLis
   const handleComplete = useCallback(async () => {
     swipeableRef.current?.close();
 
-    // If external onComplete handler is provided (for timer fill-out check), delegate to it
+    // When onComplete is provided, delegate completion to the parent (TaskList) which
+    // checks for timer records first and may show TimerFillSheet instead of completing
+    // immediately. We only delegate on "complete" (not "undo"), so uncompleting always
+    // works inline without the timer check.
     if (onComplete && !isCompleted) {
       onComplete(task);
       return;

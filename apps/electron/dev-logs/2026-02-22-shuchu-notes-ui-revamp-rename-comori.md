@@ -1,11 +1,11 @@
-# UI Revamp: Rename to Techo + Charming Design
+# UI Revamp: Rename to Techoo + Charming Design
 
 **Date:** 2026-02-22
 **Branch:** shuchu-notes
 
 ## What Was Implemented
 
-### Phase 0: Rename Shuchu to Techo
+### Phase 0: Rename Shuchu to Techoo
 - Updated all user-facing text across Electron and Mobile apps
 - Updated build configs: `electron-builder.yml`, `package.json`, `app.json`
 - Updated API metadata in backend route, handlers, common core, and tests
@@ -47,7 +47,7 @@
 - Updated TaskSideMenu: warm container, success text color
 - Updated NotesView: warm empty state with character
 - Updated AccountView: title "Your Space", semantic colors
-- Updated AuthScreen: "Welcome to Techo", character illustration
+- Updated AuthScreen: "Welcome to Techoo", character illustration
 - Updated CommentsPanel: warm placeholder
 - Replaced all `text-red-*`, `bg-red-*` in main views with semantic tokens
 
@@ -62,7 +62,7 @@
 - Updated `lib/theme.ts` with warm light theme values
 - Updated mobile UI components: pill buttons, rounder cards/inputs
 - Updated view components: warm microcopy, semantic colors
-- Updated settings footer: "Techo v{ver} — Your cozy focus companion"
+- Updated settings footer: "Techoo v{ver} — Your cozy focus companion"
 
 ### Phase 6: Documentation
 - Replaced `docs/UI_DESIGN_PRINCIPLES.md` with new charming design guidelines
@@ -75,7 +75,7 @@
    pnpm --filter electron run api:generate
    pnpm --filter mobile run api:generate
    ```
-   This will rename `shuchuAPI.gen.ts` to `techoAPI.gen.ts` and update all imports.
+   This will rename `shuchuAPI.gen.ts` to `techooAPI.gen.ts` and update all imports.
 
 2. **Install Nunito font for mobile** (Expo):
    ```sh

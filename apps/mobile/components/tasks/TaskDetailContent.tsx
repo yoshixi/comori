@@ -9,7 +9,7 @@ import {
   usePutApiTasksId,
   useDeleteApiTasksId,
   useGetApiTasksTaskIdTimers,
-} from '@/gen/api/endpoints/techoAPI.gen';
+} from '@/gen/api/endpoints/techooAPI.gen';
 import { Text } from '@/components/ui/text';
 import { Input, TextArea } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

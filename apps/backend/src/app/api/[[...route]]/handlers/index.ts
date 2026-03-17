@@ -19,7 +19,7 @@ export const healthHandler: RouteHandler<typeof healthRoute, AppBindings> = (c) 
   return c.json(
     {
       status: 'ok',
-      message: 'Techo API is running',
+      message: 'Techoo API is running',
       timestamp: new Date().toISOString()
     },
     200

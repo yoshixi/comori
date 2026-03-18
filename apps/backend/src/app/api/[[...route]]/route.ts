@@ -208,25 +208,48 @@ app.on(['POST', 'GET'], '/auth/*', (c) => {
   return auth.handler(c.req.raw)
 })
 
-// Token exchange endpoint: session token → short-lived JWT
+// Token exchange endpoint.
+// Accepts either:
+//   - A session token via Authorization header → returns { token: JWT }
+//   - A short-lived exchange code in the body → returns { token: JWT, session_token }
 app.post('/token', async (c) => {
   const auth = createAuth()
+
+  // If a code is provided in the body, exchange it for a session token first.
+  const body = await c.req.json().catch(() => ({}))
+  const code = typeof body?.code === 'string' ? body.code.trim() : ''
+  let sessionToken: string | null = null
+
+  if (code) {
+    sessionToken = await consumeExchangeCode(code)
+    if (!sessionToken) {
+      return c.json({ error: 'Invalid or expired code' }, 400)
+    }
+  }
+
+  // Resolve the session — from the exchanged token or from the Authorization header.
   let session = await auth.api.getSession({ headers: c.req.raw.headers })
   const authHeader = c.req.header('Authorization')
-  if (!session && authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
+  const bearerToken = sessionToken ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)
+  if (!session && bearerToken) {
     const headers = new Headers(c.req.raw.headers)
-    headers.set('cookie', `better-auth.session_token=${token}`)
+    headers.set('cookie', `better-auth.session_token=${bearerToken}`)
     session = await auth.api.getSession({ headers })
   }
   if (!session) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
+
   const jwt = await signJwt({
     id: Number(session.user.id),
     email: session.user.email,
     name: session.user.name,
   })
+
+  // When exchanging a code, also return the session token so the client can persist it.
+  if (sessionToken) {
+    return c.json({ token: jwt, session_token: sessionToken })
+  }
   return c.json({ token: jwt })
 })
 
@@ -264,19 +287,6 @@ app.post('/session-code', async (c) => {
   return c.json({ code })
 })
 
-// Exchange a short-lived code for the session token.
-app.post('/session-exchange', async (c) => {
-  const body = await c.req.json().catch(() => ({}))
-  const code = typeof body?.code === 'string' ? body.code.trim() : ''
-  if (!code) {
-    return c.json({ error: 'Missing code' }, 400)
-  }
-  const sessionToken = await consumeExchangeCode(code)
-  if (!sessionToken) {
-    return c.json({ error: 'Invalid or expired code' }, 400)
-  }
-  return c.json({ session_token: sessionToken })
-})
 
 // Desktop app OAuth initiation: the browser navigates here directly so that
 // better-auth's state cookie is set in the browser's cookie jar (not in
@@ -568,7 +578,6 @@ app.use('/*', async (c, next) => {
     path === '/api/token' ||
     path === '/api/session' ||
     path === '/api/session-code' ||
-    path === '/api/session-exchange' ||
     path === '/api/oauth/desktop' ||
     path === '/api/oauth/desktop/callback' ||
     path === '/api/oauth/desktop-link' ||

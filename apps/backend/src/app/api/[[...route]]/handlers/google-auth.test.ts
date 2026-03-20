@@ -10,16 +10,20 @@ import {
   type SqliteLibsqlTestContext
 } from '../../../db/tests/sqliteLibsqlTestUtils'
 import { accountsTable } from '../../../db/schema/schema'
+import type { DB } from '../../../core/common.db'
+import { createOAuthService } from '../../../core/oauth.service'
 
 type TestUser = { id: number; email: string; name: string }
 
-const createTestApp = (getUser: () => TestUser | null) => {
+const createTestApp = (getUser: () => TestUser | null, getDb: () => DB) => {
   const app = new OpenAPIHono<AppBindings>()
 
   app.use('/*', async (c, next) => {
     const user = getUser()
     if (user) {
       c.set('user', user)
+      c.set('db', getDb())
+      c.set('oauth', createOAuthService(user.id, getDb()))
     }
     await next()
   })
@@ -38,7 +42,7 @@ describe('Google Auth Handlers', () => {
 
   beforeAll(async () => {
     testContext = await createSqliteLibsqlTestContext()
-    app = createTestApp(() => testUser)
+    app = createTestApp(() => testUser, () => testContext.db)
     request = createTestRequest(testContext)(app)
   })
 

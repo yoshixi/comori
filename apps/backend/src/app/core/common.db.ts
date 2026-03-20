@@ -1,64 +1,77 @@
-import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql'
-import { createClient } from '@libsql/client'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
-import fs from 'fs'
-import path from 'path'
+import { createTenanso, type TenansoInstance } from 'tenanso'
 import * as schema from '../db/schema/schema'
+import { getMainDb, resetMainDbForTests } from './internal/main-db'
 
-const DRIZZLE_CONFIG = {
-  casing: 'snake_case' as const,
+// Re-export so existing callers of common.db.getMainDb still compile,
+// but new code should prefer the user-scoped OAuthService or tenant DB.
+export { getMainDb }
+
+/** @deprecated Use getTenantDbForUser() or OAuthService instead */
+export function getDb(): DB {
+  return getMainDb()
 }
 
-let dbInstance: ReturnType<typeof drizzleLibsql> | null = null
+const getEnv = (): Record<string, string | undefined> =>
+  (typeof process === 'undefined' ? {} : (process.env as Record<string, string | undefined>))
 
-const getEnv = (): NodeJS.ProcessEnv =>
-  (typeof process === 'undefined' ? ({} as NodeJS.ProcessEnv) : process.env)
-const isNodeRuntime = () => typeof process !== 'undefined' && !!process.versions?.node
+let tenansoInstance: TenansoInstance | null = null
 
-const getLocalDbUrl = () => {
-  if (!isNodeRuntime()) {
-    throw new Error('Local SQLite file database is not supported in this runtime. Set TURSO_CONNECTION_URL/TURSO_AUTH_TOKEN instead.')
+/**
+ * Returns the tenanso instance for multi-tenant database management.
+ * Returns null when tenanso env vars are not configured (local dev).
+ */
+export function getTenanso(): TenansoInstance | null {
+  const env = getEnv()
+  if (tenansoInstance) return tenansoInstance
+
+  const orgSlug = env.TURSO_ORG_SLUG
+  const apiToken = env.TURSO_API_TOKEN
+  const group = env.TURSO_GROUP
+  const groupAuthToken = env.TURSO_GROUP_AUTH_TOKEN
+  const tenantDbUrl = env.TURSO_TENANT_DB_URL
+  const seedDb = env.TURSO_SEED_DB
+
+  if (!orgSlug || !apiToken || !group || !groupAuthToken || !tenantDbUrl || !seedDb) {
+    return null
   }
-  const tmpDir = path.join(process.cwd(), 'tmp')
-  fs.mkdirSync(tmpDir, { recursive: true })
-  return `file:${path.join(tmpDir, 'local.db')}`
-}
 
-const getDbFromSqlite = (url: string) =>
-  drizzleLibsql({
-    client: createClient({ url }),
+  tenansoInstance = createTenanso({
+    turso: {
+      organizationSlug: orgSlug,
+      apiToken,
+      group,
+    },
+    databaseUrl: tenantDbUrl,
+    authToken: groupAuthToken,
     schema,
-    ...DRIZZLE_CONFIG,
+    seed: { database: seedDb },
   })
 
-export const resetDbForTests = () => {
-  dbInstance = null
+  return tenansoInstance
 }
 
-export function getDb(): DB {
-  const env = getEnv()
-  if (dbInstance) return dbInstance as unknown as DB
-
-  if (env.TURSO_CONNECTION_URL && env.TURSO_AUTH_TOKEN) {
-    dbInstance = drizzleLibsql({
-      connection: {
-        url: env.TURSO_CONNECTION_URL,
-        authToken: env.TURSO_AUTH_TOKEN
-      },
-      schema,
-      ...DRIZZLE_CONFIG
-    })
-    return dbInstance as unknown as DB
+/**
+ * Returns the tenant database for a specific user.
+ * In production (tenanso configured): returns a per-user database.
+ * In local dev (tenanso not configured): falls back to getMainDb() (single DB mode).
+ */
+export function getTenantDbForUser(userId: number): DB {
+  const tenanso = getTenanso()
+  if (!tenanso) {
+    return getMainDb()
   }
+  return tenanso.dbFor(`user-${userId}`) as unknown as DB
+}
 
-  if (!isNodeRuntime()) {
-    throw new Error('Turso credentials are required in this runtime. Set TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN.')
-  }
+/** Helper to derive tenant name from user ID */
+export function tenantNameForUser(userId: number): string {
+  return `user-${userId}`
+}
 
-  const sqliteUrl = (env as Record<string, string | undefined>).SQLITE_URL
-  const url = sqliteUrl || getLocalDbUrl()
-  dbInstance = getDbFromSqlite(url)
-  return dbInstance as unknown as DB
+export const resetDbForTests = () => {
+  resetMainDbForTests()
+  tenansoInstance = null
 }
 
 export type DB = BaseSQLiteDatabase<'async', unknown, typeof schema>

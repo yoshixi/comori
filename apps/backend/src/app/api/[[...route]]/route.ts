@@ -2,9 +2,9 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 import { createAuth } from '../../core/auth'
 import { signJwt, verifyJwt } from '../../core/jwt'
-import { getDb } from '../../core/common.db'
-import { oauthExchangeCodesTable } from '../../db/schema/schema'
-import { eq } from 'drizzle-orm'
+import { getTenantDbForUser } from '../../core/common.db'
+import { createExchangeCode, consumeExchangeCode } from '../../core/exchange-codes'
+import { createOAuthService } from '../../core/oauth.service'
 import type { AppBindings } from './types'
 
 // Import route definitions from local routes directory
@@ -127,8 +127,6 @@ const DEFAULT_MOBILE_REDIRECT_URIS = [
   'exp+techoo://auth-callback',
   'exp+techoo://link-callback'
 ]
-const EXCHANGE_CODE_TTL_MS = 5 * 60 * 1000
-
 const getEnv = (): Record<string, string | undefined> =>
   (typeof process === 'undefined'
     ? {}
@@ -151,44 +149,6 @@ const isAllowedMobileRedirectUri = (redirectUri: string) => {
   const normalized = normalizeRedirectUri(redirectUri)
   const allowed = getAllowedMobileRedirectUris()
   return allowed.includes(normalized)
-}
-
-const hashExchangeCode = async (code: string): Promise<string> => {
-  const data = new TextEncoder().encode(code)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-const createExchangeCode = async (sessionToken: string): Promise<string> => {
-  const code = crypto.randomUUID()
-  const codeHash = await hashExchangeCode(code)
-  const expiresAt = new Date(Date.now() + EXCHANGE_CODE_TTL_MS)
-  const db = getDb()
-  await db.insert(oauthExchangeCodesTable).values({
-    codeHash,
-    sessionToken,
-    expiresAt
-  })
-  return code
-}
-
-const consumeExchangeCode = async (code: string): Promise<string | null> => {
-  const codeHash = await hashExchangeCode(code)
-  const db = getDb()
-  const rows = await db
-    .select()
-    .from(oauthExchangeCodesTable)
-    .where(eq(oauthExchangeCodesTable.codeHash, codeHash))
-  const row = rows[0]
-  if (!row) return null
-  if (row.expiresAt.getTime() < Date.now()) {
-    await db.delete(oauthExchangeCodesTable).where(eq(oauthExchangeCodesTable.id, row.id))
-    return null
-  }
-  await db.delete(oauthExchangeCodesTable).where(eq(oauthExchangeCodesTable.id, row.id))
-  return row.sessionToken
 }
 
 // Hono's CORS middleware sets headers on c.res after await next(),
@@ -598,11 +558,16 @@ app.use('/*', async (c, next) => {
 
   try {
     const payload = await verifyJwt(authHeader.slice(7))
+    const userId = Number(payload.sub)
     c.set('user', {
-      id: Number(payload.sub),
+      id: userId,
       email: payload.email,
       name: payload.name,
     })
+    // Set the tenant database for this user
+    c.set('db', getTenantDbForUser(userId))
+    // Set user-scoped OAuth service
+    c.set('oauth', createOAuthService(userId))
     await next()
   } catch {
     return c.json({ error: 'Unauthorized' }, 401)

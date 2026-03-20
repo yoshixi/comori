@@ -1,14 +1,14 @@
 import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
 import { googleCalendarWebhookRoute } from '../routes/webhooks'
-import { getDb } from '../../../core/common.db'
+import { getTenantDbForUser } from '../../../core/common.db'
 import { getWatchChannelByChannelId } from '../../../core/watch-channels.db'
 import {
   getCalendarByIdOnly,
   updateCalendarLastSynced
 } from '../../../core/calendars.db'
 import { importEventsForCalendar } from '../../../core/events.db'
-import { getOAuthTokenForAccount, updateOAuthToken } from '../../../core/oauth.db'
+import { createOAuthService } from '../../../core/oauth.service'
 import {
   googleCalendarProvider,
   getValidGoogleTokens
@@ -52,7 +52,15 @@ export const googleCalendarWebhookHandler: RouteHandler<
       return c.json({}, 200)
     }
 
-    const db = getDb()
+    // Channel token format: "user-{id}:{uuid}" — extract tenant name
+    const tenantPart = channelToken?.split(':')[0]
+    const tenantUserId = tenantPart ? parseInt(tenantPart.replace('user-', ''), 10) : NaN
+    if (!tenantPart || isNaN(tenantUserId)) {
+      console.warn('Missing or invalid tenant in channel token:', channelToken)
+      return c.json({}, 200)
+    }
+    const db = getTenantDbForUser(tenantUserId)
+    const oauth = createOAuthService(tenantUserId)
 
     // Find the watch channel
     const watchChannel = await getWatchChannelByChannelId(db, channelId)
@@ -85,9 +93,7 @@ export const googleCalendarWebhookHandler: RouteHandler<
     }
 
     // Get OAuth tokens from accounts table (populated by better-auth)
-    const account = await getOAuthTokenForAccount(
-      db,
-      userId,
+    const account = await oauth.getTokenForAccount(
       'google',
       calendar.providerAccountId
     )
@@ -108,7 +114,7 @@ export const googleCalendarWebhookHandler: RouteHandler<
 
       // Update tokens if refreshed
       if (validTokens.accessToken !== account.accessToken) {
-        await updateOAuthToken(db, userId, 'google', calendar.providerAccountId, {
+        await oauth.updateToken('google', calendar.providerAccountId, {
           accessToken: validTokens.accessToken,
           refreshToken: validTokens.refreshToken,
           expiresAt: validTokens.expiresAt

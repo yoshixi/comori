@@ -2,7 +2,8 @@ import { betterAuth } from "better-auth";
 import { eq } from "drizzle-orm";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
-import { getDb } from "./common.db";
+import { getMainDb } from "./internal/main-db";
+import { getTenanso } from "./common.db";
 import { googleCalendarProvider } from "./calendar-providers/google.service";
 import { requireEnv } from "../lib/utils";
 import {
@@ -40,7 +41,7 @@ const updateGoogleAccountProfile = async (account: {
   const userId = Number(account.userId);
   if (Number.isNaN(accountId) || Number.isNaN(userId)) return;
 
-  const db = getDb();
+  const db = getMainDb();
 
   if (info.email && info.email !== account.providerEmail) {
     await db
@@ -85,7 +86,7 @@ export const createAuth = () => {
   return betterAuth({
     secret,
     baseURL: betterAuthUrl || "http://localhost:8787",
-    database: drizzleAdapter(getDb(), {
+    database: drizzleAdapter(getMainDb(), {
       provider: "sqlite",
       usePlural: true,
       schema: {
@@ -150,6 +151,21 @@ export const createAuth = () => {
       "http://localhost:*"
     ],
     databaseHooks: {
+      user: {
+        create: {
+          after: async (user: { id?: string | number }) => {
+            const tenanso = getTenanso();
+            if (!tenanso || user.id === undefined || user.id === null) return;
+            const tenantName = `user-${user.id}`;
+            try {
+              await tenanso.createTenant(tenantName);
+              console.log(`Created tenant database: ${tenantName}`);
+            } catch (error) {
+              console.error(`Failed to create tenant database ${tenantName}:`, error);
+            }
+          }
+        }
+      },
       account: {
         create: {
           after: async (account: {

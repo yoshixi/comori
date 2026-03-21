@@ -176,7 +176,7 @@ export function createApp(deps?: AppDeps) {
 
   // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
   // Sign-up paths are intercepted to provision the tenant DB after user creation.
-  const SIGN_UP_PATHS = ['/api/auth/sign-up/email', '/api/auth/sign-in/social']
+  const SIGN_UP_PATHS = ['/api/auth/sign-up/email', '/api/auth/sign-in/social', '/api/auth/callback']
 
   app.on(['POST', 'GET'], '/auth/*', async (c) => {
     const response = await auth.handler(c.req.raw)
@@ -242,13 +242,22 @@ export function createApp(deps?: AppDeps) {
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    // Verify the user's tenant DB exists before issuing a JWT.
-    // If tenant provisioning failed during sign-up, the user should not
-    // proceed to the authenticated experience.
-    const readiness = await validateUserReady(Number(session.user.id))
+    // Ensure the user's tenant DB exists before issuing a JWT.
+    // This handles all auth flows (email sign-up, OAuth callback, etc.)
+    // — if the tenant wasn't provisioned yet, create it now.
+    const userId = Number(session.user.id)
+    const readiness = await validateUserReady(userId)
     if (!readiness.ok) {
-      console.error('User not ready:', readiness.error)
-      return c.json({ error: 'Account setup incomplete. Please try signing up again.' }, 503)
+      try {
+        await provisionTenant({
+          id: userId,
+          name: session.user.name,
+          email: session.user.email,
+        })
+      } catch (error) {
+        console.error('Tenant provisioning failed at /token:', error)
+        return c.json({ error: 'Account setup failed. Please try again.' }, 503)
+      }
     }
 
     const jwt = await signJwt({

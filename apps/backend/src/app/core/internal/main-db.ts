@@ -24,11 +24,11 @@ export function getMainDb(): DB {
   const env = getEnv()
   if (mainDbInstance) return mainDbInstance as unknown as DB
 
-  if (env.TURSO_CONNECTION_URL && env.TURSO_AUTH_TOKEN) {
+  if (env.TURSO_MAIN_DB_URL && env.TURSO_MAIN_DB_AUTH_TOKEN) {
     mainDbInstance = drizzleLibsql({
       connection: {
-        url: env.TURSO_CONNECTION_URL,
-        authToken: env.TURSO_AUTH_TOKEN
+        url: env.TURSO_MAIN_DB_URL,
+        authToken: env.TURSO_MAIN_DB_AUTH_TOKEN
       },
       schema,
       ...DRIZZLE_CONFIG

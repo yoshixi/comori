@@ -25,8 +25,8 @@ const appEnvSchema = z.object({
   MOBILE_REDIRECT_URIS: z.string().optional(),
 
   // Centralized DB (Turso)
-  TURSO_CONNECTION_URL: z.string().optional(),
-  TURSO_AUTH_TOKEN: z.string().optional(),
+  TURSO_MAIN_DB_URL: z.string().optional(),
+  TURSO_MAIN_DB_AUTH_TOKEN: z.string().optional(),
 
   // Local dev DB
   SQLITE_URL: z.string().optional(),

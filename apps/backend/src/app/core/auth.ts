@@ -146,7 +146,13 @@ export const createAuth = () => {
         create: {
           after: async (user: { id?: string | number; name?: string; email?: string }) => {
             const tenanso = getTenanso();
-            if (!tenanso || user.id === undefined || user.id === null) return;
+            if (!tenanso) return; // Local dev — single DB mode, no tenant provisioning
+
+            if (user.id === undefined || user.id === null) {
+              console.error('User created without an ID — cannot provision tenant database');
+              throw new Error('User created without an ID');
+            }
+
             const userId = Number(user.id);
             const tenantName = `user-${userId}`;
             try {

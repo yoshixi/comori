@@ -84,11 +84,25 @@ export async function provisionTenant(user: { id: number; name: string; email: s
   await tenanso.createTenant(tenantName)
 
   // Seed the user record into the tenant DB so FK constraints are satisfied.
+  // Turso has a short propagation delay after database creation, so we retry.
   const tenantDb = getTenantDbForUser(user.id)
-  await tenantDb
-    .insert(schema.usersTable)
-    .values({ id: user.id, name: user.name, email: user.email })
-    .onConflictDoNothing()
+  const maxRetries = 5
+  const delayMs = 1000
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await tenantDb
+        .insert(schema.usersTable)
+        .values({ id: user.id, name: user.name, email: user.email })
+        .onConflictDoNothing()
+      return
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to seed tenant DB after ${maxRetries} attempts`, { cause: error })
+      }
+      console.log(`Tenant DB not ready yet (attempt ${attempt}/${maxRetries}), retrying in ${delayMs}ms...`)
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
 }
 
 /**

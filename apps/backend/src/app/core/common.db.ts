@@ -28,14 +28,15 @@ export function getTenanso(): TenansoInstance | null {
   const apiToken = env.TURSO_API_TOKEN
   const group = env.TURSO_GROUP
   const groupAuthToken = env.TURSO_GROUP_AUTH_TOKEN
-  const tenantDbUrl = env.TURSO_TENANT_DB_URL
   const seedDbName = env.TURSO_SEED_DB_NAME
 
-  if (!orgSlug || !apiToken || !group || !groupAuthToken || !tenantDbUrl || !seedDbName) {
+  if (!orgSlug || !apiToken || !group || !groupAuthToken || !seedDbName) {
     return null
   }
 
   const tursoApiBaseUrl = env.TURSO_API_BASE_URL
+  // Compute the tenant DB URL from orgSlug, or use override (for tests with file: URLs)
+  const tenantDbUrl = env.TURSO_TENANT_DB_URL || `libsql://{tenant}-${orgSlug}.turso.io`
 
   tenansoInstance = createTenanso({
     turso: {

@@ -29,18 +29,11 @@ export function getTenanso(): TenansoInstance | null {
   const group = env.TURSO_GROUP
   const groupAuthToken = env.TURSO_GROUP_AUTH_TOKEN
   const tenantDbUrl = env.TURSO_TENANT_DB_URL
-  const seedDbUrl = env.TURSO_SEED_DB_URL
+  const seedDbName = env.TURSO_SEED_DB_NAME
 
-  if (!orgSlug || !apiToken || !group || !groupAuthToken || !tenantDbUrl || !seedDbUrl) {
+  if (!orgSlug || !apiToken || !group || !groupAuthToken || !tenantDbUrl || !seedDbName) {
     return null
   }
-
-  // Extract DB name from URL for tenanso's seed config.
-  // libsql://{db-name}-{org}.turso.io → db-name-org
-  // file:/path/to/seed.db → seed
-  const seedDbName = seedDbUrl.startsWith('file:')
-    ? seedDbUrl.replace(/^file:.*\//, '').replace(/\.db$/, '')
-    : new URL(seedDbUrl).hostname.replace(/\.turso\.io$/, '')
 
   const tursoApiBaseUrl = env.TURSO_API_BASE_URL
 

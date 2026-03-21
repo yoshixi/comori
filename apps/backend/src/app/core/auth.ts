@@ -7,14 +7,13 @@ import { getTenanso, getTenantDbForUser } from "./common.db";
 import { usersTable as tenantUsersTable } from "../db/schema/schema";
 import { googleCalendarProvider } from "./calendar-providers/google.service";
 import { requireEnv } from "../lib/utils";
+import { getEnv } from "./env";
 import {
   usersTable,
   sessionsTable,
   accountsTable,
   verificationsTable,
 } from "../db/schema/schema";
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === "undefined" ? {} : (process.env as Record<string, string | undefined>));
 
 const updateGoogleAccountProfile = async (account: {
   id?: number | string
@@ -144,7 +143,7 @@ export const createAuth = () => {
       // },
     },
     trustedOrigins: [
-      ...(process.env.TRUSTED_ORIGINS || "http://localhost:5173")
+      ...(env.TRUSTED_ORIGINS || "http://localhost:5173")
         .split(",")
         .map((origin) => origin.trim())
         .filter(Boolean),

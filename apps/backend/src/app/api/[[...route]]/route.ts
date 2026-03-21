@@ -5,6 +5,7 @@ import { signJwt, verifyJwt } from '../../core/jwt'
 import { getTenantDbForUser } from '../../core/common.db'
 import { createExchangeCode, consumeExchangeCode } from '../../core/exchange-codes'
 import { createOAuthService } from '../../core/oauth.service'
+import { getEnv } from '../../core/env'
 import type { AppBindings } from './types'
 
 // Import route definitions from local routes directory
@@ -127,11 +128,6 @@ const DEFAULT_MOBILE_REDIRECT_URIS = [
   'exp+techoo://auth-callback',
   'exp+techoo://link-callback'
 ]
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === 'undefined'
-    ? {}
-    : (process.env as Record<string, string | undefined>))
-
 const normalizeRedirectUri = (redirectUri: string) =>
   redirectUri.trim().replace(/\/$/, '')
 

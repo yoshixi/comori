@@ -1,5 +1,6 @@
 import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
+import { getEnv } from '../../../core/env'
 import {
   listAvailableCalendarsRoute,
   listCalendarsRoute,
@@ -432,7 +433,7 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
     }
 
     // Get webhook URL from environment or construct it
-    const webhookBaseUrl = process.env.WEBHOOK_BASE_URL
+    const webhookBaseUrl = getEnv().WEBHOOK_BASE_URL
     if (!webhookBaseUrl) {
       return c.json({ error: 'WEBHOOK_BASE_URL environment variable not set' }, 500)
     }

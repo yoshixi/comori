@@ -2,6 +2,7 @@ import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import { createTenanso, type TenansoInstance } from 'tenanso'
 import * as schema from '../db/schema/schema'
 import { getMainDb, resetMainDbForTests } from './internal/main-db'
+import { getEnv } from './env'
 
 // Re-export so existing callers of common.db.getMainDb still compile,
 // but new code should prefer the user-scoped OAuthService or tenant DB.
@@ -11,9 +12,6 @@ export { getMainDb }
 export function getDb(): DB {
   return getMainDb()
 }
-
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === 'undefined' ? {} : (process.env as Record<string, string | undefined>))
 
 let tenansoInstance: TenansoInstance | null = null
 

@@ -8,15 +8,13 @@ import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql'
 import { createClient } from '@libsql/client'
 import * as schema from '../../db/schema/schema'
 import type { DB } from '../common.db'
+import { getEnv } from '../env'
 
 const DRIZZLE_CONFIG = {
   casing: 'snake_case' as const,
 }
 
 let mainDbInstance: ReturnType<typeof drizzleLibsql> | null = null
-
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === 'undefined' ? {} : (process.env as Record<string, string | undefined>))
 
 /**
  * Returns the centralized (main) database used for auth tables

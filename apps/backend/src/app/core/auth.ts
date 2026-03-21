@@ -155,19 +155,31 @@ export const createAuth = () => {
 
             const userId = Number(user.id);
             const tenantName = `user-${userId}`;
-            await tenanso.createTenant(tenantName);
-            console.log(`Created tenant database: ${tenantName}`);
+            try {
+              await tenanso.createTenant(tenantName);
+              console.log(`Created tenant database: ${tenantName}`);
 
-            // Seed the user record into the tenant DB so FK constraints are satisfied.
-            const tenantDb = getTenantDbForUser(userId);
-            await tenantDb
-              .insert(tenantUsersTable)
-              .values({
-                id: userId,
-                name: user.name || '',
-                email: user.email || '',
-              })
-              .onConflictDoNothing();
+              // Seed the user record into the tenant DB so FK constraints are satisfied.
+              const tenantDb = getTenantDbForUser(userId);
+              await tenantDb
+                .insert(tenantUsersTable)
+                .values({
+                  id: userId,
+                  name: user.name || '',
+                  email: user.email || '',
+                })
+                .onConflictDoNothing();
+            } catch (error) {
+              // Tenant provisioning failed — clean up the orphaned user from the main DB
+              // so the user can retry sign-up. The `after` hook runs post-commit,
+              // so we must delete manually.
+              console.error(`Failed to provision tenant ${tenantName}, rolling back user:`, error);
+              const mainDb = getMainDb();
+              await mainDb.delete(sessionsTable).where(eq(sessionsTable.userId, userId));
+              await mainDb.delete(accountsTable).where(eq(accountsTable.userId, userId));
+              await mainDb.delete(usersTable).where(eq(usersTable.id, userId));
+              throw error;
+            }
           }
         }
       },

@@ -3,7 +3,8 @@ import { eq } from "drizzle-orm";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
 import { getMainDb } from "./internal/main-db";
-import { getTenanso } from "./common.db";
+import { getTenanso, getTenantDbForUser } from "./common.db";
+import { usersTable as tenantUsersTable } from "../db/schema/schema";
 import { googleCalendarProvider } from "./calendar-providers/google.service";
 import { requireEnv } from "../lib/utils";
 import {
@@ -153,13 +154,25 @@ export const createAuth = () => {
     databaseHooks: {
       user: {
         create: {
-          after: async (user: { id?: string | number }) => {
+          after: async (user: { id?: string | number; name?: string; email?: string }) => {
             const tenanso = getTenanso();
             if (!tenanso || user.id === undefined || user.id === null) return;
-            const tenantName = `user-${user.id}`;
+            const userId = Number(user.id);
+            const tenantName = `user-${userId}`;
             try {
               await tenanso.createTenant(tenantName);
               console.log(`Created tenant database: ${tenantName}`);
+
+              // Seed the user record into the tenant DB so FK constraints are satisfied.
+              const tenantDb = getTenantDbForUser(userId);
+              await tenantDb
+                .insert(tenantUsersTable)
+                .values({
+                  id: userId,
+                  name: user.name || '',
+                  email: user.email || '',
+                })
+                .onConflictDoNothing();
             } catch (error) {
               console.error(`Failed to create tenant database ${tenantName}:`, error);
             }

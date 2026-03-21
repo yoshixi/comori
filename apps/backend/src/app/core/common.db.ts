@@ -36,15 +36,19 @@ export function getTenanso(): TenansoInstance | null {
     return null
   }
 
+  const tursoApiBaseUrl = env.TURSO_API_BASE_URL
+
   tenansoInstance = createTenanso({
     turso: {
       organizationSlug: orgSlug,
       apiToken,
       group,
+      ...(tursoApiBaseUrl ? { baseUrl: tursoApiBaseUrl } : {}),
     },
     databaseUrl: tenantDbUrl,
     authToken: groupAuthToken,
     schema,
+    drizzleOptions: { casing: 'snake_case' },
     seed: { database: seedDb },
   })
 

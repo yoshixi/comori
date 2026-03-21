@@ -2,7 +2,7 @@
 title: "Multi-Tenancy: Per-User Database with Tenanso"
 brief_description: "Separate the database into per-user databases using Turso and the tenanso library for complete data isolation."
 created_at: "2026-03-19"
-update_at: "2026-03-19"
+update_at: "2026-03-20"
 ---
 
 # Multi-Tenancy: Per-User Database with Tenanso
@@ -20,42 +20,29 @@ Separate the database into per-user databases using Turso and the [tenanso](http
 
 ## Schema Management
 
-**Single schema file** (`schema.ts`) — same as today, no split needed. All three database types share the same full schema. Tables that aren't used in a given DB simply remain empty (zero cost in SQLite).
+**Single schema file** (`schema.ts`) — all three database types share the same full schema. Tables that aren't used in a given DB simply remain empty (zero cost in SQLite).
 
 **Note:** Turso's multi-db schema propagation feature is deprecated for new users, so we use a migration script approach instead.
 
 ```
 schema.ts (single source of truth)
     │
-    ├──→ drizzle-kit generate → migration files
+    ├──→ drizzle-kit generate → migration files (./migrations/)
     │
-    ├──→ drizzle-kit migrate → Centralized DB
+    ├──→ drizzle-kit migrate → Centralized DB (drizzle.config.ts)
     │
-    ├──→ drizzle-kit push → Seed DB (keeps template up to date for new users)
+    ├──→ drizzle-kit push → Seed DB (drizzle.config.seed.ts)
     │
-    └──→ migration script → iterates all tenant DBs via tenanso.listTenants()
-                             and applies migrations to each
+    └──→ scripts/migrate-tenants.ts → iterates all tenant DBs via tenanso.listTenants()
+                                       and applies migrations to each
 ```
 
 **Schema change workflow:**
 1. Edit `schema.ts`
-2. `drizzle-kit generate` → create migration files
-3. `drizzle-kit migrate` → apply to centralized DB
-4. `drizzle-kit push` → apply to seed DB (so new users get latest schema)
-5. Run tenant migration script → apply migrations to all existing user DBs
-
-**Tenant migration script** (`scripts/migrate-tenants.ts`):
-```typescript
-import { migrate } from 'drizzle-orm/libsql/migrator'
-
-const tenanso = getTenanso()
-const tenants = await tenanso.listTenants()
-for (const tenant of tenants) {
-  await tenanso.withTenant(tenant, async (db) => {
-    await migrate(db, { migrationsFolder: './migrations' })
-  })
-}
-```
+2. `pnpm --filter @apps/backend run drizzle:generate:prod` → create migration files
+3. `pnpm --filter @apps/backend run drizzle:migrate:prod` → apply to centralized DB
+4. `pnpm --filter @apps/backend run drizzle:push:seed` → apply to seed DB (so new users get latest schema)
+5. `pnpm --filter @apps/backend run migrate:tenants` → apply migrations to all existing user DBs
 
 ### Tenant Naming
 Each user's tenant is named `user-{userId}` (e.g., `user-42`).
@@ -70,40 +57,58 @@ Each user's tenant is named `user-{userId}` (e.g., `user-42`).
 
 Existing `TURSO_CONNECTION_URL` and `TURSO_AUTH_TOKEN` continue to be used for the centralized DB.
 
-## Implementation Steps
+## Architecture
 
-### 1. Database Layer (`common.db.ts`)
-- `getMainDb()` — returns the centralized auth database (singleton, same as current `getDb()`)
-- `getTenanso()` — lazy-init tenanso instance
-- `getTenantDbForUser(userId)` — convenience for `tenanso.dbFor('user-{userId}')`
-- Local dev fallback: when tenanso env vars absent, `getTenantDbForUser()` returns `getMainDb()` (single DB mode, same as today)
+### Database Access Control
 
-### 2. Hono Context & Middleware
-- `AppBindings.Variables` adds `db: DB`
-- JWT middleware (after auth): derives tenant from user ID, sets `c.set('db', tenantDb)`
-- Handlers access tenant DB via `c.get('db')`
-- Handlers needing centralized DB (OAuth operations) import `getMainDb()` directly
+Handlers are forbidden from accessing the centralized DB directly. The `getMainDb()` implementation lives in `core/internal/main-db.ts`. Only core modules may import from `internal/`.
 
-### 3. Handler Updates
-All domain handlers replace `const db = getDb()` with `const db = c.get('db')`.
+| Caller | Centralized DB access | Tenant DB access |
+|--------|----------------------|-----------------|
+| **Handlers** | Via `c.get('oauth')` (OAuthService) | Via `c.get('db')` |
+| **core/auth.ts** | Direct import from `internal/main-db` | N/A |
+| **core/oauth.service.ts** | Direct import from `internal/main-db` | N/A |
+| **core/exchange-codes.ts** | Direct import from `internal/main-db` | N/A |
+| **Webhook handler** | Via `createOAuthService(userId)` | Via `getTenantDbForUser(userId)` |
 
-### 4. Webhook Handler (Public Route)
-- Encodes tenant name in Google channel token when creating a watch
+### Key Files
+
+| File | Role |
+|------|------|
+| `core/internal/main-db.ts` | Owns `getMainDb()` implementation (singleton, centralized DB) |
+| `core/common.db.ts` | Re-exports `getMainDb()`, owns `getTenanso()`, `getTenantDbForUser()`, `DB` type |
+| `core/oauth.service.ts` | User-scoped OAuth service — wraps centralized DB queries behind `getTokenForAccount()`, `listAccounts()`, `listAccountRecords()`, `updateToken()` |
+| `core/exchange-codes.ts` | `createExchangeCode()`, `consumeExchangeCode()` — extracted from route.ts |
+| `api/.../types.ts` | `AppBindings.Variables` = `{ user, db, oauth }` |
+| `api/.../route.ts` | JWT middleware sets `c.set('db', tenantDb)` and `c.set('oauth', oauthService)` |
+| `drizzle.config.ts` | Drizzle config for centralized DB (local SQLite or Turso) |
+| `drizzle.config.seed.ts` | Drizzle config for seed DB (push-only, no migrations) |
+| `scripts/migrate-tenants.ts` | Iterates all tenants via `tenanso.listTenants()` and applies Drizzle migrations |
+
+### Hono Context & Middleware
+
+The JWT middleware (in `route.ts`) runs for all authenticated routes and sets:
+- `c.set('user', { id, email, name })` — from JWT payload
+- `c.set('db', getTenantDbForUser(userId))` — per-user tenant database
+- `c.set('oauth', createOAuthService(userId))` — user-scoped OAuth service
+
+Public routes (auth, webhooks, token exchange) skip the middleware. The webhook handler resolves the tenant from `X-Goog-Channel-Token` and constructs its own `OAuthService` via `createOAuthService(userId)`.
+
+### Handler Pattern
+All domain handlers use `c.get('db')` for tenant data:
+```typescript
+const db = c.get('db')    // tenant DB (tasks, timers, etc.)
+const oauth = c.get('oauth')  // OAuth operations on centralized DB
+```
+
+### Webhook Handler (Public Route)
+- Encodes tenant name in Google channel token when creating a watch: `user-{id}:{uuid}`
 - On webhook receipt: extracts tenant from `X-Goog-Channel-Token` header
-- Gets tenant DB via `getTenantDbForUser()`, centralized DB via `getMainDb()` for OAuth tokens
+- Gets tenant DB via `getTenantDbForUser()`, OAuth via `createOAuthService()` (no JWT context)
 
-### 5. Tenant Provisioning
+### Tenant Provisioning
 - better-auth `databaseHooks.user.create.after` creates the tenant DB via `tenanso.createTenant()`
 - Runs only when tenanso is configured (production)
 
-### 6. Auth Module (`auth.ts`)
-- Replace `getDb()` calls with `getMainDb()` — auth always uses the centralized DB
-
-### 7. Drizzle Config
-- `drizzle.config.ts` — existing config, used for centralized DB migrations
-- `drizzle.config.seed.ts` — new config, points to seed DB for `drizzle-kit push`
-- Both use the same `schema.ts`
-
-### 8. Tenant Migration Script
-- `scripts/migrate-tenants.ts` — iterates all tenants and applies Drizzle migrations
-- Added as npm script: `pnpm --filter @apps/backend run migrate:tenants`
+### Local Dev Fallback
+When tenanso env vars are absent, `getTenantDbForUser()` returns `getMainDb()` (single DB mode). The `createOAuthService()` also falls back to `getMainDb()`. This means local development works identically to before — all data in one SQLite file.

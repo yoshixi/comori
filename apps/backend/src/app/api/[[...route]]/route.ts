@@ -172,8 +172,30 @@ export function createApp(deps?: AppDeps) {
 }))
 
 // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
-app.on(['POST', 'GET'], '/auth/*', (c) => {
-  return auth.handler(c.req.raw)
+// Sign-up paths are intercepted to verify tenant provisioning succeeded.
+const SIGN_UP_PATHS = ['/api/auth/sign-up/email', '/api/auth/sign-in/social']
+
+app.on(['POST', 'GET'], '/auth/*', async (c) => {
+  const response = await auth.handler(c.req.raw)
+
+  // For sign-up requests that succeeded, verify the tenant DB was created.
+  // better-auth returns the session token before our after-hook finishes,
+  // so by the time we get here the hook has already run (and possibly failed).
+  if (SIGN_UP_PATHS.some((p) => c.req.path.startsWith(p)) && response.ok) {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers })
+    if (session) {
+      try {
+        const ready = await isUserReady(Number(session.user.id))
+        if (!ready) {
+          return c.json({ error: 'Account setup failed. Please try again.' }, 500)
+        }
+      } catch {
+        return c.json({ error: 'Account setup failed. Please try again.' }, 500)
+      }
+    }
+  }
+
+  return response
 })
 
 // Token exchange endpoint.

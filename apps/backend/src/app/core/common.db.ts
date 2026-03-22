@@ -68,9 +68,10 @@ export function getTenantDbForUser(userId: number): DB {
   return tenanso.dbFor(tenantNameForUser(userId)) as unknown as DB
 }
 
-/** Derive tenant database name from user ID */
+/** Derive tenant database name: {group}-user-{id} */
 export function tenantNameForUser(userId: number): string {
-  return `user-${userId}`
+  const group = getEnv().TURSO_GROUP || 'default'
+  return `${group}-user-${userId}`
 }
 
 /**

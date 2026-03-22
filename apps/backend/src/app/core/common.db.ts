@@ -1,64 +1,102 @@
-import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql'
-import { createClient } from '@libsql/client'
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
-import fs from 'fs'
-import path from 'path'
+import { createTenanso, type TenansoInstance } from 'tenanso'
 import * as schema from '../db/schema/schema'
+import { getMainDb, resetMainDbForTests } from './internal/main-db'
+import { getEnv } from './env'
+import { type Result, Ok, Err } from './types'
 
-const DRIZZLE_CONFIG = {
-  casing: 'snake_case' as const,
+// Re-export so existing callers of common.db.getMainDb still compile,
+// but new code should prefer the user-scoped OAuthService or tenant DB.
+export { getMainDb }
+
+/** @deprecated Use getTenantDbForUser() or OAuthService instead */
+export function getDb(): DB {
+  return getMainDb()
 }
 
-let dbInstance: ReturnType<typeof drizzleLibsql> | null = null
+let tenansoInstance: TenansoInstance | null = null
 
-const getEnv = (): NodeJS.ProcessEnv =>
-  (typeof process === 'undefined' ? ({} as NodeJS.ProcessEnv) : process.env)
-const isNodeRuntime = () => typeof process !== 'undefined' && !!process.versions?.node
+/**
+ * Returns the tenanso instance for multi-tenant database management.
+ */
+export function getTenanso(): TenansoInstance {
+  if (tenansoInstance) return tenansoInstance
 
-const getLocalDbUrl = () => {
-  if (!isNodeRuntime()) {
-    throw new Error('Local SQLite file database is not supported in this runtime. Set TURSO_CONNECTION_URL/TURSO_AUTH_TOKEN instead.')
-  }
-  const tmpDir = path.join(process.cwd(), 'tmp')
-  fs.mkdirSync(tmpDir, { recursive: true })
-  return `file:${path.join(tmpDir, 'local.db')}`
-}
+  const env = getEnv()
+  const tursoApiBaseUrl = env.TURSO_API_BASE_URL
+  // Compute the tenant DB URL from orgSlug, or use override (for tests with file: URLs)
+  const tenantDbUrl = env.TURSO_TENANT_DB_URL || `libsql://{tenant}-${env.TURSO_ORG_SLUG}.turso.io`
 
-const getDbFromSqlite = (url: string) =>
-  drizzleLibsql({
-    client: createClient({ url }),
+  tenansoInstance = createTenanso({
+    turso: {
+      organizationSlug: env.TURSO_ORG_SLUG,
+      apiToken: env.TURSO_API_TOKEN,
+      group: env.TURSO_GROUP,
+      ...(tursoApiBaseUrl ? { baseUrl: tursoApiBaseUrl } : {}),
+    },
+    databaseUrl: tenantDbUrl,
+    authToken: env.TURSO_GROUP_AUTH_TOKEN,
     schema,
-    ...DRIZZLE_CONFIG,
+    drizzleOptions: { casing: 'snake_case' },
+    seed: { database: env.TURSO_SEED_DB_NAME },
   })
 
-export const resetDbForTests = () => {
-  dbInstance = null
+  return tenansoInstance
 }
 
-export function getDb(): DB {
-  const env = getEnv()
-  if (dbInstance) return dbInstance as unknown as DB
+/**
+ * Returns the tenant database for a specific user.
+ */
+export function getTenantDbForUser(userId: number): DB {
+  return getTenanso().dbFor(tenantNameForUser(userId)) as unknown as DB
+}
 
-  if (env.TURSO_CONNECTION_URL && env.TURSO_AUTH_TOKEN) {
-    dbInstance = drizzleLibsql({
-      connection: {
-        url: env.TURSO_CONNECTION_URL,
-        authToken: env.TURSO_AUTH_TOKEN
-      },
-      schema,
-      ...DRIZZLE_CONFIG
-    })
-    return dbInstance as unknown as DB
+/** Derive tenant database name: {group}-user-{id} */
+export function tenantNameForUser(userId: number): string {
+  const group = getEnv().TURSO_GROUP || 'default'
+  return `${group}-user-${userId}`
+}
+
+/**
+ * Creates the tenant DB for a user and seeds the user record.
+ * No-op in local dev (single DB mode). Throws on failure.
+ *
+ * tenanso 0.2.1+ polls the health endpoint after creation,
+ * so the DB is ready to use when createTenant() resolves.
+ */
+export async function provisionTenant(user: { id: number; name: string; email: string }): Promise<void> {
+  const tenantName = tenantNameForUser(user.id)
+  await getTenanso().createTenant(tenantName)
+
+  // Seed the user record into the tenant DB so FK constraints are satisfied.
+  const tenantDb = getTenantDbForUser(user.id)
+  await tenantDb
+    .insert(schema.usersTable)
+    .values({ id: user.id, name: user.name, email: user.email })
+    .onConflictDoNothing()
+}
+
+/**
+ * Validates that the user's tenant DB is provisioned and ready.
+ * Returns Ok() on success, Err(reason) on failure.
+ * In local dev (single DB mode), always returns Ok().
+ */
+export async function validateUserReady(userId: number): Promise<Result> {
+  try {
+    const exists = await getTenanso().tenantExists(tenantNameForUser(userId))
+    if (!exists) {
+      return Err(`Tenant database for user ${userId} does not exist`)
+    }
+    return Ok()
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    return Err(`Failed to check tenant database for user ${userId}: ${reason}`)
   }
+}
 
-  if (!isNodeRuntime()) {
-    throw new Error('Turso credentials are required in this runtime. Set TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN.')
-  }
-
-  const sqliteUrl = (env as Record<string, string | undefined>).SQLITE_URL
-  const url = sqliteUrl || getLocalDbUrl()
-  dbInstance = getDbFromSqlite(url)
-  return dbInstance as unknown as DB
+export const resetDbForTests = () => {
+  resetMainDbForTests()
+  tenansoInstance = null
 }
 
 export type DB = BaseSQLiteDatabase<'async', unknown, typeof schema>

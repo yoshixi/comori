@@ -1,18 +1,19 @@
 import { SignJWT, jwtVerify } from "jose";
+import { getEnv } from "./env";
 
-const ISSUER = process.env.BETTER_AUTH_URL || "http://localhost:8787";
 const JWT_EXPIRATION = "15m";
 let cachedJwtSecret: Uint8Array | null = null;
+let cachedIssuer: string | null = null;
+
+const getIssuer = () => {
+  if (cachedIssuer) return cachedIssuer;
+  cachedIssuer = getEnv().BETTER_AUTH_URL;
+  return cachedIssuer;
+};
 
 const getJwtSecret = () => {
   if (cachedJwtSecret) return cachedJwtSecret;
-  const rawSecret = process.env.JWT_SECRET || "";
-  if (!rawSecret) {
-    console.error("JWT_SECRET is missing or empty");
-    throw new Error("JWT_SECRET is required");
-  }
-  cachedJwtSecret = new TextEncoder().encode(rawSecret);
-  console.log(`JWT_SECRET length ${rawSecret.length}`);
+  cachedJwtSecret = new TextEncoder().encode(getEnv().JWT_SECRET);
   return cachedJwtSecret;
 };
 
@@ -30,14 +31,14 @@ export async function signJwt(user: {
   return new SignJWT({ email: user.email, name: user.name })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(String(user.id))
-    .setIssuer(ISSUER)
+    .setIssuer(getIssuer())
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRATION)
     .sign(getJwtSecret());
 }
 
 export async function verifyJwt(token: string): Promise<JwtPayload> {
-  const { payload } = await jwtVerify(token, getJwtSecret(), { issuer: ISSUER });
+  const { payload } = await jwtVerify(token, getJwtSecret(), { issuer: getIssuer() });
   return {
     sub: payload.sub!,
     email: payload.email as string,

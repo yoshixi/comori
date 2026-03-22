@@ -17,8 +17,8 @@ Set required secrets (Cloudflare):
 
 ```txt
 cd apps/backend
-pnpm exec wrangler secret put TURSO_CONNECTION_URL --config wrangler.jsonc
-pnpm exec wrangler secret put TURSO_AUTH_TOKEN --config wrangler.jsonc
+pnpm exec wrangler secret put TURSO_MAIN_DB_URL --config wrangler.jsonc
+pnpm exec wrangler secret put TURSO_MAIN_DB_AUTH_TOKEN --config wrangler.jsonc
 pnpm exec wrangler secret put BETTER_AUTH_SECRET --config wrangler.jsonc
 pnpm exec wrangler secret put GOOGLE_CLIENT_ID --config wrangler.jsonc
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --config wrangler.jsonc

@@ -2,9 +2,13 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 import { createAuth } from '../../core/auth'
 import { signJwt, verifyJwt } from '../../core/jwt'
-import { getDb } from '../../core/common.db'
-import { oauthExchangeCodesTable } from '../../db/schema/schema'
+import { getTenantDbForUser, validateUserReady, provisionTenant } from '../../core/common.db'
+import { usersTable, sessionsTable, accountsTable } from '../../db/schema/schema'
+import { getMainDb } from '../../core/internal/main-db'
 import { eq } from 'drizzle-orm'
+import { createExchangeCode, consumeExchangeCode } from '../../core/exchange-codes'
+import { createOAuthService } from '../../core/oauth.service'
+import { validateEnv, getEnv } from '../../core/env'
 import type { AppBindings } from './types'
 
 // Import route definitions from local routes directory
@@ -119,7 +123,12 @@ import {
   convertNoteToTaskHandler
 } from './handlers'
 
-const app = new OpenAPIHono<AppBindings>().basePath('/api')
+export type Auth = ReturnType<typeof createAuth>
+
+export interface AppDeps {
+  auth?: Auth
+  skipEnvValidation?: boolean
+}
 
 const DEFAULT_MOBILE_REDIRECT_URIS = [
   'techoo://auth-callback',
@@ -127,13 +136,6 @@ const DEFAULT_MOBILE_REDIRECT_URIS = [
   'exp+techoo://auth-callback',
   'exp+techoo://link-callback'
 ]
-const EXCHANGE_CODE_TTL_MS = 5 * 60 * 1000
-
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === 'undefined'
-    ? {}
-    : (process.env as Record<string, string | undefined>))
-
 const normalizeRedirectUri = (redirectUri: string) =>
   redirectUri.trim().replace(/\/$/, '')
 
@@ -153,543 +155,597 @@ const isAllowedMobileRedirectUri = (redirectUri: string) => {
   return allowed.includes(normalized)
 }
 
-const hashExchangeCode = async (code: string): Promise<string> => {
-  const data = new TextEncoder().encode(code)
-  const digest = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
-}
-
-const createExchangeCode = async (sessionToken: string): Promise<string> => {
-  const code = crypto.randomUUID()
-  const codeHash = await hashExchangeCode(code)
-  const expiresAt = new Date(Date.now() + EXCHANGE_CODE_TTL_MS)
-  const db = getDb()
-  await db.insert(oauthExchangeCodesTable).values({
-    codeHash,
-    sessionToken,
-    expiresAt
-  })
-  return code
-}
-
-const consumeExchangeCode = async (code: string): Promise<string | null> => {
-  const codeHash = await hashExchangeCode(code)
-  const db = getDb()
-  const rows = await db
-    .select()
-    .from(oauthExchangeCodesTable)
-    .where(eq(oauthExchangeCodesTable.codeHash, codeHash))
-  const row = rows[0]
-  if (!row) return null
-  if (row.expiresAt.getTime() < Date.now()) {
-    await db.delete(oauthExchangeCodesTable).where(eq(oauthExchangeCodesTable.id, row.id))
-    return null
+export function createApp(deps?: AppDeps) {
+  if (!deps?.skipEnvValidation) {
+    validateEnv()
   }
-  await db.delete(oauthExchangeCodesTable).where(eq(oauthExchangeCodesTable.id, row.id))
-  return row.sessionToken
-}
 
-// Hono's CORS middleware sets headers on c.res after await next(),
-// so it correctly applies to all responses including raw Response
-// objects returned by auth.handler().
-app.use('/*', cors({
-  origin: (origin) => origin,
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  exposeHeaders: ['set-auth-token'],
-  credentials: true,
-}))
+  const auth = deps?.auth ?? createAuth()
+  const app = new OpenAPIHono<AppBindings>().basePath('/api')
 
-// Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
-app.on(['POST', 'GET'], '/auth/*', (c) => {
-  const auth = createAuth()
-  return auth.handler(c.req.raw)
-})
+  // Hono's CORS middleware sets headers on c.res after await next(),
+  // so it correctly applies to all responses including raw Response
+  // objects returned by auth.handler().
+  app.use('/*', cors({
+    origin: (origin) => origin,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    exposeHeaders: ['set-auth-token'],
+    credentials: true,
+  }))
 
-// Token exchange endpoint.
-// Accepts either:
-//   - A session token via Authorization header → returns { token: JWT }
-//   - A short-lived exchange code in the body → returns { token: JWT, session_token }
-app.post('/token', async (c) => {
-  const auth = createAuth()
+  // Mount better-auth handler (sign-up, sign-in, sign-out, OAuth callbacks, etc.)
+  // Sign-up paths are intercepted to provision the tenant DB after user creation.
+  const SIGN_UP_PATHS = ['/api/auth/sign-up/email', '/api/auth/sign-in/social', '/api/auth/callback']
 
-  // If a code is provided in the body, exchange it for a session token first.
-  const body = await c.req.json().catch(() => ({}))
-  const code = typeof body?.code === 'string' ? body.code.trim() : ''
-  let sessionToken: string | null = null
+  app.on(['POST', 'GET'], '/auth/*', async (c) => {
+    const response = await auth.handler(c.req.raw)
 
-  if (code) {
-    sessionToken = await consumeExchangeCode(code)
-    if (!sessionToken) {
-      return c.json({ error: 'Invalid or expired code' }, 400)
+    // After a successful sign-up, provision the tenant DB before returning
+    // the response to the client. If provisioning fails, clean up the user
+    // and return an error — the client can retry.
+    if (SIGN_UP_PATHS.some((p) => c.req.path.startsWith(p)) && response.ok) {
+      // Clone response to read body without consuming it
+      const data = await response.clone().json().catch(() => null) as { user?: { id?: string | number; name?: string; email?: string } } | null
+      const userId = data?.user?.id ? Number(data.user.id) : null
+
+      if (userId) {
+        try {
+          await provisionTenant({
+            id: userId,
+            name: data?.user?.name || '',
+            email: data?.user?.email || '',
+          })
+        } catch (error) {
+          console.error('Tenant provisioning failed, rolling back user:', error)
+          const mainDb = getMainDb()
+          await mainDb.delete(sessionsTable).where(eq(sessionsTable.userId, userId))
+          await mainDb.delete(accountsTable).where(eq(accountsTable.userId, userId))
+          await mainDb.delete(usersTable).where(eq(usersTable.id, userId))
+          return c.json({ error: 'Account setup failed. Please try again.' }, 500)
+        }
+      }
     }
-  }
 
-  // Resolve the session — from the exchanged token or from the Authorization header.
-  let session = await auth.api.getSession({ headers: c.req.raw.headers })
-  const authHeader = c.req.header('Authorization')
-  const bearerToken = sessionToken ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)
-  if (!session && bearerToken) {
-    const headers = new Headers(c.req.raw.headers)
-    headers.set('cookie', `better-auth.session_token=${bearerToken}`)
-    session = await auth.api.getSession({ headers })
-  }
-  if (!session) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  const jwt = await signJwt({
-    id: Number(session.user.id),
-    email: session.user.email,
-    name: session.user.name,
+    return response
   })
 
-  // When exchanging a code, also return the session token so the client can persist it.
-  if (sessionToken) {
-    return c.json({ token: jwt, session_token: sessionToken })
-  }
-  return c.json({ token: jwt })
-})
+  // Token exchange endpoint.
+  // Accepts either:
+  //   - A session token via Authorization header → returns { token: JWT }
+  //   - A short-lived exchange code in the body → returns { token: JWT, session_token }
+  app.post('/token', async (c) => {
 
-// Session lookup endpoint: bearer session token → user/session data
-app.get('/session', async (c) => {
-  const auth = createAuth()
-  let session = await auth.api.getSession({ headers: c.req.raw.headers })
-  const authHeader = c.req.header('Authorization')
-  if (!session && authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7)
-    const headers = new Headers(c.req.raw.headers)
-    headers.set('cookie', `better-auth.session_token=${token}`)
-    session = await auth.api.getSession({ headers })
-  }
-  if (!session) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  return c.json({
-    user: {
+    // If a code is provided in the body, exchange it for a session token first.
+    const body = await c.req.json().catch(() => ({}))
+    const code = typeof body?.code === 'string' ? body.code.trim() : ''
+    let sessionToken: string | null = null
+
+    if (code) {
+      sessionToken = await consumeExchangeCode(code)
+      if (!sessionToken) {
+        console.log(`Fails to exchange the code`)
+        return c.json({ error: 'Invalid or expired code' }, 400)
+      }
+    }
+
+    // Resolve the session — from the exchanged token or from the Authorization header.
+    let session = await auth.api.getSession({ headers: c.req.raw.headers })
+    const authHeader = c.req.header('Authorization')
+    const bearerToken = sessionToken ?? (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)
+    if (!session && bearerToken) {
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('cookie', `better-auth.session_token=${bearerToken}`)
+      session = await auth.api.getSession({ headers })
+    }
+    if (!session) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    // Ensure the user's tenant DB exists before issuing a JWT.
+    // This handles all auth flows (email sign-up, OAuth callback, etc.)
+    // — if the tenant wasn't provisioned yet, create it now.
+    const userId = Number(session.user.id)
+    const readiness = await validateUserReady(userId)
+    if (!readiness.ok) {
+      try {
+        await provisionTenant({
+          id: userId,
+          name: session.user.name,
+          email: session.user.email,
+        })
+      } catch (error) {
+        console.error('Tenant provisioning failed at /token:', error)
+        return c.json({ error: 'Account setup failed. Please try again.' }, 503)
+      }
+    }
+
+    const jwt = await signJwt({
       id: Number(session.user.id),
       email: session.user.email,
       name: session.user.name,
+    })
+
+    // When exchanging a code, also return the session token so the client can persist it.
+    if (sessionToken) {
+      return c.json({ token: jwt, session_token: sessionToken })
+    }
+    return c.json({ token: jwt })
+  })
+
+  // Session lookup endpoint: bearer session token → user/session data
+  app.get('/session', async (c) => {
+
+    let session = await auth.api.getSession({ headers: c.req.raw.headers })
+    const authHeader = c.req.header('Authorization')
+    if (!session && authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7)
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('cookie', `better-auth.session_token=${token}`)
+      session = await auth.api.getSession({ headers })
+    }
+    if (!session) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+    return c.json({
+      user: {
+        id: Number(session.user.id),
+        email: session.user.email,
+        name: session.user.name,
+      }
+    })
+  })
+
+  // Create a short-lived code tied to a session token (used for OAuth redirects).
+  app.post('/session-code', async (c) => {
+    const authHeader = c.req.header('Authorization')
+    const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!sessionToken) {
+      return c.json({ error: 'Missing session token' }, 400)
+    }
+
+    // Verify the session is valid before creating an exchange code
+    let session = await auth.api.getSession({ headers: c.req.raw.headers })
+    if (!session) {
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('cookie', `better-auth.session_token=${sessionToken}`)
+      session = await auth.api.getSession({ headers })
+    }
+    if (!session) {
+      return c.json({ error: 'Invalid session token' }, 401)
+    }
+
+    const code = await createExchangeCode(sessionToken)
+    return c.json({ code })
+  })
+
+
+  // Desktop app OAuth initiation: the browser navigates here directly so that
+  // better-auth's state cookie is set in the browser's cookie jar (not in
+  // Electron's net.fetch, which has a separate cookie store).
+  app.get('/oauth/desktop', async (c) => {
+    const provider = c.req.query('provider')
+    const port = c.req.query('port')
+    if (!provider || !port) {
+      return c.text('Missing provider or port parameter', 400)
+    }
+
+    const url = new URL(c.req.url)
+    const baseUrl = url.origin
+    const callbackURL = `${baseUrl}/api/oauth/desktop/callback?port=${port}`
+
+    // Call better-auth handler in-process (no network hop) to generate the OAuth
+    // URL and set the state cookie on the browser response.
+
+    const authResponse = await auth.handler(
+      new Request(`${baseUrl}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          Origin: baseUrl,
+        }),
+        body: JSON.stringify({ provider, callbackURL }),
+      })
+    )
+
+    // Extract Set-Cookie headers (contains the OAuth state cookie)
+    const setCookies = authResponse.headers.getSetCookie()
+
+    // Get the OAuth provider URL from better-auth's response
+    let oauthUrl: string | null = null
+    if (authResponse.status >= 300 && authResponse.status < 400) {
+      oauthUrl = authResponse.headers.get('location')
+    } else if (authResponse.ok) {
+      const data = (await authResponse.json()) as { url?: string }
+      oauthUrl = data?.url ?? null
+    }
+
+    if (!oauthUrl) {
+      return c.text('Failed to initiate OAuth', 500)
+    }
+
+    // Redirect browser to the OAuth provider, forwarding the state cookies
+    const response = new Response(null, {
+      status: 302,
+      headers: { Location: oauthUrl },
+    })
+    for (const cookie of setCookies) {
+      response.headers.append('Set-Cookie', cookie)
+    }
+    return response
+  })
+
+  // Desktop app OAuth callback: reads the session cookie set by better-auth and
+  // redirects to the Electron loopback server with a short-lived code.
+  app.get('/oauth/desktop/callback', async (c) => {
+    const port = c.req.query('port')
+    if (!port) {
+      return c.text('Missing port parameter', 400)
+    }
+
+    const cookies = c.req.header('cookie') || ''
+    const match = cookies.match(/better-auth\.session_token=([^;]+)/)
+    const sessionToken = match?.[1] || undefined
+
+    if (!sessionToken) {
+      return c.html(
+        '<html><body style="font-family:system-ui;text-align:center;padding:3rem"><h1>Authentication failed</h1><p>Session token not found. Please close this window and try again.</p></body></html>',
+        401
+      )
+    }
+
+    const code = await createExchangeCode(sessionToken)
+    return c.redirect(
+      `http://127.0.0.1:${port}/callback?code=${encodeURIComponent(code)}`
+    )
+  })
+
+  // Desktop app account linking initiation: ensures OAuth state cookie is set in the browser.
+  app.get('/oauth/desktop-link', async (c) => {
+    const provider = c.req.query('provider')
+    const port = c.req.query('port')
+    const sessionCode = c.req.query('session_code')
+    if (!provider || !port || !sessionCode) {
+      return c.text('Missing provider, port, or session code', 400)
+    }
+
+    const sessionToken = await consumeExchangeCode(sessionCode)
+    if (!sessionToken) {
+      return c.text('Invalid or expired session code', 401)
+    }
+
+    const url = new URL(c.req.url)
+    const baseUrl = url.origin
+    const callbackURL = `http://127.0.0.1:${port}/callback?linked=1`
+
+
+    const authResponse = await auth.handler(
+      new Request(`${baseUrl}/api/auth/link-social`, {
+        method: 'POST',
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          Origin: baseUrl,
+          Authorization: `Bearer ${sessionToken}`
+        }),
+        body: JSON.stringify({ provider, callbackURL, disableRedirect: true })
+      })
+    )
+
+    const setCookies = authResponse.headers.getSetCookie()
+
+    let oauthUrl: string | null = null
+    if (authResponse.ok) {
+      const data = (await authResponse.json()) as { url?: string }
+      oauthUrl = data?.url ?? null
+    }
+
+    if (!oauthUrl) {
+      return c.text('Failed to initiate link flow', 500)
+    }
+
+    const response = new Response(null, {
+      status: 302,
+      headers: { Location: oauthUrl }
+    })
+    for (const cookie of setCookies) {
+      response.headers.append('Set-Cookie', cookie)
+    }
+    return response
+  })
+
+  // Mobile app OAuth initiation: same pattern as desktop but uses deep link redirect
+  app.get('/oauth/mobile', async (c) => {
+    const provider = c.req.query('provider')
+    const redirectUri = c.req.query('redirect_uri')
+    if (!provider || !redirectUri) {
+      return c.text('Missing provider or redirect_uri parameter', 400)
+    }
+    if (!isAllowedMobileRedirectUri(redirectUri)) {
+      return c.text('Untrusted redirect_uri parameter', 400)
+    }
+
+    const url = new URL(c.req.url)
+    const baseUrl = url.origin
+    const callbackURL = `${baseUrl}/api/oauth/mobile/callback?redirect_uri=${encodeURIComponent(redirectUri)}`
+
+
+    const authResponse = await auth.handler(
+      new Request(`${baseUrl}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          Origin: baseUrl,
+        }),
+        body: JSON.stringify({ provider, callbackURL }),
+      })
+    )
+
+    const setCookies = authResponse.headers.getSetCookie()
+
+    let oauthUrl: string | null = null
+    if (authResponse.status >= 300 && authResponse.status < 400) {
+      oauthUrl = authResponse.headers.get('location')
+    } else if (authResponse.ok) {
+      const data = (await authResponse.json()) as { url?: string }
+      oauthUrl = data?.url ?? null
+    }
+
+    if (!oauthUrl) {
+      return c.text('Failed to initiate OAuth', 500)
+    }
+
+    const response = new Response(null, {
+      status: 302,
+      headers: { Location: oauthUrl },
+    })
+    for (const cookie of setCookies) {
+      response.headers.append('Set-Cookie', cookie)
+    }
+    return response
+  })
+
+  // Mobile app OAuth callback: reads session cookie and redirects to deep link
+  app.get('/oauth/mobile/callback', async (c) => {
+    const redirectUri = c.req.query('redirect_uri')
+    if (!redirectUri) {
+      return c.text('Missing redirect_uri parameter', 400)
+    }
+    if (!isAllowedMobileRedirectUri(redirectUri)) {
+      return c.text('Untrusted redirect_uri parameter', 400)
+    }
+
+    const cookies = c.req.header('cookie') || ''
+    const match = cookies.match(/better-auth\.session_token=([^;]+)/)
+    const sessionToken = match?.[1] || undefined
+
+    if (!sessionToken) {
+      return c.html(
+        '<html><body style="font-family:system-ui;text-align:center;padding:3rem"><h1>Authentication failed</h1><p>Session token not found. Please close this window and try again.</p></body></html>',
+        401
+      )
+    }
+
+    const separator = redirectUri.includes('?') ? '&' : '?'
+    const code = await createExchangeCode(sessionToken)
+    return c.redirect(
+      `${redirectUri}${separator}code=${encodeURIComponent(code)}`
+    )
+  })
+
+  // Mobile app account linking initiation: same as desktop-link but uses deep link redirect
+  app.get('/oauth/mobile-link', async (c) => {
+    const provider = c.req.query('provider')
+    const redirectUri = c.req.query('redirect_uri')
+    const sessionCode = c.req.query('session_code')
+    if (!provider || !redirectUri || !sessionCode) {
+      return c.text('Missing provider, redirect_uri, or session_code parameter', 400)
+    }
+    if (!isAllowedMobileRedirectUri(redirectUri)) {
+      return c.text('Untrusted redirect_uri parameter', 400)
+    }
+
+    const sessionToken = await consumeExchangeCode(sessionCode)
+    if (!sessionToken) {
+      return c.text('Invalid or expired session code', 401)
+    }
+
+    const url = new URL(c.req.url)
+    const baseUrl = url.origin
+    const callbackURL = `${baseUrl}/api/oauth/mobile-link/callback?redirect_uri=${encodeURIComponent(redirectUri)}`
+
+
+    const authResponse = await auth.handler(
+      new Request(`${baseUrl}/api/auth/link-social`, {
+        method: 'POST',
+        headers: new Headers({
+          'Content-Type': 'application/json',
+          Origin: baseUrl,
+          Authorization: `Bearer ${sessionToken}`
+        }),
+        body: JSON.stringify({ provider, callbackURL, disableRedirect: true })
+      })
+    )
+
+    const setCookies = authResponse.headers.getSetCookie()
+
+    let oauthUrl: string | null = null
+    if (authResponse.ok) {
+      const data = (await authResponse.json()) as { url?: string }
+      oauthUrl = data?.url ?? null
+    }
+
+    if (!oauthUrl) {
+      return c.text('Failed to initiate link flow', 500)
+    }
+
+    const response = new Response(null, {
+      status: 302,
+      headers: { Location: oauthUrl }
+    })
+    for (const cookie of setCookies) {
+      response.headers.append('Set-Cookie', cookie)
+    }
+    return response
+  })
+
+  // Mobile app account linking callback: reads session cookie and redirects to deep link
+  app.get('/oauth/mobile-link/callback', async (c) => {
+    const redirectUri = c.req.query('redirect_uri')
+    if (!redirectUri) {
+      return c.text('Missing redirect_uri parameter', 400)
+    }
+    if (!isAllowedMobileRedirectUri(redirectUri)) {
+      return c.text('Untrusted redirect_uri parameter', 400)
+    }
+
+    const separator = redirectUri.includes('?') ? '&' : '?'
+    return c.redirect(`${redirectUri}${separator}linked=1`)
+  })
+  // JWT auth middleware — skip public routes
+  app.use('/*', async (c, next) => {
+    const path = c.req.path
+    if (
+      path.startsWith('/api/auth') ||
+      path.startsWith('/api/webhooks') || // Google Calendar push notifications (no JWT)
+      path === '/api/token' ||
+      path === '/api/session' ||
+      path === '/api/session-code' ||
+      path === '/api/oauth/desktop' ||
+      path === '/api/oauth/desktop/callback' ||
+      path === '/api/oauth/desktop-link' ||
+      path === '/api/oauth/mobile' ||
+      path === '/api/oauth/mobile/callback' ||
+      path === '/api/oauth/mobile-link' ||
+      path === '/api/oauth/mobile-link/callback' ||
+      path === '/api/health' ||
+      path === '/api/doc'
+    ) {
+      return next()
+    }
+
+    const authHeader = c.req.header('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    try {
+      const payload = await verifyJwt(authHeader.slice(7))
+      const userId = Number(payload.sub)
+      c.set('user', {
+        id: userId,
+        email: payload.email,
+        name: payload.name,
+      })
+      // Set the tenant database for this user
+      c.set('db', getTenantDbForUser(userId))
+      // Set user-scoped OAuth service
+      c.set('oauth', createOAuthService(userId))
+      await next()
+    } catch {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
   })
-})
 
-// Create a short-lived code tied to a session token (used for OAuth redirects).
-app.post('/session-code', async (c) => {
-  const authHeader = c.req.header('Authorization')
-  const sessionToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-  if (!sessionToken) {
-    return c.json({ error: 'Missing session token' }, 400)
-  }
-  const code = await createExchangeCode(sessionToken)
-  return c.json({ code })
-})
+  // Register health check route
+  app.openapi(healthRoute, healthHandler)
 
+  // Register task routes
+  app.openapi(listTasksRoute, listTasksHandler)
+  app.openapi(getTaskRoute, getTaskHandler)
+  app.openapi(createTaskRoute, createTaskHandler)
+  app.openapi(updateTaskRoute, updateTaskHandler)
+  app.openapi(deleteTaskRoute, deleteTaskHandler)
 
-// Desktop app OAuth initiation: the browser navigates here directly so that
-// better-auth's state cookie is set in the browser's cookie jar (not in
-// Electron's net.fetch, which has a separate cookie store).
-app.get('/oauth/desktop', async (c) => {
-  const provider = c.req.query('provider')
-  const port = c.req.query('port')
-  if (!provider || !port) {
-    return c.text('Missing provider or port parameter', 400)
-  }
+  // Register task comment routes
+  app.openapi(listTaskCommentsRoute, listTaskCommentsHandler)
+  app.openapi(createTaskCommentRoute, createTaskCommentHandler)
+  app.openapi(getTaskCommentRoute, getTaskCommentHandler)
+  app.openapi(updateTaskCommentRoute, updateTaskCommentHandler)
+  app.openapi(deleteTaskCommentRoute, deleteTaskCommentHandler)
 
-  const url = new URL(c.req.url)
-  const baseUrl = url.origin
-  const callbackURL = `${baseUrl}/api/oauth/desktop/callback?port=${port}`
+  // Register task activity route
+  app.openapi(getTaskActivitiesRoute, getTaskActivitiesHandler)
 
-  // Call better-auth handler in-process (no network hop) to generate the OAuth
-  // URL and set the state cookie on the browser response.
-  const auth = createAuth()
-  const authResponse = await auth.handler(
-    new Request(`${baseUrl}/api/auth/sign-in/social`, {
-      method: 'POST',
-      headers: new Headers({
-        'Content-Type': 'application/json',
-        Origin: baseUrl,
-      }),
-      body: JSON.stringify({ provider, callbackURL }),
-    })
-  )
+  // Register timer routes
+  app.openapi(listTimersRoute, listTimersHandler)
+  app.openapi(getTaskTimersRoute, getTaskTimersHandler)
+  app.openapi(getTimerRoute, getTimerHandler)
+  app.openapi(createTimerRoute, createTimerHandler)
+  app.openapi(updateTimerRoute, updateTimerHandler)
+  app.openapi(deleteTimerRoute, deleteTimerHandler)
 
-  // Extract Set-Cookie headers (contains the OAuth state cookie)
-  const setCookies = authResponse.headers.getSetCookie()
+  // Register tag routes
+  app.openapi(listTagsRoute, listTagsHandler)
+  app.openapi(getTagRoute, getTagHandler)
+  app.openapi(createTagRoute, createTagHandler)
+  app.openapi(updateTagRoute, updateTagHandler)
+  app.openapi(deleteTagRoute, deleteTagHandler)
 
-  // Get the OAuth provider URL from better-auth's response
-  let oauthUrl: string | null = null
-  if (authResponse.status >= 300 && authResponse.status < 400) {
-    oauthUrl = authResponse.headers.get('location')
-  } else if (authResponse.ok) {
-    const data = (await authResponse.json()) as { url?: string }
-    oauthUrl = data?.url ?? null
-  }
+  // Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
+  app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
+  app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
+  app.openapi(listGoogleAccountsRoute, listGoogleAccountsHandler)
 
-  if (!oauthUrl) {
-    return c.text('Failed to initiate OAuth', 500)
-  }
+  // Register calendar routes
+  app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)
+  app.openapi(listCalendarsRoute, listCalendarsHandler)
+  app.openapi(createCalendarRoute, createCalendarHandler)
+  app.openapi(getCalendarRoute, getCalendarHandler)
+  app.openapi(updateCalendarRoute, updateCalendarHandler)
+  app.openapi(deleteCalendarRoute, deleteCalendarHandler)
+  app.openapi(syncCalendarRoute, syncCalendarHandler)
+  app.openapi(syncAllCalendarsRoute, syncAllCalendarsHandler)
 
-  // Redirect browser to the OAuth provider, forwarding the state cookies
-  const response = new Response(null, {
-    status: 302,
-    headers: { Location: oauthUrl },
+  // Register event routes
+  app.openapi(listEventsRoute, listEventsHandler)
+  app.openapi(getEventRoute, getEventHandler)
+
+  // Register calendar watch routes
+  app.openapi(watchCalendarRoute, watchCalendarHandler)
+  app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
+  app.openapi(getWatchStatusRoute, getWatchStatusHandler)
+
+  // Register note routes
+  app.openapi(listNotesRoute, listNotesHandler)
+  app.openapi(getNoteRoute, getNoteHandler)
+  app.openapi(createNoteRoute, createNoteHandler)
+  app.openapi(updateNoteRoute, updateNoteHandler)
+  app.openapi(deleteNoteRoute, deleteNoteHandler)
+  app.openapi(convertNoteToTaskRoute, convertNoteToTaskHandler)
+
+  // Register webhook routes
+  app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)
+
+  // The OpenAPI documentation will be available at /doc
+  app.doc('/doc', {
+    openapi: '3.0.0',
+    info: {
+      version: '1.0.0',
+      title: 'Techoo API',
+      description: 'API for the Techoo task management application with OpenAPI documentation'
+    }
   })
-  for (const cookie of setCookies) {
-    response.headers.append('Set-Cookie', cookie)
+
+  return { app, auth }
+}
+
+// Lazy-init the default app so that importing createApp alone
+// (e.g. from tests) does not trigger validateEnv().
+let defaultApp: ReturnType<typeof createApp> | null = null
+
+function getDefaultApp() {
+  if (!defaultApp) {
+    console.log('starting the server')
+    defaultApp = createApp()
   }
-  return response
+  return defaultApp
+}
+
+// Export the app for use by the OpenAPI schema generator and Next.js runtime
+export const honoApp = new Proxy({} as ReturnType<typeof createApp>['app'], {
+  get(_, prop) {
+    return (getDefaultApp().app as any)[prop]
+  },
 })
 
-// Desktop app OAuth callback: reads the session cookie set by better-auth and
-// redirects to the Electron loopback server with a short-lived code.
-app.get('/oauth/desktop/callback', async (c) => {
-  const port = c.req.query('port')
-  if (!port) {
-    return c.text('Missing port parameter', 400)
-  }
-
-  const cookies = c.req.header('cookie') || ''
-  const match = cookies.match(/better-auth\.session_token=([^;]+)/)
-  const sessionToken = match?.[1] || undefined
-
-  if (!sessionToken) {
-    return c.html(
-      '<html><body style="font-family:system-ui;text-align:center;padding:3rem"><h1>Authentication failed</h1><p>Session token not found. Please close this window and try again.</p></body></html>',
-      401
-    )
-  }
-
-  const code = await createExchangeCode(sessionToken)
-  return c.redirect(
-    `http://127.0.0.1:${port}/callback?code=${encodeURIComponent(code)}`
-  )
-})
-
-// Desktop app account linking initiation: ensures OAuth state cookie is set in the browser.
-app.get('/oauth/desktop-link', async (c) => {
-  const provider = c.req.query('provider')
-  const port = c.req.query('port')
-  const sessionCode = c.req.query('session_code')
-  if (!provider || !port || !sessionCode) {
-    return c.text('Missing provider, port, or session code', 400)
-  }
-
-  const sessionToken = await consumeExchangeCode(sessionCode)
-  if (!sessionToken) {
-    return c.text('Invalid or expired session code', 401)
-  }
-
-  const url = new URL(c.req.url)
-  const baseUrl = url.origin
-  const callbackURL = `http://127.0.0.1:${port}/callback?linked=1`
-
-  const auth = createAuth()
-  const authResponse = await auth.handler(
-    new Request(`${baseUrl}/api/auth/link-social`, {
-      method: 'POST',
-      headers: new Headers({
-        'Content-Type': 'application/json',
-        Origin: baseUrl,
-        Authorization: `Bearer ${sessionToken}`
-      }),
-      body: JSON.stringify({ provider, callbackURL, disableRedirect: true })
-    })
-  )
-
-  const setCookies = authResponse.headers.getSetCookie()
-
-  let oauthUrl: string | null = null
-  if (authResponse.ok) {
-    const data = (await authResponse.json()) as { url?: string }
-    oauthUrl = data?.url ?? null
-  }
-
-  if (!oauthUrl) {
-    return c.text('Failed to initiate link flow', 500)
-  }
-
-  const response = new Response(null, {
-    status: 302,
-    headers: { Location: oauthUrl }
-  })
-  for (const cookie of setCookies) {
-    response.headers.append('Set-Cookie', cookie)
-  }
-  return response
-})
-
-// Mobile app OAuth initiation: same pattern as desktop but uses deep link redirect
-app.get('/oauth/mobile', async (c) => {
-  const provider = c.req.query('provider')
-  const redirectUri = c.req.query('redirect_uri')
-  if (!provider || !redirectUri) {
-    return c.text('Missing provider or redirect_uri parameter', 400)
-  }
-  if (!isAllowedMobileRedirectUri(redirectUri)) {
-    return c.text('Untrusted redirect_uri parameter', 400)
-  }
-
-  const url = new URL(c.req.url)
-  const baseUrl = url.origin
-  const callbackURL = `${baseUrl}/api/oauth/mobile/callback?redirect_uri=${encodeURIComponent(redirectUri)}`
-
-  const auth = createAuth()
-  const authResponse = await auth.handler(
-    new Request(`${baseUrl}/api/auth/sign-in/social`, {
-      method: 'POST',
-      headers: new Headers({
-        'Content-Type': 'application/json',
-        Origin: baseUrl,
-      }),
-      body: JSON.stringify({ provider, callbackURL }),
-    })
-  )
-
-  const setCookies = authResponse.headers.getSetCookie()
-
-  let oauthUrl: string | null = null
-  if (authResponse.status >= 300 && authResponse.status < 400) {
-    oauthUrl = authResponse.headers.get('location')
-  } else if (authResponse.ok) {
-    const data = (await authResponse.json()) as { url?: string }
-    oauthUrl = data?.url ?? null
-  }
-
-  if (!oauthUrl) {
-    return c.text('Failed to initiate OAuth', 500)
-  }
-
-  const response = new Response(null, {
-    status: 302,
-    headers: { Location: oauthUrl },
-  })
-  for (const cookie of setCookies) {
-    response.headers.append('Set-Cookie', cookie)
-  }
-  return response
-})
-
-// Mobile app OAuth callback: reads session cookie and redirects to deep link
-app.get('/oauth/mobile/callback', async (c) => {
-  const redirectUri = c.req.query('redirect_uri')
-  if (!redirectUri) {
-    return c.text('Missing redirect_uri parameter', 400)
-  }
-  if (!isAllowedMobileRedirectUri(redirectUri)) {
-    return c.text('Untrusted redirect_uri parameter', 400)
-  }
-
-  const cookies = c.req.header('cookie') || ''
-  const match = cookies.match(/better-auth\.session_token=([^;]+)/)
-  const sessionToken = match?.[1] || undefined
-
-  if (!sessionToken) {
-    return c.html(
-      '<html><body style="font-family:system-ui;text-align:center;padding:3rem"><h1>Authentication failed</h1><p>Session token not found. Please close this window and try again.</p></body></html>',
-      401
-    )
-  }
-
-  const separator = redirectUri.includes('?') ? '&' : '?'
-  const code = await createExchangeCode(sessionToken)
-  return c.redirect(
-    `${redirectUri}${separator}code=${encodeURIComponent(code)}`
-  )
-})
-
-// Mobile app account linking initiation: same as desktop-link but uses deep link redirect
-app.get('/oauth/mobile-link', async (c) => {
-  const provider = c.req.query('provider')
-  const redirectUri = c.req.query('redirect_uri')
-  const sessionCode = c.req.query('session_code')
-  if (!provider || !redirectUri || !sessionCode) {
-    return c.text('Missing provider, redirect_uri, or session_code parameter', 400)
-  }
-  if (!isAllowedMobileRedirectUri(redirectUri)) {
-    return c.text('Untrusted redirect_uri parameter', 400)
-  }
-
-  const sessionToken = await consumeExchangeCode(sessionCode)
-  if (!sessionToken) {
-    return c.text('Invalid or expired session code', 401)
-  }
-
-  const url = new URL(c.req.url)
-  const baseUrl = url.origin
-  const callbackURL = `${baseUrl}/api/oauth/mobile-link/callback?redirect_uri=${encodeURIComponent(redirectUri)}`
-
-  const auth = createAuth()
-  const authResponse = await auth.handler(
-    new Request(`${baseUrl}/api/auth/link-social`, {
-      method: 'POST',
-      headers: new Headers({
-        'Content-Type': 'application/json',
-        Origin: baseUrl,
-        Authorization: `Bearer ${sessionToken}`
-      }),
-      body: JSON.stringify({ provider, callbackURL, disableRedirect: true })
-    })
-  )
-
-  const setCookies = authResponse.headers.getSetCookie()
-
-  let oauthUrl: string | null = null
-  if (authResponse.ok) {
-    const data = (await authResponse.json()) as { url?: string }
-    oauthUrl = data?.url ?? null
-  }
-
-  if (!oauthUrl) {
-    return c.text('Failed to initiate link flow', 500)
-  }
-
-  const response = new Response(null, {
-    status: 302,
-    headers: { Location: oauthUrl }
-  })
-  for (const cookie of setCookies) {
-    response.headers.append('Set-Cookie', cookie)
-  }
-  return response
-})
-
-// Mobile app account linking callback: reads session cookie and redirects to deep link
-app.get('/oauth/mobile-link/callback', async (c) => {
-  const redirectUri = c.req.query('redirect_uri')
-  if (!redirectUri) {
-    return c.text('Missing redirect_uri parameter', 400)
-  }
-  if (!isAllowedMobileRedirectUri(redirectUri)) {
-    return c.text('Untrusted redirect_uri parameter', 400)
-  }
-
-  const separator = redirectUri.includes('?') ? '&' : '?'
-  return c.redirect(`${redirectUri}${separator}linked=1`)
-})
-// JWT auth middleware — skip public routes
-app.use('/*', async (c, next) => {
-  const path = c.req.path
-  if (
-    path.startsWith('/api/auth') ||
-    path.startsWith('/api/webhooks') || // Google Calendar push notifications (no JWT)
-    path === '/api/token' ||
-    path === '/api/session' ||
-    path === '/api/session-code' ||
-    path === '/api/oauth/desktop' ||
-    path === '/api/oauth/desktop/callback' ||
-    path === '/api/oauth/desktop-link' ||
-    path === '/api/oauth/mobile' ||
-    path === '/api/oauth/mobile/callback' ||
-    path === '/api/oauth/mobile-link' ||
-    path === '/api/oauth/mobile-link/callback' ||
-    path === '/api/health' ||
-    path === '/api/doc'
-  ) {
-    return next()
-  }
-
-  const authHeader = c.req.header('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  try {
-    const payload = await verifyJwt(authHeader.slice(7))
-    c.set('user', {
-      id: Number(payload.sub),
-      email: payload.email,
-      name: payload.name,
-    })
-    await next()
-  } catch {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-})
-
-// Register health check route
-app.openapi(healthRoute, healthHandler)
-
-// Register task routes
-app.openapi(listTasksRoute, listTasksHandler)
-app.openapi(getTaskRoute, getTaskHandler)
-app.openapi(createTaskRoute, createTaskHandler)
-app.openapi(updateTaskRoute, updateTaskHandler)
-app.openapi(deleteTaskRoute, deleteTaskHandler)
-
-// Register task comment routes
-app.openapi(listTaskCommentsRoute, listTaskCommentsHandler)
-app.openapi(createTaskCommentRoute, createTaskCommentHandler)
-app.openapi(getTaskCommentRoute, getTaskCommentHandler)
-app.openapi(updateTaskCommentRoute, updateTaskCommentHandler)
-app.openapi(deleteTaskCommentRoute, deleteTaskCommentHandler)
-
-// Register task activity route
-app.openapi(getTaskActivitiesRoute, getTaskActivitiesHandler)
-
-// Register timer routes
-app.openapi(listTimersRoute, listTimersHandler)
-app.openapi(getTaskTimersRoute, getTaskTimersHandler)
-app.openapi(getTimerRoute, getTimerHandler)
-app.openapi(createTimerRoute, createTimerHandler)
-app.openapi(updateTimerRoute, updateTimerHandler)
-app.openapi(deleteTimerRoute, deleteTimerHandler)
-
-// Register tag routes
-app.openapi(listTagsRoute, listTagsHandler)
-app.openapi(getTagRoute, getTagHandler)
-app.openapi(createTagRoute, createTagHandler)
-app.openapi(updateTagRoute, updateTagHandler)
-app.openapi(deleteTagRoute, deleteTagHandler)
-
-// Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
-app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
-app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
-app.openapi(listGoogleAccountsRoute, listGoogleAccountsHandler)
-
-// Register calendar routes
-app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)
-app.openapi(listCalendarsRoute, listCalendarsHandler)
-app.openapi(createCalendarRoute, createCalendarHandler)
-app.openapi(getCalendarRoute, getCalendarHandler)
-app.openapi(updateCalendarRoute, updateCalendarHandler)
-app.openapi(deleteCalendarRoute, deleteCalendarHandler)
-app.openapi(syncCalendarRoute, syncCalendarHandler)
-app.openapi(syncAllCalendarsRoute, syncAllCalendarsHandler)
-
-// Register event routes
-app.openapi(listEventsRoute, listEventsHandler)
-app.openapi(getEventRoute, getEventHandler)
-
-// Register calendar watch routes
-app.openapi(watchCalendarRoute, watchCalendarHandler)
-app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
-app.openapi(getWatchStatusRoute, getWatchStatusHandler)
-
-// Register note routes
-app.openapi(listNotesRoute, listNotesHandler)
-app.openapi(getNoteRoute, getNoteHandler)
-app.openapi(createNoteRoute, createNoteHandler)
-app.openapi(updateNoteRoute, updateNoteHandler)
-app.openapi(deleteNoteRoute, deleteNoteHandler)
-app.openapi(convertNoteToTaskRoute, convertNoteToTaskHandler)
-
-// Register webhook routes
-app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)
-
-// The OpenAPI documentation will be available at /doc
-app.doc('/doc', {
-  openapi: '3.0.0',
-  info: {
-    version: '1.0.0',
-    title: 'Techoo API',
-    description: 'API for the Techoo task management application with OpenAPI documentation'
-  }
-})
-console.log(`starting the server`)
-
-// Export the app for use by the OpenAPI schema generator
-export { app as honoApp }
-export default app
+export default honoApp

@@ -1,5 +1,7 @@
 import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
+import { getEnv } from '../../../core/env'
+import { tenantNameForUser } from '../../../core/common.db'
 import {
   listAvailableCalendarsRoute,
   listCalendarsRoute,
@@ -13,8 +15,7 @@ import {
   stopWatchingCalendarRoute,
   getWatchStatusRoute
 } from '../routes/calendars'
-import { getDb } from '../../../core/common.db'
-import { getOAuthTokenForAccount, updateOAuthToken } from '../../../core/oauth.db'
+import type { OAuthService } from '../../../core/oauth.service'
 import {
   getAllCalendars,
   getCalendarById,
@@ -65,16 +66,10 @@ function convertWatchChannelToApi(channel: {
 
 // Helper function to get valid tokens or throw error message
 async function getValidTokensOrThrow(
-  db: ReturnType<typeof getDb>,
-  userId: number,
+  oauth: OAuthService,
   providerAccountId: string
 ): Promise<{ tokens: ProviderTokens } | { errorMessage: string }> {
-  const account = await getOAuthTokenForAccount(
-    db,
-    userId,
-    'google',
-    providerAccountId
-  )
+  const account = await oauth.getTokenForAccount('google', providerAccountId)
   if (!account || !account.accessToken) {
     return { errorMessage: 'Google OAuth not connected. Please sign in with Google.' }
   }
@@ -90,7 +85,7 @@ async function getValidTokensOrThrow(
 
     // Update tokens in DB if they were refreshed
     if (validTokens.accessToken !== account.accessToken) {
-      await updateOAuthToken(db, userId, 'google', providerAccountId, {
+      await oauth.updateToken('google', providerAccountId, {
         accessToken: validTokens.accessToken,
         refreshToken: validTokens.refreshToken,
         expiresAt: validTokens.expiresAt
@@ -107,11 +102,12 @@ async function getValidTokensOrThrow(
 // GET /calendars/available - List available calendars from Google
 export const listAvailableCalendarsHandler: RouteHandler<typeof listAvailableCalendarsRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const { accountId } = c.req.valid('query')
 
-    const tokensResult = await getValidTokensOrThrow(db, user.id, accountId)
+    const tokensResult = await getValidTokensOrThrow(oauth, accountId)
     if ('errorMessage' in tokensResult) {
       return c.json({ error: tokensResult.errorMessage }, 401)
     }
@@ -147,7 +143,7 @@ export const listAvailableCalendarsHandler: RouteHandler<typeof listAvailableCal
 // GET /calendars - List integrated calendars
 export const listCalendarsHandler: RouteHandler<typeof listCalendarsRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const db = c.get('db')
     const user = c.get('user')
 
     const calendars = await getAllCalendars(db, user.id)
@@ -162,13 +158,13 @@ export const listCalendarsHandler: RouteHandler<typeof listCalendarsRoute, AppBi
 // POST /calendars - Add a calendar to sync
 export const createCalendarHandler: RouteHandler<typeof createCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const data = c.req.valid('json')
 
     const tokensResult = await getValidTokensOrThrow(
-      db,
-      user.id,
+      oauth,
       data.providerAccountId
     )
     if ('errorMessage' in tokensResult) {
@@ -217,7 +213,7 @@ export const createCalendarHandler: RouteHandler<typeof createCalendarRoute, App
 // GET /calendars/{id} - Get a specific calendar
 export const getCalendarHandler: RouteHandler<typeof getCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 
@@ -237,7 +233,7 @@ export const getCalendarHandler: RouteHandler<typeof getCalendarRoute, AppBindin
 // PATCH /calendars/{id} - Update a calendar
 export const updateCalendarHandler: RouteHandler<typeof updateCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
     const data = c.req.valid('json')
@@ -258,7 +254,7 @@ export const updateCalendarHandler: RouteHandler<typeof updateCalendarRoute, App
 // DELETE /calendars/{id} - Remove a calendar
 export const deleteCalendarHandler: RouteHandler<typeof deleteCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 
@@ -278,7 +274,8 @@ export const deleteCalendarHandler: RouteHandler<typeof deleteCalendarRoute, App
 // POST /calendars/{id}/sync - Sync a specific calendar
 export const syncCalendarHandler: RouteHandler<typeof syncCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 
@@ -288,8 +285,7 @@ export const syncCalendarHandler: RouteHandler<typeof syncCalendarRoute, AppBind
     }
 
     const tokensResult = await getValidTokensOrThrow(
-      db,
-      user.id,
+      oauth,
       calendar.providerAccountId
     )
     if ('errorMessage' in tokensResult) {
@@ -336,7 +332,8 @@ export const syncCalendarHandler: RouteHandler<typeof syncCalendarRoute, AppBind
 // POST /calendars/sync - Sync all enabled calendars
 export const syncAllCalendarsHandler: RouteHandler<typeof syncAllCalendarsRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
 
     const enabledCalendars = await getEnabledCalendars(db, user.id, 'google')
@@ -364,8 +361,7 @@ export const syncAllCalendarsHandler: RouteHandler<typeof syncAllCalendarsRoute,
         let tokens = tokensByAccount.get(calendar.providerAccountId)
         if (!tokens) {
           const tokensResult = await getValidTokensOrThrow(
-            db,
-            user.id,
+            oauth,
             calendar.providerAccountId
           )
           if ('errorMessage' in tokensResult) {
@@ -411,7 +407,8 @@ export const syncAllCalendarsHandler: RouteHandler<typeof syncAllCalendarsRoute,
 // POST /calendars/{id}/watch - Start watching a calendar for changes
 export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 
@@ -421,8 +418,7 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
     }
 
     const tokensResult = await getValidTokensOrThrow(
-      db,
-      user.id,
+      oauth,
       calendar.providerAccountId
     )
     if ('errorMessage' in tokensResult) {
@@ -438,7 +434,7 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
     }
 
     // Get webhook URL from environment or construct it
-    const webhookBaseUrl = process.env.WEBHOOK_BASE_URL
+    const webhookBaseUrl = getEnv().WEBHOOK_BASE_URL
     if (!webhookBaseUrl) {
       return c.json({ error: 'WEBHOOK_BASE_URL environment variable not set' }, 500)
     }
@@ -447,8 +443,8 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
     // Generate a unique channel ID
     const channelId = crypto.randomUUID()
 
-    // Generate a verification token
-    const token = crypto.randomUUID()
+    // Generate a verification token that includes the tenant name for webhook routing
+    const token = `${tenantNameForUser(user.id)}:${crypto.randomUUID()}`
 
     // Create watch channel with Google
     const watchResult = await googleCalendarProvider.watchCalendar!(
@@ -481,7 +477,8 @@ export const watchCalendarHandler: RouteHandler<typeof watchCalendarRoute, AppBi
 // DELETE /calendars/{id}/watch - Stop watching a calendar
 export const stopWatchingCalendarHandler: RouteHandler<typeof stopWatchingCalendarRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 
@@ -496,8 +493,7 @@ export const stopWatchingCalendarHandler: RouteHandler<typeof stopWatchingCalend
     }
 
     const tokensResult = await getValidTokensOrThrow(
-      db,
-      user.id,
+      oauth,
       calendar.providerAccountId
     )
     if ('errorMessage' in tokensResult) {
@@ -531,7 +527,7 @@ export const stopWatchingCalendarHandler: RouteHandler<typeof stopWatchingCalend
 // GET /calendars/{id}/watch - Get watch channel status
 export const getWatchStatusHandler: RouteHandler<typeof getWatchStatusRoute, AppBindings> = async (c) => {
   try {
-    const db = getDb()
+    const db = c.get('db')
     const user = c.get('user')
     const { id } = c.req.valid('param')
 

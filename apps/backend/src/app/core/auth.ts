@@ -2,17 +2,15 @@ import { betterAuth } from "better-auth";
 import { eq } from "drizzle-orm";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins";
-import { getDb } from "./common.db";
+import { getMainDb } from "./internal/main-db";
 import { googleCalendarProvider } from "./calendar-providers/google.service";
-import { requireEnv } from "../lib/utils";
+import { getEnv } from "./env";
 import {
   usersTable,
   sessionsTable,
   accountsTable,
   verificationsTable,
 } from "../db/schema/schema";
-const getEnv = (): Record<string, string | undefined> =>
-  (typeof process === "undefined" ? {} : (process.env as Record<string, string | undefined>));
 
 const updateGoogleAccountProfile = async (account: {
   id?: number | string
@@ -40,7 +38,7 @@ const updateGoogleAccountProfile = async (account: {
   const userId = Number(account.userId);
   if (Number.isNaN(accountId) || Number.isNaN(userId)) return;
 
-  const db = getDb();
+  const db = getMainDb();
 
   if (info.email && info.email !== account.providerEmail) {
     await db
@@ -61,31 +59,23 @@ export const createAuth = () => {
   const env = getEnv()
   const isProduction = env.NODE_ENV === "production"
 
-  const secret = requireEnv(env.BETTER_AUTH_SECRET, "BETTER_AUTH_SECRET", isProduction)
-  const betterAuthUrl = requireEnv(env.BETTER_AUTH_URL, "BETTER_AUTH_URL", isProduction)
-  const googleClientId = requireEnv(env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID", isProduction)
-  const googleClientSecret = requireEnv(env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET", isProduction)
-  const googleRedirectUri = env.GOOGLE_REDIRECT_URI ?? ""
-
-  if (!googleRedirectUri) {
-    const message = "GOOGLE_REDIRECT_URI is missing or empty"
-    if (isProduction) {
-      throw new Error(message)
-    }
-    console.error(message)
-  }
+  const secret = env.BETTER_AUTH_SECRET
+  const betterAuthUrl = env.BETTER_AUTH_URL
+  const googleClientId = env.GOOGLE_CLIENT_ID
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET
+  const googleRedirectUri = env.GOOGLE_REDIRECT_URI
 
   if (!isProduction) {
-    if (secret) console.log(`BETTER_AUTH_SECRET length ${secret.length}`)
-    if (betterAuthUrl) console.log(`BETTER_AUTH_URL length ${betterAuthUrl.length}`)
-    if (googleClientId) console.log(`GOOGLE_CLIENT_ID length ${googleClientId.length}`)
-    if (googleClientSecret) console.log(`GOOGLE_CLIENT_SECRET length ${googleClientSecret.length}`)
-    if (googleRedirectUri) console.log(`GOOGLE_REDIRECT_URI length ${googleRedirectUri.length}`)
+    console.log(`BETTER_AUTH_SECRET length ${secret.length}`)
+    console.log(`BETTER_AUTH_URL length ${betterAuthUrl.length}`)
+    console.log(`GOOGLE_CLIENT_ID length ${googleClientId.length}`)
+    console.log(`GOOGLE_CLIENT_SECRET length ${googleClientSecret.length}`)
+    console.log(`GOOGLE_REDIRECT_URI length ${googleRedirectUri.length}`)
   }
   return betterAuth({
     secret,
     baseURL: betterAuthUrl || "http://localhost:8787",
-    database: drizzleAdapter(getDb(), {
+    database: drizzleAdapter(getMainDb(), {
       provider: "sqlite",
       usePlural: true,
       schema: {
@@ -117,19 +107,19 @@ export const createAuth = () => {
     socialProviders: {
       ...(googleClientId && googleClientSecret
         ? {
-            google: {
-              clientId: googleClientId,
-              clientSecret: googleClientSecret,
-              scope: [
-                'openid',
-                'email',
-                'profile',
-                'https://www.googleapis.com/auth/calendar.readonly',
-                'https://www.googleapis.com/auth/calendar.events.readonly'
-              ],
-              accessType: 'offline', // Request refresh token
-            },
-          }
+          google: {
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+            scope: [
+              'openid',
+              'email',
+              'profile',
+              'https://www.googleapis.com/auth/calendar.readonly',
+              'https://www.googleapis.com/auth/calendar.events.readonly'
+            ],
+            accessType: 'offline', // Request refresh token
+          },
+        }
         : {}),
       // TODO: GitHub and Apple OAuth are not supported yet
       // github: {
@@ -142,7 +132,7 @@ export const createAuth = () => {
       // },
     },
     trustedOrigins: [
-      ...(process.env.TRUSTED_ORIGINS || "http://localhost:5173")
+      ...(env.TRUSTED_ORIGINS || "http://localhost:5173")
         .split(",")
         .map((origin) => origin.trim())
         .filter(Boolean),

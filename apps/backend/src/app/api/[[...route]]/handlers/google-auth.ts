@@ -5,12 +5,6 @@ import {
   deleteGoogleAuthRoute,
   listGoogleAccountsRoute
 } from '../routes/google-auth'
-import { getDb } from '../../../core/common.db'
-import {
-  getOAuthTokenForAccount,
-  listOAuthAccountRecords,
-  listOAuthAccounts
-} from '../../../core/oauth.db'
 import { deleteAllCalendarsForProvider } from '../../../core/calendars.db'
 import { googleCalendarProvider } from '../../../core/calendar-providers/google.service'
 import { formatTimestamp } from '../../../core/common.core'
@@ -21,18 +15,12 @@ export const getGoogleAuthStatusHandler: RouteHandler<
   AppBindings
 > = async (c) => {
   try {
-    const db = getDb()
-    const user = c.get('user')
+    const oauth = c.get('oauth')
     const { accountId } = c.req.valid('query')
 
     // Check accounts table (populated by better-auth when user signs in with Google)
     if (accountId) {
-      const account = await getOAuthTokenForAccount(
-        db,
-        user.id,
-        'google',
-        accountId
-      )
+      const account = await oauth.getTokenForAccount('google', accountId)
 
       if (!account || !account.accessToken) {
         return c.json({ connected: false }, 200)
@@ -57,7 +45,7 @@ export const getGoogleAuthStatusHandler: RouteHandler<
       )
     }
 
-    const accounts = await listOAuthAccountRecords(db, user.id, 'google')
+    const accounts = await oauth.listAccountRecords('google')
     const now = Date.now()
     const hasValid = accounts.some((account) => {
       if (!account.accessToken) return false
@@ -87,17 +75,13 @@ export const deleteGoogleAuthHandler: RouteHandler<
   AppBindings
 > = async (c) => {
   try {
-    const db = getDb()
+    const oauth = c.get('oauth')
+    const db = c.get('db')
     const user = c.get('user')
     const { accountId } = c.req.valid('query')
 
     if (accountId) {
-      const account = await getOAuthTokenForAccount(
-        db,
-        user.id,
-        'google',
-        accountId
-      )
+      const account = await oauth.getTokenForAccount('google', accountId)
 
       if (!account) {
         return c.json({ error: 'No Google OAuth connection found' }, 404)
@@ -127,7 +111,7 @@ export const deleteGoogleAuthHandler: RouteHandler<
       )
     }
 
-    const accounts = await listOAuthAccountRecords(db, user.id, 'google')
+    const accounts = await oauth.listAccountRecords('google')
     if (!accounts.length) {
       return c.json({ error: 'No Google OAuth connection found' }, 404)
     }
@@ -162,10 +146,9 @@ export const listGoogleAccountsHandler: RouteHandler<
   AppBindings
 > = async (c) => {
   try {
-    const db = getDb()
-    const user = c.get('user')
+    const oauth = c.get('oauth')
 
-    const accounts = await listOAuthAccounts(db, user.id, 'google')
+    const accounts = await oauth.listAccounts('google')
 
     return c.json({ accounts }, 200)
   } catch (error) {

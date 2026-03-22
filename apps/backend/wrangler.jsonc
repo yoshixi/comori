@@ -12,8 +12,8 @@
 		"GOOGLE_REDIRECT_URI": "http://localhost:8787/api/auth/callback/google",
 
     // values stored as the secrets
-		"TURSO_AUTH_TOKEN": "",
-		"TURSO_CONNECTION_URL": "",
+		"TURSO_MAIN_DB_AUTH_TOKEN": "",
+		"TURSO_MAIN_DB_URL": "",
 		"BETTER_AUTH_SECRET": "",
     "GOOGLE_CLIENT_ID": "",
 		"GOOGLE_CLIENT_SECRET": "",

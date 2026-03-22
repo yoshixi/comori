@@ -7,6 +7,7 @@ import type {
   WatchChannelResult,
   WatchChannelInfo
 } from './types'
+import { getEnv } from '../env'
 
 const GOOGLE_OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_OAUTH_REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
@@ -20,9 +21,10 @@ const SCOPES = [
 
 // Get OAuth2 client configuration
 function getOAuth2Config() {
-  const clientId = process.env.GOOGLE_CLIENT_ID
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI
+  const env = getEnv()
+  const clientId = env.GOOGLE_CLIENT_ID
+  const clientSecret = env.GOOGLE_CLIENT_SECRET
+  const redirectUri = env.GOOGLE_REDIRECT_URI
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error(

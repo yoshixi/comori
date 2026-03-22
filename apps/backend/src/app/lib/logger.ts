@@ -8,4 +8,9 @@ export const rootLogger = pino({
   serializers: {
     err: pino.stdSerializers.err,
   },
+  browser: {
+    write: (o) => {
+      console.log(JSON.stringify(o))
+    },
+  },
 })

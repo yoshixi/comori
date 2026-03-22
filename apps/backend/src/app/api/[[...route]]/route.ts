@@ -303,6 +303,15 @@ export function createApp(deps?: AppDeps) {
     if (!sessionToken) {
       return c.json({ error: 'Missing session token' }, 400)
     }
+
+    // Verify the session is valid before creating an exchange code
+    const headers = new Headers(c.req.raw.headers)
+    headers.set('cookie', `better-auth.session_token=${sessionToken}`)
+    const session = await auth.api.getSession({ headers })
+    if (!session) {
+      return c.json({ error: 'Invalid session token' }, 401)
+    }
+
     const code = await createExchangeCode(sessionToken)
     return c.json({ code })
   })

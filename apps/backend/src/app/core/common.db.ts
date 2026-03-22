@@ -18,38 +18,27 @@ let tenansoInstance: TenansoInstance | null = null
 
 /**
  * Returns the tenanso instance for multi-tenant database management.
- * Returns null when tenanso env vars are not configured (local dev).
  */
-export function getTenanso(): TenansoInstance | null {
-  const env = getEnv()
+export function getTenanso(): TenansoInstance {
   if (tenansoInstance) return tenansoInstance
 
-  const orgSlug = env.TURSO_ORG_SLUG
-  const apiToken = env.TURSO_API_TOKEN
-  const group = env.TURSO_GROUP
-  const groupAuthToken = env.TURSO_GROUP_AUTH_TOKEN
-  const seedDbName = env.TURSO_SEED_DB_NAME
-
-  if (!orgSlug || !apiToken || !group || !groupAuthToken || !seedDbName) {
-    return null
-  }
-
+  const env = getEnv()
   const tursoApiBaseUrl = env.TURSO_API_BASE_URL
   // Compute the tenant DB URL from orgSlug, or use override (for tests with file: URLs)
-  const tenantDbUrl = env.TURSO_TENANT_DB_URL || `libsql://{tenant}-${orgSlug}.turso.io`
+  const tenantDbUrl = env.TURSO_TENANT_DB_URL || `libsql://{tenant}-${env.TURSO_ORG_SLUG}.turso.io`
 
   tenansoInstance = createTenanso({
     turso: {
-      organizationSlug: orgSlug,
-      apiToken,
-      group,
+      organizationSlug: env.TURSO_ORG_SLUG,
+      apiToken: env.TURSO_API_TOKEN,
+      group: env.TURSO_GROUP,
       ...(tursoApiBaseUrl ? { baseUrl: tursoApiBaseUrl } : {}),
     },
     databaseUrl: tenantDbUrl,
-    authToken: groupAuthToken,
+    authToken: env.TURSO_GROUP_AUTH_TOKEN,
     schema,
     drizzleOptions: { casing: 'snake_case' },
-    seed: { database: seedDbName },
+    seed: { database: env.TURSO_SEED_DB_NAME },
   })
 
   return tenansoInstance
@@ -57,15 +46,9 @@ export function getTenanso(): TenansoInstance | null {
 
 /**
  * Returns the tenant database for a specific user.
- * In production (tenanso configured): returns a per-user database.
- * In local dev (tenanso not configured): falls back to getMainDb() (single DB mode).
  */
 export function getTenantDbForUser(userId: number): DB {
-  const tenanso = getTenanso()
-  if (!tenanso) {
-    return getMainDb()
-  }
-  return tenanso.dbFor(tenantNameForUser(userId)) as unknown as DB
+  return getTenanso().dbFor(tenantNameForUser(userId)) as unknown as DB
 }
 
 /** Derive tenant database name: {group}-user-{id} */
@@ -82,11 +65,8 @@ export function tenantNameForUser(userId: number): string {
  * so the DB is ready to use when createTenant() resolves.
  */
 export async function provisionTenant(user: { id: number; name: string; email: string }): Promise<void> {
-  const tenanso = getTenanso()
-  if (!tenanso) return // Local dev — single DB mode
-
   const tenantName = tenantNameForUser(user.id)
-  await tenanso.createTenant(tenantName)
+  await getTenanso().createTenant(tenantName)
 
   // Seed the user record into the tenant DB so FK constraints are satisfied.
   const tenantDb = getTenantDbForUser(user.id)
@@ -102,11 +82,8 @@ export async function provisionTenant(user: { id: number; name: string; email: s
  * In local dev (single DB mode), always returns Ok().
  */
 export async function validateUserReady(userId: number): Promise<Result> {
-  const tenanso = getTenanso()
-  if (!tenanso) return Ok()
-
   try {
-    const exists = await tenanso.tenantExists(tenantNameForUser(userId))
+    const exists = await getTenanso().tenantExists(tenantNameForUser(userId))
     if (!exists) {
       return Err(`Tenant database for user ${userId} does not exist`)
     }

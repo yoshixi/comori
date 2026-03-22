@@ -19,28 +19,24 @@ const appEnvSchema = z.object({
   GOOGLE_CLIENT_SECRET: requiredString,
   GOOGLE_REDIRECT_URI: requiredString,
 
+  // Centralized DB (Turso)
+  TURSO_MAIN_DB_URL: requiredString,
+  TURSO_MAIN_DB_AUTH_TOKEN: requiredString,
+
+  // Multi-tenant (tenanso)
+  TURSO_ORG_SLUG: requiredString,
+  TURSO_API_TOKEN: requiredString,
+  TURSO_GROUP: requiredString,
+  TURSO_GROUP_AUTH_TOKEN: requiredString,
+  TURSO_SEED_DB_NAME: requiredString,
+
   // Optional
   NODE_ENV: z.string().optional(),
   TRUSTED_ORIGINS: z.string().optional(),
   MOBILE_REDIRECT_URIS: z.string().optional(),
-
-  // Centralized DB (Turso)
-  TURSO_MAIN_DB_URL: z.string().optional(),
-  TURSO_MAIN_DB_AUTH_TOKEN: z.string().optional(),
-
-  // Local dev DB
   SQLITE_URL: z.string().optional(),
-
-  // Multi-tenant (tenanso)
-  TURSO_ORG_SLUG: z.string().optional(),
-  TURSO_API_TOKEN: z.string().optional(),
-  TURSO_GROUP: z.string().optional(),
-  TURSO_GROUP_AUTH_TOKEN: z.string().optional(),
-  TURSO_TENANT_DB_URL: z.string().optional(),
-  TURSO_SEED_DB_NAME: z.string().optional(),
-  TURSO_API_BASE_URL: z.string().optional(),
-
-  // Webhooks
+  TURSO_TENANT_DB_URL: z.string().optional(),  // Computed from orgSlug by default
+  TURSO_API_BASE_URL: z.string().optional(),    // Override for testing
   WEBHOOK_BASE_URL: z.string().optional(),
 })
 

@@ -305,9 +305,12 @@ export function createApp(deps?: AppDeps) {
     }
 
     // Verify the session is valid before creating an exchange code
-    const headers = new Headers(c.req.raw.headers)
-    headers.set('cookie', `better-auth.session_token=${sessionToken}`)
-    const session = await auth.api.getSession({ headers })
+    let session = await auth.api.getSession({ headers: c.req.raw.headers })
+    if (!session) {
+      const headers = new Headers(c.req.raw.headers)
+      headers.set('cookie', `better-auth.session_token=${sessionToken}`)
+      session = await auth.api.getSession({ headers })
+    }
     if (!session) {
       return c.json({ error: 'Invalid session token' }, 401)
     }

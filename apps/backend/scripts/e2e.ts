@@ -5,9 +5,6 @@
  * The auth flow mirrors the OAuth path used by clients:
  *   sign-up/sign-in → session token → /session-code → /token (with code) → JWT
  *
- * This is the same code path that desktop/mobile OAuth uses, so
- * testing it with email/password covers the shared /token logic.
- *
  * Usage:
  *   pnpm --filter @apps/backend run dev    # start server
  *   pnpm --filter @apps/backend run e2e    # run tests
@@ -18,7 +15,6 @@
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8787'
 const API = `${BASE_URL}/api`
 
-// Unique email per run to avoid conflicts
 const RUN_ID = Date.now()
 const TEST_EMAIL = `e2e-${RUN_ID}@test.example.com`
 const TEST_PASSWORD = 'e2e-test-password-123456'
@@ -45,19 +41,40 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 
 function assert(condition: boolean, message: string) {
-  if (!condition) throw new Error(`Assertion failed: ${message}`)
+  if (!condition) throw new Error(message)
 }
 
-function assertEqual(actual: unknown, expected: unknown, label: string) {
-  if (actual !== expected) {
-    throw new Error(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+interface ApiResponse {
+  status: number
+  data: any
+  headers: Headers
+  endpoint: string
+}
+
+/** Assert status code — on failure shows endpoint, actual status, and body */
+function assertStatus(res: ApiResponse, expected: number) {
+  if (res.status !== expected) {
+    throw new Error(
+      `${res.endpoint} → ${res.status} (expected ${expected})\n` +
+      `      body: ${JSON.stringify(res.data)}`
+    )
+  }
+}
+
+/** Assert a non-success status (anything other than the given code) */
+function assertNotStatus(res: ApiResponse, notExpected: number) {
+  if (res.status === notExpected) {
+    throw new Error(
+      `${res.endpoint} → ${res.status} (expected NOT ${notExpected})\n` +
+      `      body: ${JSON.stringify(res.data)}`
+    )
   }
 }
 
 async function api(
   path: string,
   options: { method?: string; body?: unknown; headers?: Record<string, string> } = {}
-): Promise<{ status: number; data: any; headers: Headers }> {
+): Promise<ApiResponse> {
   const method = options.method || 'GET'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -69,9 +86,10 @@ async function api(
     ? JSON.stringify(options.body)
     : needsBody ? '{}' : undefined
 
+  const endpoint = `${method} /api${path}`
   const res = await fetch(`${API}${path}`, { method, headers, body })
   const data = await res.json().catch(() => null)
-  return { status: res.status, data, headers: res.headers }
+  return { status: res.status, data, headers: res.headers, endpoint }
 }
 
 /**
@@ -79,22 +97,26 @@ async function api(
  * This mirrors the OAuth flow: session-token → exchange code → /token
  */
 async function sessionToJwt(sessionToken: string): Promise<string> {
-  // Step 1: Create a short-lived exchange code from the session token
   const codeRes = await api('/session-code', {
     method: 'POST',
     headers: { Authorization: `Bearer ${sessionToken}` },
   })
   if (codeRes.status !== 200 || !codeRes.data?.code) {
-    throw new Error(`/session-code failed: ${codeRes.status} ${JSON.stringify(codeRes.data)}`)
+    throw new Error(
+      `${codeRes.endpoint} → ${codeRes.status}\n` +
+      `      body: ${JSON.stringify(codeRes.data)}`
+    )
   }
 
-  // Step 2: Exchange the code for a JWT (same path as OAuth callback)
   const tokenRes = await api('/token', {
     method: 'POST',
     body: { code: codeRes.data.code },
   })
   if (tokenRes.status !== 200 || !tokenRes.data?.token) {
-    throw new Error(`/token failed: ${tokenRes.status} ${JSON.stringify(tokenRes.data)}`)
+    throw new Error(
+      `${tokenRes.endpoint} → ${tokenRes.status}\n` +
+      `      body: ${JSON.stringify(tokenRes.data)}`
+    )
   }
 
   return tokenRes.data.token
@@ -109,24 +131,24 @@ async function testSignUp() {
 
   let sessionToken: string | null = null
 
-  await test('should sign up a new user', async () => {
-    const { status, data, headers } = await api('/auth/sign-up/email', {
+  await test('POST /auth/sign-up/email → sign up a new user', async () => {
+    const res = await api('/auth/sign-up/email', {
       method: 'POST',
       body: { email: TEST_EMAIL, password: TEST_PASSWORD, name: TEST_NAME },
     })
-    assertEqual(status, 200, 'status')
-    assert(data.user !== undefined, 'response should have user')
-    assertEqual(data.user.email, TEST_EMAIL, 'email')
-    sessionToken = headers.get('set-auth-token')
-    assert(sessionToken !== null, 'should return session token')
+    assertStatus(res, 200)
+    assert(res.data.user !== undefined, 'response should have user')
+    assert(res.data.user.email === TEST_EMAIL, `email mismatch: ${res.data.user.email}`)
+    sessionToken = res.headers.get('set-auth-token')
+    assert(sessionToken !== null, 'should return session token in set-auth-token header')
   })
 
-  await test('should reject duplicate email', async () => {
-    const { status } = await api('/auth/sign-up/email', {
+  await test('POST /auth/sign-up/email → reject duplicate email', async () => {
+    const res = await api('/auth/sign-up/email', {
       method: 'POST',
       body: { email: TEST_EMAIL, password: TEST_PASSWORD, name: TEST_NAME },
     })
-    assert(status !== 200, `expected non-200, got ${status}`)
+    assertNotStatus(res, 200)
   })
 
   return sessionToken!
@@ -137,35 +159,38 @@ async function testTokenExchange(sessionToken: string) {
 
   let jwt: string = ''
 
-  await test('should create exchange code from session token', async () => {
-    const { status, data } = await api('/session-code', {
+  await test('POST /session-code → create exchange code', async () => {
+    const res = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
-    assertEqual(status, 200, 'status')
-    assert(typeof data.code === 'string', 'should return code')
+    assertStatus(res, 200)
+    assert(typeof res.data.code === 'string', 'should return code')
   })
 
-  await test('should exchange code for JWT', async () => {
+  await test('POST /token { code } → exchange code for JWT', async () => {
     jwt = await sessionToJwt(sessionToken)
     assert(typeof jwt === 'string', 'should return JWT')
     assert(jwt.split('.').length === 3, 'JWT should have 3 parts')
   })
 
-  await test('should reject invalid code', async () => {
-    const { status } = await api('/token', {
+  await test('POST /token { code: invalid } → reject invalid code', async () => {
+    const res = await api('/token', {
       method: 'POST',
       body: { code: 'invalid-code' },
     })
-    assertEqual(status, 400, 'status')
+    assertStatus(res, 400)
   })
 
-  await test('should reject invalid session token for code creation', async () => {
-    const { status } = await api('/session-code', {
+  await test('POST /session-code (invalid token) → reject', async () => {
+    const res = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: 'Bearer invalid-token' },
     })
-    assert(status === 400 || status === 401, `expected 400 or 401, got ${status}`)
+    assert(
+      res.status === 400 || res.status === 401,
+      `${res.endpoint} → ${res.status} (expected 400 or 401)\n      body: ${JSON.stringify(res.data)}`
+    )
   })
 
   return jwt
@@ -177,47 +202,47 @@ async function testCrudTasks(jwt: string) {
   const auth = { Authorization: `Bearer ${jwt}` }
   let taskId: number
 
-  await test('should list tasks (empty)', async () => {
-    const { status, data } = await api('/tasks', { headers: auth })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.total, 0, 'total')
+  await test('GET /tasks → empty list', async () => {
+    const res = await api('/tasks', { headers: auth })
+    assertStatus(res, 200)
+    assert(res.data.total === 0, `expected 0 tasks, got ${res.data.total}`)
   })
 
-  await test('should create a task', async () => {
-    const { status, data } = await api('/tasks', {
+  await test('POST /tasks → create', async () => {
+    const res = await api('/tasks', {
       method: 'POST',
       headers: auth,
       body: { title: 'E2E Task', description: 'Created by e2e script' },
     })
-    assertEqual(status, 201, 'status')
-    assertEqual(data.task.title, 'E2E Task', 'title')
-    taskId = data.task.id
+    assertStatus(res, 201)
+    assert(res.data.task.title === 'E2E Task', `title: ${res.data.task.title}`)
+    taskId = res.data.task.id
   })
 
-  await test('should read the task', async () => {
-    const { status, data } = await api(`/tasks/${taskId}`, { headers: auth })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.task.title, 'E2E Task', 'title')
+  await test('GET /tasks/:id → read', async () => {
+    const res = await api(`/tasks/${taskId}`, { headers: auth })
+    assertStatus(res, 200)
+    assert(res.data.task.title === 'E2E Task', `title: ${res.data.task.title}`)
   })
 
-  await test('should update the task', async () => {
-    const { status, data } = await api(`/tasks/${taskId}`, {
+  await test('PUT /tasks/:id → update', async () => {
+    const res = await api(`/tasks/${taskId}`, {
       method: 'PUT',
       headers: auth,
       body: { title: 'Updated E2E Task' },
     })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.task.title, 'Updated E2E Task', 'title')
+    assertStatus(res, 200)
+    assert(res.data.task.title === 'Updated E2E Task', `title: ${res.data.task.title}`)
   })
 
-  await test('should delete the task', async () => {
-    const { status } = await api(`/tasks/${taskId}`, { method: 'DELETE', headers: auth })
-    assertEqual(status, 200, 'status')
+  await test('DELETE /tasks/:id → delete', async () => {
+    const res = await api(`/tasks/${taskId}`, { method: 'DELETE', headers: auth })
+    assertStatus(res, 200)
   })
 
-  await test('should return 404 for deleted task', async () => {
-    const { status } = await api(`/tasks/${taskId}`, { headers: auth })
-    assertEqual(status, 404, 'status')
+  await test('GET /tasks/:id → 404 after delete', async () => {
+    const res = await api(`/tasks/${taskId}`, { headers: auth })
+    assertStatus(res, 404)
   })
 }
 
@@ -227,80 +252,82 @@ async function testCrudNotes(jwt: string) {
   const auth = { Authorization: `Bearer ${jwt}` }
   let noteId: number
 
-  await test('should list notes (empty)', async () => {
-    const { status, data } = await api('/notes', { headers: auth })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.total, 0, 'total')
+  await test('GET /notes → empty list', async () => {
+    const res = await api('/notes', { headers: auth })
+    assertStatus(res, 200)
+    assert(res.data.total === 0, `expected 0 notes, got ${res.data.total}`)
   })
 
-  await test('should create a note', async () => {
-    const { status, data } = await api('/notes', {
+  await test('POST /notes → create', async () => {
+    const res = await api('/notes', {
       method: 'POST',
       headers: auth,
       body: { title: 'E2E Note', content: 'Created by e2e script' },
     })
-    assertEqual(status, 201, 'status')
-    assertEqual(data.note.title, 'E2E Note', 'title')
-    noteId = data.note.id
+    assertStatus(res, 201)
+    assert(res.data.note.title === 'E2E Note', `title: ${res.data.note.title}`)
+    noteId = res.data.note.id
   })
 
-  await test('should read the note', async () => {
-    const { status, data } = await api(`/notes/${noteId}`, { headers: auth })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.note.title, 'E2E Note', 'title')
+  await test('GET /notes/:id → read', async () => {
+    const res = await api(`/notes/${noteId}`, { headers: auth })
+    assertStatus(res, 200)
+    assert(res.data.note.title === 'E2E Note', `title: ${res.data.note.title}`)
   })
 
-  await test('should update the note', async () => {
-    const { status, data } = await api(`/notes/${noteId}`, {
+  await test('PUT /notes/:id → update', async () => {
+    const res = await api(`/notes/${noteId}`, {
       method: 'PUT',
       headers: auth,
       body: { title: 'Updated E2E Note' },
     })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.note.title, 'Updated E2E Note', 'title')
+    assertStatus(res, 200)
+    assert(res.data.note.title === 'Updated E2E Note', `title: ${res.data.note.title}`)
   })
 
-  await test('should convert note to task', async () => {
-    const { status, data } = await api(`/notes/${noteId}/task_conversions`, {
+  await test('POST /notes/:id/task_conversions → convert to task', async () => {
+    const res = await api(`/notes/${noteId}/task_conversions`, {
       method: 'POST',
       headers: auth,
     })
-    assertEqual(status, 201, 'status')
-    assert(data.task !== undefined, 'should return task')
-    assertEqual(data.task.title, 'Updated E2E Note', 'task title should match note title')
-
-    // Clean up the created task
-    await api(`/tasks/${data.task.id}`, { method: 'DELETE', headers: auth })
+    assertStatus(res, 201)
+    assert(res.data.task !== undefined, 'should return task')
+    assert(res.data.task.title === 'Updated E2E Note', `task title: ${res.data.task.title}`)
+    await api(`/tasks/${res.data.task.id}`, { method: 'DELETE', headers: auth })
   })
 
-  await test('should delete a note', async () => {
-    const { data: created } = await api('/notes', {
+  await test('DELETE /notes/:id → delete', async () => {
+    const createRes = await api('/notes', {
       method: 'POST',
       headers: auth,
       body: { title: 'To delete' },
     })
-    const { status } = await api(`/notes/${created.note.id}`, { method: 'DELETE', headers: auth })
-    assertEqual(status, 200, 'status')
+    assertStatus(createRes, 201)
+    const res = await api(`/notes/${createRes.data.note.id}`, { method: 'DELETE', headers: auth })
+    assertStatus(res, 200)
   })
 }
 
 async function testSignOut(sessionToken: string) {
   console.log('\n--- Sign-out ---')
 
-  await test('should sign out', async () => {
-    const { status } = await api('/auth/sign-out', {
+  await test('POST /auth/sign-out → sign out', async () => {
+    const res = await api('/auth/sign-out', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
-    assertEqual(status, 200, 'status')
+    assertStatus(res, 200)
   })
 
-  await test('should reject code creation after sign-out', async () => {
-    const { status } = await api('/session-code', {
+  await test('POST /session-code → reject after sign-out', async () => {
+    const res = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
-    assert(status === 400 || status === 401, `expected 400 or 401, got ${status}`)
+    assert(
+      res.status === 400 || res.status === 401,
+      `${res.endpoint} → ${res.status} (expected 400 or 401)\n      body: ${JSON.stringify(res.data)}`
+    )
   })
 }
 
@@ -309,36 +336,32 @@ async function testSignIn() {
 
   let jwt: string = ''
 
-  await test('should sign in and get JWT via code flow', async () => {
-    const { status, data, headers } = await api('/auth/sign-in/email', {
+  await test('POST /auth/sign-in/email → sign in + code flow JWT', async () => {
+    const res = await api('/auth/sign-in/email', {
       method: 'POST',
       body: { email: TEST_EMAIL, password: TEST_PASSWORD },
     })
-    assertEqual(status, 200, 'status')
-    assertEqual(data.user.email, TEST_EMAIL, 'email')
+    assertStatus(res, 200)
+    assert(res.data.user.email === TEST_EMAIL, `email: ${res.data.user.email}`)
 
-    const sessionToken = headers.get('set-auth-token')
+    const sessionToken = res.headers.get('set-auth-token')
     assert(sessionToken !== null, 'should return session token')
-
-    // Use the same code flow as OAuth clients
     jwt = await sessionToJwt(sessionToken!)
     assert(jwt.split('.').length === 3, 'JWT should have 3 parts')
   })
 
-  await test('should reject wrong password', async () => {
-    const { status } = await api('/auth/sign-in/email', {
+  await test('POST /auth/sign-in/email → reject wrong password', async () => {
+    const res = await api('/auth/sign-in/email', {
       method: 'POST',
       body: { email: TEST_EMAIL, password: 'wrong-password' },
     })
-    assert(status !== 200, `expected non-200, got ${status}`)
+    assertNotStatus(res, 200)
   })
 
-  await test('should access protected routes after sign-in', async () => {
-    const { status, data } = await api('/tasks', {
-      headers: { Authorization: `Bearer ${jwt}` },
-    })
-    assertEqual(status, 200, 'status')
-    assert(Array.isArray(data.tasks), 'should return tasks array')
+  await test('GET /tasks → access protected route after sign-in', async () => {
+    const res = await api('/tasks', { headers: { Authorization: `Bearer ${jwt}` } })
+    assertStatus(res, 200)
+    assert(Array.isArray(res.data.tasks), 'should return tasks array')
   })
 }
 
@@ -351,11 +374,10 @@ async function main() {
   console.log(`Test user: ${TEST_EMAIL}`)
   console.log(`Auth flow: session-token → /session-code → /token (code exchange)\n`)
 
-  // Check server is reachable
   try {
     const res = await fetch(`${API}/health`)
     if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
-  } catch (error) {
+  } catch {
     console.error(`Cannot reach server at ${BASE_URL}. Is it running?`)
     process.exit(1)
   }

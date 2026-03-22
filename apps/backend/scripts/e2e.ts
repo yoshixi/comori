@@ -2,14 +2,16 @@
 /**
  * E2E test script — runs against a real server, no mocks.
  *
+ * The auth flow mirrors the OAuth path used by clients:
+ *   sign-up/sign-in → session token → /session-code → /token (with code) → JWT
+ *
+ * This is the same code path that desktop/mobile OAuth uses, so
+ * testing it with email/password covers the shared /token logic.
+ *
  * Usage:
- *   # Start the server first:
- *   pnpm --filter @apps/backend run dev
+ *   pnpm --filter @apps/backend run dev    # start server
+ *   pnpm --filter @apps/backend run e2e    # run tests
  *
- *   # Then run the e2e tests:
- *   pnpm --filter @apps/backend run e2e
- *
- *   # Or against a custom URL:
  *   BASE_URL=https://api.example.com pnpm --filter @apps/backend run e2e
  */
 
@@ -59,11 +61,9 @@ async function api(
   const method = options.method || 'GET'
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Origin: BASE_URL,  // Required by better-auth for CSRF protection
+    Origin: BASE_URL,
     ...options.headers,
   }
-  // POST/PUT/DELETE with no explicit body → send empty JSON object
-  // (better-auth expects a parseable JSON body on POST requests)
   const needsBody = method !== 'GET' && method !== 'HEAD'
   const body = options.body
     ? JSON.stringify(options.body)
@@ -72,6 +72,32 @@ async function api(
   const res = await fetch(`${API}${path}`, { method, headers, body })
   const data = await res.json().catch(() => null)
   return { status: res.status, data, headers: res.headers }
+}
+
+/**
+ * Exchange a session token for a JWT via the code flow.
+ * This mirrors the OAuth flow: session-token → exchange code → /token
+ */
+async function sessionToJwt(sessionToken: string): Promise<string> {
+  // Step 1: Create a short-lived exchange code from the session token
+  const codeRes = await api('/session-code', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  })
+  if (codeRes.status !== 200 || !codeRes.data?.code) {
+    throw new Error(`/session-code failed: ${codeRes.status} ${JSON.stringify(codeRes.data)}`)
+  }
+
+  // Step 2: Exchange the code for a JWT (same path as OAuth callback)
+  const tokenRes = await api('/token', {
+    method: 'POST',
+    body: { code: codeRes.data.code },
+  })
+  if (tokenRes.status !== 200 || !tokenRes.data?.token) {
+    throw new Error(`/token failed: ${tokenRes.status} ${JSON.stringify(tokenRes.data)}`)
+  }
+
+  return tokenRes.data.token
 }
 
 // ---------------------------------------------------------------------------
@@ -107,27 +133,39 @@ async function testSignUp() {
 }
 
 async function testTokenExchange(sessionToken: string) {
-  console.log('\n--- Token exchange ---')
+  console.log('\n--- Token exchange (code flow) ---')
 
   let jwt: string = ''
 
-  await test('should exchange session token for JWT', async () => {
-    const { status, data } = await api('/token', {
+  await test('should create exchange code from session token', async () => {
+    const { status, data } = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
     assertEqual(status, 200, 'status')
-    assert(typeof data.token === 'string', 'should return JWT')
-    assert(data.token.split('.').length === 3, 'JWT should have 3 parts')
-    jwt = data.token
+    assert(typeof data.code === 'string', 'should return code')
   })
 
-  await test('should reject invalid session token', async () => {
+  await test('should exchange code for JWT', async () => {
+    jwt = await sessionToJwt(sessionToken)
+    assert(typeof jwt === 'string', 'should return JWT')
+    assert(jwt.split('.').length === 3, 'JWT should have 3 parts')
+  })
+
+  await test('should reject invalid code', async () => {
     const { status } = await api('/token', {
+      method: 'POST',
+      body: { code: 'invalid-code' },
+    })
+    assertEqual(status, 400, 'status')
+  })
+
+  await test('should reject invalid session token for code creation', async () => {
+    const { status } = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: 'Bearer invalid-token' },
     })
-    assertEqual(status, 401, 'status')
+    assert(status === 400 || status === 401, `expected 400 or 401, got ${status}`)
   })
 
   return jwt
@@ -226,7 +264,6 @@ async function testCrudNotes(jwt: string) {
     const { status, data } = await api(`/notes/${noteId}/task_conversions`, {
       method: 'POST',
       headers: auth,
-      body: {},
     })
     assertEqual(status, 201, 'status')
     assert(data.task !== undefined, 'should return task')
@@ -236,8 +273,7 @@ async function testCrudNotes(jwt: string) {
     await api(`/tasks/${data.task.id}`, { method: 'DELETE', headers: auth })
   })
 
-  await test('should delete the note', async () => {
-    // Note was archived by convert, create a new one to delete
+  await test('should delete a note', async () => {
     const { data: created } = await api('/notes', {
       method: 'POST',
       headers: auth,
@@ -259,38 +295,34 @@ async function testSignOut(sessionToken: string) {
     assertEqual(status, 200, 'status')
   })
 
-  await test('should reject token exchange after sign-out', async () => {
-    const { status } = await api('/token', {
+  await test('should reject code creation after sign-out', async () => {
+    const { status } = await api('/session-code', {
       method: 'POST',
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
-    assertEqual(status, 401, 'status')
+    assert(status === 400 || status === 401, `expected 400 or 401, got ${status}`)
   })
 }
 
 async function testSignIn() {
-  console.log('\n--- Sign-in ---')
+  console.log('\n--- Sign-in (code flow) ---')
 
   let jwt: string = ''
 
-  await test('should sign in with correct credentials', async () => {
+  await test('should sign in and get JWT via code flow', async () => {
     const { status, data, headers } = await api('/auth/sign-in/email', {
       method: 'POST',
       body: { email: TEST_EMAIL, password: TEST_PASSWORD },
     })
     assertEqual(status, 200, 'status')
-    assert(data.user !== undefined, 'response should have user')
     assertEqual(data.user.email, TEST_EMAIL, 'email')
 
     const sessionToken = headers.get('set-auth-token')
     assert(sessionToken !== null, 'should return session token')
 
-    const tokenRes = await api('/token', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${sessionToken}` },
-    })
-    assertEqual(tokenRes.status, 200, 'token status')
-    jwt = tokenRes.data.token
+    // Use the same code flow as OAuth clients
+    jwt = await sessionToJwt(sessionToken!)
+    assert(jwt.split('.').length === 3, 'JWT should have 3 parts')
   })
 
   await test('should reject wrong password', async () => {
@@ -316,7 +348,8 @@ async function testSignIn() {
 
 async function main() {
   console.log(`\nE2E tests against ${BASE_URL}`)
-  console.log(`Test user: ${TEST_EMAIL}\n`)
+  console.log(`Test user: ${TEST_EMAIL}`)
+  console.log(`Auth flow: session-token → /session-code → /token (code exchange)\n`)
 
   // Check server is reachable
   try {
@@ -327,7 +360,6 @@ async function main() {
     process.exit(1)
   }
 
-  // Run tests in order — each depends on the previous
   const sessionToken = await testSignUp()
   const jwt = await testTokenExchange(sessionToken)
   await testCrudTasks(jwt)
@@ -335,7 +367,6 @@ async function main() {
   await testSignOut(sessionToken)
   await testSignIn()
 
-  // Summary
   console.log(`\n${'─'.repeat(40)}`)
   console.log(`${passCount} passed, ${failCount} failed`)
   if (failCount > 0) process.exit(1)

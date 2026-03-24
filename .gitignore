@@ -47,3 +47,7 @@ result
 .pre-commit-config.yaml
 apps/backend/tmp
 apps/electron/electron.vite.config.*.mjs
+
+AuthKey.p8
+certificate.p12
+

@@ -10,22 +10,19 @@
 		"NODE_ENV": "production",
 		"BETTER_AUTH_URL": "http://localhost:8787",
 		"GOOGLE_REDIRECT_URI": "http://localhost:8787/api/auth/callback/google",
-
-    // values stored as the secrets
-		"TURSO_MAIN_DB_AUTH_TOKEN": "",
-		"TURSO_MAIN_DB_URL": "",
-		"BETTER_AUTH_SECRET": "",
-    "GOOGLE_CLIENT_ID": "",
-		"GOOGLE_CLIENT_SECRET": "",
-		"JWT_SECRET": "",
+		// Remaining env vars (BETTER_AUTH_SECRET, JWT_SECRET, GOOGLE_CLIENT_ID,
+		// GOOGLE_CLIENT_SECRET, TURSO_MAIN_DB_URL, TURSO_MAIN_DB_AUTH_TOKEN,
+		// TURSO_ORG_SLUG, TURSO_API_TOKEN, TURSO_GROUP, TURSO_GROUP_AUTH_TOKEN,
+		// TURSO_SEED_DB_NAME) are stored as secrets via `wrangler secret put`
 	},
 	"env": {
 		"prod": {
-			"name": "prod-techoo-backend",
+			"name": "techoo-backend-prod",
 			"vars": {
 				"NODE_ENV": "production",
 				"BETTER_AUTH_URL": "https://api.techoo.app",
 				"GOOGLE_REDIRECT_URI": "https://api.techoo.app/api/auth/callback/google",
+				// Secrets stored via `wrangler secret put --env prod`
 			},
 			"placement": {
 				"mode": "targeted",

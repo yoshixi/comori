@@ -1,0 +1,54 @@
+name: Migrate Production Databases
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: migrate-prod
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Mask derived values (DB URLs, tenant names) that migrate-all.ts
+      # prints to stdout — secrets themselves are already masked by GitHub.
+      - name: Mask sensitive values
+        env:
+          TURSO_MAIN_DB_URL: ${{ secrets.PROD_TURSO_MAIN_DB_URL }}
+          TURSO_ORG_SLUG: ${{ secrets.PROD_TURSO_ORG_SLUG }}
+          TURSO_GROUP: ${{ secrets.PROD_TURSO_GROUP }}
+          TURSO_SEED_DB_NAME: ${{ secrets.PROD_TURSO_SEED_DB_NAME }}
+        run: |
+          echo "::add-mask::$TURSO_MAIN_DB_URL"
+          echo "::add-mask::$TURSO_ORG_SLUG"
+          echo "::add-mask::$TURSO_GROUP"
+          echo "::add-mask::$TURSO_SEED_DB_NAME"
+
+      - name: Run migrate-all
+        working-directory: apps/backend
+        env:
+          TURSO_MAIN_DB_URL: ${{ secrets.PROD_TURSO_MAIN_DB_URL }}
+          TURSO_MAIN_DB_AUTH_TOKEN: ${{ secrets.PROD_TURSO_MAIN_DB_AUTH_TOKEN }}
+          TURSO_ORG_SLUG: ${{ secrets.PROD_TURSO_ORG_SLUG }}
+          TURSO_API_TOKEN: ${{ secrets.PROD_TURSO_API_TOKEN }}
+          TURSO_GROUP: ${{ secrets.PROD_TURSO_GROUP }}
+          TURSO_GROUP_AUTH_TOKEN: ${{ secrets.PROD_TURSO_GROUP_AUTH_TOKEN }}
+          TURSO_SEED_DB_NAME: ${{ secrets.PROD_TURSO_SEED_DB_NAME }}
+        run: npx tsx scripts/migrate-all.ts

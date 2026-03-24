@@ -271,11 +271,17 @@ function getDefaultApp() {
   return defaultApp
 }
 
-// Export the app for use by the OpenAPI schema generator and Next.js runtime
+// CF Workers requires an explicit fetch method on the default export —
+// a Proxy doesn't pass the runtime's static handler check.
+export default {
+  fetch(request: Request, env?: Record<string, unknown>, ctx?: unknown) {
+    return getDefaultApp().app.fetch(request, env, ctx as ExecutionContext)
+  },
+}
+
+// Named export for the OpenAPI schema generator (needs getOpenAPIDocument etc.)
 export const honoApp = new Proxy({} as ReturnType<typeof createApp>['app'], {
   get(_, prop) {
     return (getDefaultApp().app as any)[prop]
   },
 })
-
-export default honoApp

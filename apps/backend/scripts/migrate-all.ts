@@ -28,7 +28,7 @@ async function migrateDb(url: string, authToken?: string, label?: string) {
   await migrate(db as Parameters<typeof migrate>[0], {
     migrationsFolder: MIGRATIONS_FOLDER,
   })
-  console.log(`  ✓ ${label || url}`)
+  console.log(`  ✓ ${label}`)
 }
 
 async function main() {
@@ -50,9 +50,9 @@ async function main() {
   if (seedDbName && orgSlug && groupAuthToken) {
     const seedUrl = `libsql://${seedDbName}-${orgSlug}.turso.io`
     console.log('Migrating seed DB...')
-    await migrateDb(seedUrl, groupAuthToken, `seed (${seedDbName})`)
+    await migrateDb(seedUrl, groupAuthToken, 'seed')
   } else {
-    console.log('Skipping seed DB (TURSO_SEED_DB_NAME, TURSO_ORG_SLUG, or TURSO_GROUP_AUTH_TOKEN not set)')
+    console.log('Skipping seed DB (missing env vars)')
   }
 
   // 3. All tenant DBs
@@ -62,33 +62,24 @@ async function main() {
     return
   }
 
-  console.log('Listing tenants...')
+  console.log('Migrating tenant DBs...')
   const tenants = await tenanso.listTenants()
-  // Filter out the seed DB from tenant list
   const tenantDbs = tenants.filter((t) => t !== seedDbName)
-  console.log(`Found ${tenantDbs.length} tenant DB(s)`)
 
-  let succeeded = 0
-  let failed = 0
-
-  for (const tenant of tenantDbs) {
-    console.log(`migrate tenant(${tenant})`)
+  for (const [i, tenant] of tenantDbs.entries()) {
     try {
       await tenanso.withTenant(tenant, async (db) => {
         await migrate(db as Parameters<typeof migrate>[0], {
           migrationsFolder: MIGRATIONS_FOLDER,
         })
       })
-      succeeded++
-      console.log(`  ✓ ${tenant}`)
     } catch (error) {
-      failed++
-      console.error(`  ✗ ${tenant}:`, error)
+      console.error(`\n✗ tenant ${i + 1} failed:`, error instanceof Error ? error.message : error)
+      process.exit(1)
     }
   }
 
-  console.log(`\nDone: main + seed + ${succeeded} tenant(s) migrated${failed > 0 ? `, ${failed} failed` : ''}`)
-  if (failed > 0) process.exit(1)
+  console.log('\nDone: all succeeded')
 }
 
 main()

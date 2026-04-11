@@ -71,111 +71,62 @@ pnpm --filter web add <package-name>
 pnpm --filter electron add -D <package-name>
 ```
 
-### Database Operations (Web App)
+### Database Operations (Backend)
 
-The web app uses Drizzle ORM with different strategies for local and production environments.
+The backend uses Drizzle ORM with a multi-tenant architecture:
+- **Main DB** (Turso): Stores auth tables (users, sessions, accounts, verifications)
+- **Tenant DBs** (Turso, per-user): Stores domain data (todos, posts, notes, calendars, events)
+- **Seed DB** (Turso): Template database cloned when creating new tenant DBs
 
 **Running the API server:**
 ```sh
-# Run with local SQLite database (default for dev)
-pnpm --filter web run dev:local
-
-# Run with production Turso database (requires TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN)
-pnpm --filter web run dev:prod
+# Start backend with wrangler (uses .env for config)
+pnpm --filter @apps/backend run dev
 ```
 
-The server automatically selects the database based on environment variables:
-- If `TURSO_CONNECTION_URL` and `TURSO_AUTH_TOKEN` are set → Uses Turso
-- Otherwise → Uses local SQLite at `./tmp/local.db`
-
-**Local Development (SQLite):**
-- Uses `drizzle:push:local` for fast iteration without migration history
-- Configuration: `drizzle.config.local.ts` → `./tmp/local.db`
+**Schema changes require updating multiple databases:**
 
 ```sh
-# Push schema changes directly to local database (recommended for local dev)
-pnpm --filter web run drizzle:push:local
+# 1. Push schema to the seed database (template for new tenants)
+#    Uses .env by default, or set DOTENV_CONFIG_PATH to override
+pnpm --filter @apps/backend run drizzle:push:seed
 
-# Pull schema from local database
-pnpm --filter web run drizzle:pull:local
+# 2. Push schema to all existing tenant databases
+pnpm --filter @apps/backend run migrate-all
 
-# Open Drizzle Studio to view/edit data
-pnpm --filter web run drizzle:studio:local
+# 3. For local development only — push to local SQLite
+pnpm --filter @apps/backend exec drizzle-kit push --config ./drizzle.config.ts
 ```
 
-**Production (Turso):**
-- Uses proper migrations for schema versioning and history
-- Configuration: `drizzle.config.prod.ts` → Turso database
-- Requires: `TURSO_CONNECTION_URL` and `TURSO_AUTH_TOKEN` environment variables
-
-```sh
-# Generate migration files from schema changes
-pnpm --filter web run drizzle:generate:prod
-
-# Apply migrations to production database
-pnpm --filter web run drizzle:migrate:prod
-```
+**After schema changes, the full workflow is:**
+1. Edit `apps/backend/src/app/db/schema/schema.ts`
+2. Push to seed DB: `pnpm --filter @apps/backend run drizzle:push:seed`
+3. Push to existing tenant DBs: `pnpm --filter @apps/backend run migrate-all`
+4. Restart the dev server
 
 ### Changing Database Schema
 
-The workflow differs between local development and production environments:
-
-#### Local Development Workflow (Fast Iteration)
-
-For local development, use schema push for quick iteration without maintaining migration history:
-
 1. **Modify the schema**
-   - Edit `apps/web/app/db/schema/schema.ts` to add/modify/remove columns or tables
+   - Edit `apps/backend/src/app/db/schema/schema.ts`
 
-2. **Push changes to local database**
+2. **Push schema to seed DB** (template for new tenant DBs)
    ```sh
-   # Push schema changes directly to local database
-   pnpm --filter web run drizzle:push:local
+   pnpm --filter @apps/backend run drizzle:push:seed
    ```
 
-   This directly updates your local SQLite database without creating migration files.
-
-3. **Verify the changes**
-   - Test your application to ensure the schema changes work as expected
-   - Use `pnpm --filter web run drizzle:studio:local` to inspect the database visually
-
-#### Production Workflow (Migration-based)
-
-For production, use proper migrations to maintain schema versioning and history:
-
-1. **Modify the schema**
-   - Edit `apps/web/app/db/schema/schema.ts` to add/modify/remove columns or tables
-
-2. **Generate migration**
+3. **Push schema to existing tenant DBs**
    ```sh
-   # Ensure TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN are set
-   pnpm --filter web run drizzle:generate:prod
+   pnpm --filter @apps/backend run migrate-all
    ```
 
-   This creates a new migration file in `drizzle/migrations/` with SQL statements representing your schema changes.
-
-3. **Review the migration**
-   - Check the generated SQL file in `drizzle/migrations/` to ensure it matches your intended changes
-   - The migration file will have a name like `0001_<adjective>_<noun>.sql`
-
-4. **Apply migration to production**
-   ```sh
-   pnpm --filter web run drizzle:migrate:prod
-   ```
-
-   This applies the migration to your Turso production database.
-
-5. **Commit the migration file**
-   - Add the migration file to git: `git add apps/web/drizzle/migrations/`
-   - Commit with a descriptive message: `git commit -m "Add start_at column to tasks table"`
+4. **Restart the dev server** and verify
 
 **Important notes:**
-- **Local:** Use `drizzle:push:local` for fast iteration without migration history
-- **Production:** Always use `drizzle:generate:prod` + `drizzle:migrate:prod` to maintain migration history
+- The seed DB must always be updated first — new tenants are cloned from it
+- Existing tenant DBs are not automatically updated; use `migrate-all` after schema changes
 - Ensure you are in the nix development shell (via direnv or `nix develop`)
-- Never manually edit migration files after they've been generated
-- Migration files must be committed to version control for production deployments
-- Each environment uses a separate config file: `drizzle.config.local.ts` and `drizzle.config.prod.ts`
+- Schema file: `apps/backend/src/app/db/schema/schema.ts`
+- Seed config: `apps/backend/drizzle.config.seed.ts`
 
 ### Electron App
 

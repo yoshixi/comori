@@ -8,6 +8,7 @@ export const usersTable = sqliteTable('users', {
   email: text('email').notNull().unique(),
   emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
   image: text('image'),
+  timezone: text('timezone'), // e.g. 'Asia/Tokyo'
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
@@ -67,59 +68,41 @@ export const oauthExchangeCodesTable = sqliteTable('oauth_exchange_codes', {
   expiresAtIndex: index('oauth_exchange_codes_expires_at_idx').on(table.expiresAt),
 }));
 
-// Tasks table
-export const tasksTable = sqliteTable('tasks', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+// Todos table
+export const todosTable = sqliteTable('todos', {
+  id: text('id').primaryKey(), // UUID
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
-  description: text('description'),
-  dueAt: integer('due_at', { mode: 'timestamp' }),
-  startAt: integer('start_at', { mode: 'timestamp' }),
-  endAt: integer('end_at', { mode: 'timestamp' }),
-  completedAt: integer('completed_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  startsAt: integer('starts_at', { mode: 'number' }),
+  endsAt: integer('ends_at', { mode: 'number' }),
+  isAllDay: integer('is_all_day', { mode: 'number' }).notNull().default(0),
+  done: integer('done', { mode: 'number' }).notNull().default(0),
+  doneAt: integer('done_at', { mode: 'number' }),
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 });
 
-// TaskTimers table
-export const taskTimersTable = sqliteTable('task_timers', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
-  startTime: integer('start_time', { mode: 'timestamp' }).notNull(),
-  endTime: integer('end_time', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
-
-// TaskComments table
-export const taskCommentsTable = sqliteTable('task_comments', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
-  authorId: integer('author_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
-  body: text('body').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
-
-// Tags table (user-scoped tags)
-export const tagsTable = sqliteTable('tags', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+// Posts table
+export const postsTable = sqliteTable('posts', {
+  id: text('id').primaryKey(), // UUID
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  body: text('body').notNull(),
+  postedAt: integer('posted_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+});
+
+// Post-Events junction table (many-to-many)
+export const postEventsTable = sqliteTable('post_events', {
+  postId: text('post_id').notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
+  eventId: integer('event_id', { mode: 'number' }).notNull().references(() => calendarEventsTable.id, { onDelete: 'cascade' }),
 }, (table) => ({
-  uniqueUserTag: unique().on(table.userId, table.name),
+  pk: unique().on(table.postId, table.eventId),
 }));
 
-// TaskTags junction table (many-to-many relationship between tasks and tags)
-export const taskTagsTable = sqliteTable('task_tags', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
-  tagId: integer('tag_id', { mode: 'number' }).notNull().references(() => tagsTable.id, { onDelete: 'cascade' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+// Post-Todos junction table (many-to-many)
+export const postTodosTable = sqliteTable('post_todos', {
+  postId: text('post_id').notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
+  todoId: text('todo_id').notNull().references(() => todosTable.id, { onDelete: 'cascade' }),
 }, (table) => ({
-  uniqueTaskTag: unique().on(table.taskId, table.tagId),
+  pk: unique().on(table.postId, table.todoId),
 }));
 
 // Calendars table (provider-agnostic)
@@ -180,30 +163,23 @@ export const calendarWatchChannelsTable = sqliteTable('calendar_watch_channels',
 
 // Notes table
 export const notesTable = sqliteTable('notes', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  id: text('id').primaryKey(), // UUID
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
-  content: text('content'),
-  archivedAt: integer('archived_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  body: text('body'),
+  pinned: integer('pinned', { mode: 'number' }).notNull().default(0),
+  createdAt: integer('created_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
 });
 
-// Note-Task Conversions table (tracks which note was converted to which task)
-export const noteTaskConversionsTable = sqliteTable('note_task_conversions', {
-  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
-  noteId: integer('note_id', { mode: 'number' }).notNull().references(() => notesTable.id, { onDelete: 'cascade' }),
-  taskId: integer('task_id', { mode: 'number' }).notNull().references(() => tasksTable.id, { onDelete: 'cascade' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
-});
+// Indexes — Todos
+export const todosStartsAtIdx = index('todos_starts_at_idx').on(todosTable.startsAt);
+export const todosUserIdDoneIdx = index('todos_user_id_done_idx').on(todosTable.userId, todosTable.done);
 
-// Indexes
-export const tasksDueAtIdx = index('tasks_due_at_idx').on(tasksTable.dueAt);
-export const taskTimersTaskIdIdx = index('task_timers_task_id_idx').on(taskTimersTable.taskId);
-export const taskCommentsTaskIdCreatedAtIdx = index('task_comments_task_id_created_at_idx').on(taskCommentsTable.taskId, taskCommentsTable.createdAt);
-export const tagsUserIdIdx = index('tags_user_id_idx').on(tagsTable.userId);
-export const taskTagsTaskIdIdx = index('task_tags_task_id_idx').on(taskTagsTable.taskId);
-export const taskTagsTagIdIdx = index('task_tags_tag_id_idx').on(taskTagsTable.tagId);
+// Indexes — Posts
+export const postsPostedAtIdx = index('posts_posted_at_idx').on(postsTable.postedAt);
+
+// Indexes — Calendar (kept from previous schema)
 export const calendarsUserIdIdx = index('calendars_user_id_idx').on(calendarsTable.userId);
 export const calendarEventsCalendarIdIdx = index('calendar_events_calendar_id_idx').on(calendarEventsTable.calendarId);
 export const calendarEventsStartAtIdx = index('calendar_events_start_at_idx').on(calendarEventsTable.startAt);
@@ -212,24 +188,13 @@ export const calendarWatchChannelsCalendarIdIdx = index('calendar_watch_channels
 export const calendarWatchChannelsChannelIdIdx = index('calendar_watch_channels_channel_id_idx').on(calendarWatchChannelsTable.channelId);
 export const calendarWatchChannelsExpiresAtIdx = index('calendar_watch_channels_expires_at_idx').on(calendarWatchChannelsTable.expiresAt);
 
+// Indexes — Notes
 export const notesUserIdIdx = index('notes_user_id_idx').on(notesTable.userId);
 export const notesUpdatedAtIdx = index('notes_updated_at_idx').on(notesTable.updatedAt);
-export const noteTaskConversionsNoteIdIdx = index('note_task_conversions_note_id_idx').on(noteTaskConversionsTable.noteId);
-export const noteTaskConversionsTaskIdIdx = index('note_task_conversions_task_id_idx').on(noteTaskConversionsTable.taskId);
 
-// Type exports
+// Type exports — Auth
 export type InsertUser = typeof usersTable.$inferInsert;
 export type SelectUser = typeof usersTable.$inferSelect;
-export type InsertTask = typeof tasksTable.$inferInsert;
-export type SelectTask = typeof tasksTable.$inferSelect;
-export type InsertTaskTimer = typeof taskTimersTable.$inferInsert;
-export type SelectTaskTimer = typeof taskTimersTable.$inferSelect;
-export type InsertTaskComment = typeof taskCommentsTable.$inferInsert;
-export type SelectTaskComment = typeof taskCommentsTable.$inferSelect;
-export type InsertTag = typeof tagsTable.$inferInsert;
-export type SelectTag = typeof tagsTable.$inferSelect;
-export type InsertTaskTag = typeof taskTagsTable.$inferInsert;
-export type SelectTaskTag = typeof taskTagsTable.$inferSelect;
 export type InsertSession = typeof sessionsTable.$inferInsert;
 export type SelectSession = typeof sessionsTable.$inferSelect;
 export type InsertAccount = typeof accountsTable.$inferInsert;
@@ -238,13 +203,23 @@ export type InsertVerification = typeof verificationsTable.$inferInsert;
 export type SelectVerification = typeof verificationsTable.$inferSelect;
 export type InsertOauthExchangeCode = typeof oauthExchangeCodesTable.$inferInsert;
 export type SelectOauthExchangeCode = typeof oauthExchangeCodesTable.$inferSelect;
+
+// Type exports — Calendar
 export type InsertCalendar = typeof calendarsTable.$inferInsert;
 export type SelectCalendar = typeof calendarsTable.$inferSelect;
 export type InsertCalendarEvent = typeof calendarEventsTable.$inferInsert;
 export type SelectCalendarEvent = typeof calendarEventsTable.$inferSelect;
 export type InsertCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferInsert;
 export type SelectCalendarWatchChannel = typeof calendarWatchChannelsTable.$inferSelect;
+
+// Type exports — Domain
+export type InsertTodo = typeof todosTable.$inferInsert;
+export type SelectTodo = typeof todosTable.$inferSelect;
+export type InsertPost = typeof postsTable.$inferInsert;
+export type SelectPost = typeof postsTable.$inferSelect;
+export type InsertPostEvent = typeof postEventsTable.$inferInsert;
+export type SelectPostEvent = typeof postEventsTable.$inferSelect;
+export type InsertPostTodo = typeof postTodosTable.$inferInsert;
+export type SelectPostTodo = typeof postTodosTable.$inferSelect;
 export type InsertNote = typeof notesTable.$inferInsert;
 export type SelectNote = typeof notesTable.$inferSelect;
-export type InsertNoteTaskConversion = typeof noteTaskConversionsTable.$inferInsert;
-export type SelectNoteTaskConversion = typeof noteTaskConversionsTable.$inferSelect;

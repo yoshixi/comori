@@ -86,12 +86,15 @@ function startOAuthCallbackServer(): Promise<OAuthCallbackServer> {
     })
 
     // Timeout: resolve with null after 5 minutes
-    const timeout = setTimeout(() => {
-      if (resolveCode) {
-        resolveCode(null)
-        resolveCode = null
-      }
-    }, 5 * 60 * 1000)
+    const timeout = setTimeout(
+      () => {
+        if (resolveCode) {
+          resolveCode(null)
+          resolveCode = null
+        }
+      },
+      5 * 60 * 1000
+    )
 
     const server: Server = createServer((req, res) => {
       if (!req.url?.startsWith('/callback')) {
@@ -128,7 +131,7 @@ function startOAuthCallbackServer(): Promise<OAuthCallbackServer> {
         close: () => {
           clearTimeout(timeout)
           server.close()
-        },
+        }
       })
     })
   })
@@ -145,10 +148,7 @@ async function exchangeSessionCode(apiUrl: string, code: string): Promise<string
   return data.session_token ?? null
 }
 
-async function requestSessionCode(
-  apiUrl: string,
-  sessionToken: string
-): Promise<string | null> {
+async function requestSessionCode(apiUrl: string, sessionToken: string): Promise<string | null> {
   const res = await fetch(`${apiUrl}/session-code`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${sessionToken}` }
@@ -165,12 +165,15 @@ function startOAuthLinkCallbackServer(): Promise<OAuthLinkCallbackServer> {
       resolveResult = resolve
     })
 
-    const timeout = setTimeout(() => {
-      if (resolveResult) {
-        resolveResult(false)
-        resolveResult = null
-      }
-    }, 5 * 60 * 1000)
+    const timeout = setTimeout(
+      () => {
+        if (resolveResult) {
+          resolveResult(false)
+          resolveResult = null
+        }
+      },
+      5 * 60 * 1000
+    )
 
     const server: Server = createServer((req, res) => {
       if (!req.url?.startsWith('/callback')) {
@@ -206,7 +209,7 @@ function startOAuthLinkCallbackServer(): Promise<OAuthLinkCallbackServer> {
         close: () => {
           clearTimeout(timeout)
           server.close()
-        },
+        }
       })
     })
   })
@@ -229,21 +232,21 @@ function createApplicationMenu(): void {
     // App menu (macOS only)
     ...(isMac
       ? [
-        {
-          label: app.name,
-          submenu: [
-            { role: 'about' as const },
-            { type: 'separator' as const },
-            { role: 'services' as const },
-            { type: 'separator' as const },
-            { role: 'hide' as const },
-            { role: 'hideOthers' as const },
-            { role: 'unhide' as const },
-            { type: 'separator' as const },
-            { role: 'quit' as const }
-          ]
-        }
-      ]
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' as const },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          }
+        ]
       : []),
     // Edit menu
     {
@@ -257,11 +260,15 @@ function createApplicationMenu(): void {
         { role: 'paste' },
         ...(isMac
           ? [
-            { role: 'pasteAndMatchStyle' as const },
-            { role: 'delete' as const },
-            { role: 'selectAll' as const }
-          ]
-          : [{ role: 'delete' as const }, { type: 'separator' as const }, { role: 'selectAll' as const }])
+              { role: 'pasteAndMatchStyle' as const },
+              { role: 'delete' as const },
+              { role: 'selectAll' as const }
+            ]
+          : [
+              { role: 'delete' as const },
+              { type: 'separator' as const },
+              { role: 'selectAll' as const }
+            ])
       ]
     },
     // View menu with zoom controls
@@ -315,7 +322,12 @@ function createApplicationMenu(): void {
         { role: 'minimize' },
         { role: 'zoom' },
         ...(isMac
-          ? [{ type: 'separator' as const }, { role: 'front' as const }, { type: 'separator' as const }, { role: 'window' as const }]
+          ? [
+              { type: 'separator' as const },
+              { role: 'front' as const },
+              { type: 'separator' as const },
+              { role: 'window' as const }
+            ]
           : [{ role: 'close' as const }])
       ]
     }
@@ -412,9 +424,12 @@ app.whenReady().then(() => {
   ipcMain.handle('notification:get-permission', (): NotificationPermissionStatus => {
     return NotificationScheduler.getPermissionStatus()
   })
-  ipcMain.handle('notification:request-permission', async (): Promise<NotificationPermissionStatus> => {
-    return NotificationScheduler.requestPermission()
-  })
+  ipcMain.handle(
+    'notification:request-permission',
+    async (): Promise<NotificationPermissionStatus> => {
+      return NotificationScheduler.requestPermission()
+    }
+  )
   ipcMain.handle('notification:open-settings', () => {
     NotificationScheduler.openNotificationSettings()
   })
@@ -432,8 +447,7 @@ app.whenReady().then(() => {
 
     // Open system browser to the server's desktop OAuth endpoint.
     // The server initiates the OAuth flow so the browser has the state cookie.
-    const oauthInitUrl =
-      `${apiUrl}/oauth/desktop?provider=${encodeURIComponent(provider)}&port=${callbackServer.port}`
+    const oauthInitUrl = `${apiUrl}/oauth/desktop?provider=${encodeURIComponent(provider)}&port=${callbackServer.port}`
     shell.openExternal(oauthInitUrl)
 
     // Bring Electron back to front so user sees loading state
@@ -453,35 +467,32 @@ app.whenReady().then(() => {
     }
   })
 
-  ipcMain.handle(
-    'auth:social-link',
-    async (_event, provider: string, sessionToken: string) => {
-      const callbackServer = await startOAuthLinkCallbackServer()
+  ipcMain.handle('auth:social-link', async (_event, provider: string, sessionToken: string) => {
+    const callbackServer = await startOAuthLinkCallbackServer()
 
-      try {
-        const apiUrl = `${import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:8787'}/api`
-        const sessionCode = await requestSessionCode(apiUrl, sessionToken)
-        if (!sessionCode) {
-          return false
-        }
-        const linkUrl =
-          `${apiUrl}/oauth/desktop-link?provider=${encodeURIComponent(provider)}` +
-          `&port=${callbackServer.port}&session_code=${encodeURIComponent(sessionCode)}`
-        shell.openExternal(linkUrl)
-
-        setTimeout(() => {
-          if (mainWindow) {
-            if (mainWindow.isMinimized()) mainWindow.restore()
-            mainWindow.focus()
-          }
-        }, 1000)
-
-        return await callbackServer.waitForResult()
-      } finally {
-        callbackServer.close()
+    try {
+      const apiUrl = `${import.meta.env.MAIN_VITE_API_BASE_URL || 'http://localhost:8787'}/api`
+      const sessionCode = await requestSessionCode(apiUrl, sessionToken)
+      if (!sessionCode) {
+        return false
       }
+      const linkUrl =
+        `${apiUrl}/oauth/desktop-link?provider=${encodeURIComponent(provider)}` +
+        `&port=${callbackServer.port}&session_code=${encodeURIComponent(sessionCode)}`
+      shell.openExternal(linkUrl)
+
+      setTimeout(() => {
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore()
+          mainWindow.focus()
+        }
+      }, 1000)
+
+      return await callbackServer.waitForResult()
+    } finally {
+      callbackServer.close()
     }
-  )
+  })
 
   // Timer states updates from renderer for tray display (supports multiple timers)
   ipcMain.on(
@@ -521,7 +532,8 @@ app.whenReady().then(() => {
       // Notify renderer to refresh timers
       mainWindow?.webContents.send('notification:timer-started', taskId)
     },
-    onStopTimer: (taskId: number, _timerId: number) => {
+    onStopTimer: (taskId: number, timerId: number) => {
+      void timerId
       // Notify renderer to refresh timers
       mainWindow?.webContents.send('notification:timer-stopped', taskId)
     },

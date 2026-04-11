@@ -131,5 +131,59 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
   }
+}
+
+/* Design system: Techo-specific tokens */
+:root {
+  /* Panel / sidebar background */
+  --panel: #EDE8DF;
+  --panel-foreground: #4A3E2E;
+
+  /* Amber accent variants */
+  --amber: #D4953A;
+  --amber-light: #FEF5E6;
+  --amber-dark: #854F0B;
+
+  /* Semantic event colors */
+  --event-work-bg: #EDE0CC;
+  --event-work-border: #C4A882;
+  --event-work-text: #5A3E1E;
+  --event-meeting-bg: #E8E0F0;
+  --event-meeting-border: #9A82CC;
+  --event-meeting-text: #3E2A5A;
+  --event-personal-bg: #E0EAE5;
+  --event-personal-border: #7AB5A0;
+  --event-personal-text: #1E4A3E;
+
+  /* Text hierarchy */
+  --text-dark: #4A3E2E;
+  --text-mid: #6A5C46;
+  --text-muted-custom: #8E8A84;
+  --text-hint: #B0A494;
+
+  /* Border light */
+  --border-l: #E2D9CA;
+}
+
+/* Playfair Display for titles */
+.font-title {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Pulsing context dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Strikethrough animation for completed todos */
+@keyframes strikethrough {
+  from { width: 0; }
+  to { width: 100%; }
 }

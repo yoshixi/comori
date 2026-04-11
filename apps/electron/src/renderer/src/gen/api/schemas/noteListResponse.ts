@@ -8,11 +8,5 @@
 import type { Note } from './note'
 
 export interface NoteListResponse {
-  /** List of notes */
-  notes: Note[]
-  /**
-   * Total number of notes
-   * @minimum 0
-   */
-  total: number
+  data: Note[]
 }

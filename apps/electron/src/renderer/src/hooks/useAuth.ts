@@ -35,9 +35,12 @@ export function useAuth(): UseAuthReturn {
         return
       }
 
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'}/api/session`, {
-        headers: { Authorization: `Bearer ${sessionToken}` }
-      })
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8787'}/api/session`,
+        {
+          headers: { Authorization: `Bearer ${sessionToken}` }
+        }
+      )
       if (!res.ok) {
         setUser(null)
         clearAuthState()

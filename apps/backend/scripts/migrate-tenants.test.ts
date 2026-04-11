@@ -160,13 +160,13 @@ describe('migrate-tenants script', () => {
     expect(fs.existsSync(path.join(dbDir, 'user-100.db'))).toBe(true)
     expect(fs.existsSync(path.join(dbDir, 'user-200.db'))).toBe(true)
 
-    // Verify the tenant DB has the tasks table (from seed schema)
+    // Verify the tenant DB has the todos table (from seed schema)
     const client = createClient({ url: `file:${path.join(dbDir, 'user-100.db')}` })
     const db = drizzle({ client, schema, casing: 'snake_case' })
 
-    // Query the tasks table — should be empty but exist
-    const tasks = await db.select().from(schema.tasksTable)
-    expect(tasks).toEqual([])
+    // Query the todos table — should be empty but exist
+    const todos = await db.select().from(schema.todosTable)
+    expect(todos).toEqual([])
   })
 
   it('should list created tenants', async () => {
@@ -187,21 +187,21 @@ describe('migrate-tenants script', () => {
         sql`INSERT INTO users (name, email) VALUES ('Test User', 'test@example.com')`
       )
       await (db as any).run(
-        sql`INSERT INTO tasks (user_id, title, description) VALUES (1, 'Migration test', 'Testing migrations')`
+        sql`INSERT INTO todos (id, user_id, title) VALUES ('550e8400-e29b-41d4-a716-446655440000', 1, 'Migration test')`
       )
     })
 
     // Verify data was inserted
     const client = createClient({ url: `file:${path.join(dbDir, 'user-100.db')}` })
     const db = drizzle({ client, schema, casing: 'snake_case' })
-    const tasks = await db.select().from(schema.tasksTable)
-    expect(tasks).toHaveLength(1)
-    expect(tasks[0].title).toBe('Migration test')
+    const todos = await db.select().from(schema.todosTable)
+    expect(todos).toHaveLength(1)
+    expect(todos[0].title).toBe('Migration test')
 
     // Verify user-200 is empty (isolation)
     const client2 = createClient({ url: `file:${path.join(dbDir, 'user-200.db')}` })
     const db2 = drizzle({ client: client2, schema, casing: 'snake_case' })
-    const tasks2 = await db2.select().from(schema.tasksTable)
-    expect(tasks2).toEqual([])
+    const todos2 = await db2.select().from(schema.todosTable)
+    expect(todos2).toEqual([])
   })
 })

@@ -62,9 +62,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
     }
   }
 
-  const handleSocialSignIn = async (
-    provider: 'google' | 'github' | 'apple'
-  ): Promise<void> => {
+  const handleSocialSignIn = async (provider: 'google' | 'github' | 'apple'): Promise<void> => {
     setError(null)
     setLoading(true)
     try {
@@ -98,7 +96,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center">
           <CharacterIllustration mood="idle" size="lg" className="mx-auto" />
-          <h1 className="text-xl font-semibold tracking-tight">Welcome to Techoo</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Welcome to Techo</h1>
         </CardHeader>
 
         <CardContent>
@@ -140,17 +138,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
             </div>
 
             {error && (
-              <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                {error}
-              </div>
+              <div className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">{error}</div>
             )}
 
             <Button type="submit" disabled={loading} className="w-full">
-              {loading
-                ? 'One moment...'
-                : mode === 'signin'
-                  ? "Let's Go"
-                  : 'Get Started'}
+              {loading ? 'One moment...' : mode === 'signin' ? "Let's Go" : 'Get Started'}
             </Button>
           </form>
 
@@ -161,11 +153,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps): React.JSX.Elem
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialSignIn('google')}
-          >
+          <Button variant="outline" className="w-full" onClick={() => handleSocialSignIn('google')}>
             Sign in with Google
           </Button>
 

@@ -8,19 +8,15 @@
 
 export interface UpdateNote {
   /**
-   * Title of the note
    * @minLength 1
    * @maxLength 200
    */
   title?: string
+  /** @nullable */
+  body?: string | null
   /**
-   * Content of the note
-   * @nullable
+   * @minimum 0
+   * @maximum 1
    */
-  content?: string | null
-  /**
-   * Set to an ISO 8601 timestamp to archive, or null to unarchive
-   * @nullable
-   */
-  archivedAt?: string | null
+  pinned?: number
 }

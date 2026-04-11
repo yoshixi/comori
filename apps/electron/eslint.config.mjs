@@ -29,5 +29,12 @@ export default defineConfig(
       'react/prop-types': 'off'
     }
   },
-  eslintConfigPrettier
+  eslintConfigPrettier,
+  {
+    files: ['src/renderer/src/components/ui/**/*.{ts,tsx}', 'src/renderer/src/hooks/use-mobile.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      'react-refresh/only-export-components': 'off'
+    }
+  }
 )

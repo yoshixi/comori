@@ -1,0 +1,184 @@
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
+import { Send, Hash, X } from 'lucide-react'
+import { Button } from './ui/button'
+import { Textarea } from './ui/textarea'
+import { Card } from './ui/card'
+import { Badge } from './ui/badge'
+import type { Todo } from '../gen/api/schemas'
+
+export type PostComposerContext =
+  | { type: 'event'; id: number; title: string }
+  | { type: 'todo'; id: string; title: string }
+  | null
+
+function ContextBar({
+  context,
+  onClear
+}: {
+  context: PostComposerContext
+  onClear: () => void
+}): React.JSX.Element | null {
+  if (!context) return null
+
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-input bg-muted/40 px-3 py-1.5 text-sm">
+      <span className="text-muted-foreground">Context:</span>
+      <Badge variant="default" className="gap-1">
+        {context.title}
+        <button
+          type="button"
+          onClick={onClear}
+          className="ml-0.5 rounded-sm hover:bg-muted"
+          aria-label="Remove context"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </Badge>
+    </div>
+  )
+}
+
+export function PostComposer({
+  currentContext,
+  onClearContext,
+  onSubmit,
+  onSelectContext,
+  todosForSuggestion,
+  compact
+}: {
+  currentContext: PostComposerContext
+  onClearContext: () => void
+  onSubmit: (body: string) => void
+  onSelectContext: (ctx: PostComposerContext) => void
+  todosForSuggestion: Todo[]
+  /** Narrow layout for Today sidebar */
+  compact?: boolean
+}): React.JSX.Element {
+  const [value, setValue] = useState('')
+  const [showHashPanel, setShowHashPanel] = useState(false)
+  const [hashQuery, setHashQuery] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const isMacPlatform = typeof navigator !== 'undefined' && navigator.platform.includes('Mac')
+
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const v = e.target.value
+    setValue(v)
+
+    const cursorPos = e.target.selectionStart
+    const textBeforeCursor = v.slice(0, cursorPos)
+    const lastHash = textBeforeCursor.lastIndexOf('#')
+    if (lastHash !== -1 && !textBeforeCursor.slice(lastHash + 1).includes(' ')) {
+      setShowHashPanel(true)
+      setHashQuery(textBeforeCursor.slice(lastHash + 1).toLowerCase())
+    } else {
+      setShowHashPanel(false)
+      setHashQuery('')
+    }
+  }, [])
+
+  const handleSelectTodo = useCallback(
+    (todo: Todo) => {
+      onSelectContext({ type: 'todo', id: todo.id, title: todo.title })
+      const cursorPos = textareaRef.current?.selectionStart ?? value.length
+      const textBeforeCursor = value.slice(0, cursorPos)
+      const lastHash = textBeforeCursor.lastIndexOf('#')
+      if (lastHash !== -1) {
+        setValue(value.slice(0, lastHash) + value.slice(cursorPos))
+      }
+      setShowHashPanel(false)
+      setHashQuery('')
+      textareaRef.current?.focus()
+    },
+    [value, onSelectContext]
+  )
+
+  const filteredTodos = useMemo(() => {
+    if (!hashQuery) return todosForSuggestion
+    return todosForSuggestion.filter((t) => t.title.toLowerCase().includes(hashQuery))
+  }, [todosForSuggestion, hashQuery])
+
+  const handleSubmit = useCallback(() => {
+    const trimmed = value.trim()
+    if (!trimmed) return
+    onSubmit(trimmed)
+    setValue('')
+    setShowHashPanel(false)
+  }, [value, onSubmit])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault()
+        handleSubmit()
+      }
+      if (e.key === 'Escape') {
+        setShowHashPanel(false)
+      }
+    },
+    [handleSubmit]
+  )
+
+  return (
+    <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
+      <ContextBar context={currentContext} onClear={onClearContext} />
+
+      <div className="relative">
+        <Textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Write something... (type # to tag a todo)"
+          rows={compact ? 2 : 2}
+          className={`resize-none pr-12 ${compact ? 'min-h-[52px] text-xs' : ''}`}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="absolute bottom-2 right-2 h-7 w-7 p-0"
+          disabled={!value.trim()}
+          onClick={handleSubmit}
+          title="Send"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+
+        {showHashPanel && (
+          <Card className="absolute left-0 right-0 top-full z-10 mt-1 max-h-48 overflow-y-auto">
+            {filteredTodos.length === 0 ? (
+              <div className="flex gap-2 p-3 text-sm text-muted-foreground">
+                <Hash className="h-4 w-4 shrink-0" />
+                <span>No matching todos</span>
+              </div>
+            ) : (
+              <div className="py-1">
+                {filteredTodos.map((todo) => (
+                  <button
+                    key={todo.id}
+                    type="button"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 text-left"
+                    onClick={() => handleSelectTodo(todo)}
+                  >
+                    <Hash className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate">{todo.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
+
+      <span className="text-xs text-muted-foreground">
+        Press {isMacPlatform ? '⌘' : 'Ctrl'}+Enter to post
+      </span>
+    </div>
+  )
+}

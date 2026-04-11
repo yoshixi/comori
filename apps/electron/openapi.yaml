@@ -81,478 +81,294 @@ components:
         - status
         - message
         - timestamp
-    Tag:
+    Todo:
       type: object
       properties:
         id:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Unique identifier for the tag
-          example: 1
-        name:
           type: string
-          minLength: 1
-          maxLength: 50
-          description: Name of the tag
-          example: urgent
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the tag was created
-          example: 2024-01-01T10:00:00.000Z
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the tag was last updated
-          example: 2024-01-01T15:30:00.000Z
-      required:
-        - id
-        - name
-        - createdAt
-        - updatedAt
-    Task:
-      type: object
-      properties:
-        id:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Unique identifier for the task
-          example: 1
+          format: uuid
+          description: UUID identifier
+          example: 550e8400-e29b-41d4-a716-446655440000
         title:
           type: string
-          minLength: 1
-          maxLength: 200
-          description: Title of the task
-          example: Complete project documentation
-        description:
-          type: string
-          description: Detailed description of the task
-          example: Write comprehensive documentation for the API endpoints
-        dueDate:
-          type: string
+          example: Reply to client email
+        starts_at:
+          type: integer
           nullable: true
-          format: date-time
-          description: Due date for the task in ISO 8601 format
-          example: 2024-12-31T23:59:59.000Z
-        startAt:
-          type: string
+          minimum: 0
+          description: Start time (nullable for unscheduled todos)
+          example: 1712300400
+        ends_at:
+          type: integer
           nullable: true
-          format: date-time
-          description: Start date for the task in ISO 8601 format
-          example: 2024-01-01T09:00:00.000Z
-        endAt:
-          type: string
+          minimum: 0
+          description: End time (nullable)
+          example: 1712300400
+        is_all_day:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: 1 = all-day todo
+        done:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: 1 = completed
+        done_at:
+          type: integer
           nullable: true
-          format: date-time
-          description: End date for the task in ISO 8601 format
-          example: 2024-01-01T17:00:00.000Z
-        completedAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Completion timestamp in ISO 8601 format
-          example: 2024-01-02T08:00:00.000Z
-        tags:
-          type: array
-          items:
-            $ref: "#/components/schemas/Tag"
-          description: Tags associated with this task
-          example: []
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the task was created
-          example: 2024-01-01T10:00:00.000Z
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the task was last updated
-          example: 2024-01-01T15:30:00.000Z
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
+        created_at:
+          type: integer
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
       required:
         - id
         - title
-        - description
-        - tags
-        - createdAt
-        - updatedAt
-    TaskListResponse:
+        - starts_at
+        - ends_at
+        - is_all_day
+        - done
+        - done_at
+        - created_at
+    TodoListResponse:
       type: object
       properties:
-        tasks:
+        data:
           type: array
           items:
-            $ref: "#/components/schemas/Task"
-          description: List of tasks
-        total:
-          type: integer
-          minimum: 0
-          description: Total number of tasks
-          example: 5
+            $ref: "#/components/schemas/Todo"
       required:
-        - tasks
-        - total
-    TaskResponse:
+        - data
+    TodoResponse:
       type: object
       properties:
-        task:
-          $ref: "#/components/schemas/Task"
+        data:
+          $ref: "#/components/schemas/Todo"
       required:
-        - task
-    CreateTask:
+        - data
+    CreateTodo:
       type: object
       properties:
         title:
           type: string
           minLength: 1
-          maxLength: 200
-          description: Title of the task
-          example: Complete project documentation
-        description:
-          type: string
-          default: ""
-          description: Detailed description of the task
-          example: Write comprehensive documentation for the API endpoints
-        dueDate:
-          type: string
-          format: date-time
-          description: Due date for the task in ISO 8601 format
-          example: 2024-12-31T23:59:59.000Z
-        startAt:
-          type: string
-          format: date-time
-          description: Start date for the task in ISO 8601 format
-          example: 2024-01-01T09:00:00.000Z
-        endAt:
-          type: string
-          format: date-time
-          description: End date for the task in ISO 8601 format
-          example: 2024-01-01T17:00:00.000Z
-        completedAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Completion timestamp. Use null to mark the task as incomplete
-          example: 2024-01-02T08:00:00.000Z
-        tagIds:
-          type: array
-          items:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Numeric ID
-            example: 1
-          description: Array of tag IDs to associate with the task
-          example: []
+          example: Reply to client email
+        starts_at:
+          type: integer
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
+        ends_at:
+          type: integer
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
+        is_all_day:
+          type: integer
+          minimum: 0
+          maximum: 1
+          default: 0
       required:
         - title
-    UpdateTask:
+    UpdateTodo:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        starts_at:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
+        ends_at:
+          type: integer
+          nullable: true
+          minimum: 0
+          description: UTC Unix timestamp (seconds)
+          example: 1712300400
+        is_all_day:
+          type: integer
+          minimum: 0
+          maximum: 1
+        done:
+          type: integer
+          minimum: 0
+          maximum: 1
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        posted_at:
+          type: integer
+          minimum: 0
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+            required:
+              - id
+              - title
+        todos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              title:
+                type: string
+            required:
+              - id
+              - title
+      required:
+        - id
+        - body
+        - posted_at
+        - events
+        - todos
+    PostListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+      required:
+        - data
+    PostResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Post"
+      required:
+        - data
+    CreatePost:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+        posted_at:
+          type: integer
+          minimum: 0
+          description: Defaults to now if omitted
+        event_ids:
+          type: array
+          items:
+            type: integer
+          default: []
+        todo_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          default: []
+      required:
+        - body
+    UpdatePost:
+      type: object
+      properties:
+        body:
+          type: string
+          minLength: 1
+        event_ids:
+          type: array
+          items:
+            type: integer
+        todo_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Quick idea about auth flow
+        body:
+          type: string
+          nullable: true
+          description: Full Markdown content
+        pinned:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: 1 = pinned to top
+        created_at:
+          type: integer
+          minimum: 0
+        updated_at:
+          type: integer
+          minimum: 0
+      required:
+        - id
+        - title
+        - body
+        - pinned
+        - created_at
+        - updated_at
+    NoteListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+      required:
+        - data
+    NoteResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Note"
+      required:
+        - data
+    CreateNote:
       type: object
       properties:
         title:
           type: string
           minLength: 1
           maxLength: 200
-          description: Title of the task
-          example: Complete project documentation
-        description:
-          type: string
-          description: Detailed description of the task
-          example: Write comprehensive documentation for the API endpoints
-        dueDate:
-          type: string
-          nullable: true
-          format: date-time
-          description: Due date for the task in ISO 8601 format. Use null to remove due date
-          example: 2024-12-31T23:59:59.000Z
-        startAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Start date for the task in ISO 8601 format. Use null to remove
-            start date
-          example: 2024-01-01T09:00:00.000Z
-        endAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: End date for the task in ISO 8601 format. Use null to remove end date
-          example: 2024-01-01T17:00:00.000Z
-        completedAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Completion timestamp. Use null to mark the task as incomplete
-          example: 2024-01-02T08:00:00.000Z
-        tagIds:
-          type: array
-          items:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Numeric ID
-            example: 1
-          description: Array of tag IDs to associate with the task. Replaces all existing
-            tags
-          example: []
-    TaskComment:
-      type: object
-      properties:
-        id:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Unique identifier for the comment
-          example: 1
-        taskId:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Task ID associated with this comment
-          example: 1
-        authorId:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Author (user) ID of the comment
-          example: 1
+          example: Meeting notes
         body:
           type: string
+      required:
+        - title
+    UpdateNote:
+      type: object
+      properties:
+        title:
+          type: string
           minLength: 1
-          maxLength: 2000
-          description: Comment text content (1-2000 chars)
-          example: "Wrapped up pomodoro #1, still need to draft summary."
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the comment was created
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the comment was last updated
-      required:
-        - id
-        - taskId
-        - authorId
-        - body
-        - createdAt
-        - updatedAt
-    TaskCommentListResponse:
-      type: object
-      properties:
-        comments:
-          type: array
-          items:
-            $ref: "#/components/schemas/TaskComment"
-          description: List of task comments
-        total:
-          type: integer
-          minimum: 0
-          description: Total number of comments returned
-      required:
-        - comments
-        - total
-    TaskCommentResponse:
-      type: object
-      properties:
-        comment:
-          $ref: "#/components/schemas/TaskComment"
-      required:
-        - comment
-    CreateTaskComment:
-      type: object
-      properties:
+          maxLength: 200
         body:
           type: string
-          minLength: 1
-          maxLength: 2000
-          description: Comment text (1-2000 chars)
-          example: Summarized what happened during today’s session.
-      required:
-        - body
-    UpdateTaskComment:
-      type: object
-      properties:
-        body:
-          type: string
-          minLength: 1
-          maxLength: 2000
-          description: Updated comment text (1-2000 chars)
-    TaskTimer:
-      type: object
-      properties:
-        id:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Unique identifier for the timer
-          example: 1
-        taskId:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: ID of the associated task
-          example: 1
-        startTime:
-          type: string
-          format: date-time
-          description: Timestamp when the timer was started
-          example: 2024-01-01T10:00:00.000Z
-        endTime:
-          type: string
           nullable: true
-          format: date-time
-          description: Timestamp when the timer was ended (null for active timers)
-          example: 2024-01-01T10:25:00.000Z
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the timer was created
-          example: 2024-01-01T10:00:00.000Z
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the timer was last updated
-          example: 2024-01-01T10:25:00.000Z
-      required:
-        - id
-        - taskId
-        - startTime
-        - createdAt
-        - updatedAt
-    TaskActivityItem:
-      oneOf:
-        - type: object
-          properties:
-            type:
-              type: string
-              enum:
-                - timer
-            data:
-              $ref: "#/components/schemas/TaskTimer"
-          required:
-            - type
-            - data
-        - type: object
-          properties:
-            type:
-              type: string
-              enum:
-                - comment
-            data:
-              $ref: "#/components/schemas/TaskComment"
-          required:
-            - type
-            - data
-    TaskActivitiesResponse:
-      type: object
-      properties:
-        activities:
-          type: array
-          items:
-            $ref: "#/components/schemas/TaskActivityItem"
-          description: Timeline entries combining timers and comments in descending
-            timestamp order
-      required:
-        - activities
-    TimerListResponse:
-      type: object
-      properties:
-        timers:
-          type: array
-          items:
-            $ref: "#/components/schemas/TaskTimer"
-          description: List of timers
-        total:
+        pinned:
           type: integer
           minimum: 0
-          description: Total number of timers
-          example: 5
-      required:
-        - timers
-        - total
-    TimerResponse:
-      type: object
-      properties:
-        timer:
-          $ref: "#/components/schemas/TaskTimer"
-      required:
-        - timer
-    CreateTimer:
-      type: object
-      properties:
-        taskId:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: ID of the task to start timer for
-          example: 1
-        startTime:
-          type: string
-          format: date-time
-          description: Timestamp when the timer should start
-          example: 2024-01-01T10:00:00.000Z
-      required:
-        - taskId
-        - startTime
-    UpdateTimer:
-      type: object
-      properties:
-        startTime:
-          type: string
-          format: date-time
-          description: Timestamp when the timer started
-          example: 2024-01-01T10:00:00.000Z
-        endTime:
-          type: string
-          nullable: true
-          format: date-time
-          description: Timestamp when the timer ended. Use null to remove end time
-          example: 2024-01-01T10:25:00.000Z
-    TagListResponse:
-      type: object
-      properties:
-        tags:
-          type: array
-          items:
-            $ref: "#/components/schemas/Tag"
-          description: List of tags
-        total:
-          type: integer
-          minimum: 0
-          description: Total number of tags
-          example: 5
-      required:
-        - tags
-        - total
-    TagResponse:
-      type: object
-      properties:
-        tag:
-          $ref: "#/components/schemas/Tag"
-      required:
-        - tag
-    CreateTag:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 50
-          description: Name of the tag
-          example: urgent
-      required:
-        - name
-    UpdateTag:
-      type: object
-      properties:
-        name:
-          type: string
-          minLength: 1
-          maxLength: 50
-          description: Name of the tag
-          example: high-priority
+          maximum: 1
     OAuthStatusResponse:
       type: object
       properties:
@@ -975,130 +791,13 @@ components:
         - isWatching
         - watchChannel
         - expiresIn
-    Note:
+    DeleteAccountResponse:
       type: object
       properties:
-        id:
-          type: integer
-          minimum: 0
-          exclusiveMinimum: true
-          description: Unique identifier for the note
-          example: 1
-        title:
+        message:
           type: string
-          minLength: 1
-          maxLength: 200
-          description: Title of the note
-          example: Quick idea about auth flow
-        content:
-          type: string
-          nullable: true
-          description: Content of the note
-          example: Maybe we should use OAuth2 instead of session tokens
-        archivedAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Timestamp when the note was archived (converted to task)
-          example: null
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the note was created
-          example: 2024-01-01T10:00:00.000Z
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the note was last updated
-          example: 2024-01-01T15:30:00.000Z
       required:
-        - id
-        - title
-        - content
-        - archivedAt
-        - createdAt
-        - updatedAt
-    NoteListResponse:
-      type: object
-      properties:
-        notes:
-          type: array
-          items:
-            $ref: "#/components/schemas/Note"
-          description: List of notes
-        total:
-          type: integer
-          minimum: 0
-          description: Total number of notes
-          example: 5
-      required:
-        - notes
-        - total
-    NoteResponse:
-      type: object
-      properties:
-        note:
-          $ref: "#/components/schemas/Note"
-      required:
-        - note
-    CreateNote:
-      type: object
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 200
-          description: Title of the note
-          example: Quick idea about auth flow
-        content:
-          type: string
-          description: Content of the note
-          example: Maybe we should use OAuth2 instead of session tokens
-      required:
-        - title
-    UpdateNote:
-      type: object
-      properties:
-        title:
-          type: string
-          minLength: 1
-          maxLength: 200
-          description: Title of the note
-          example: Updated idea about auth flow
-        content:
-          type: string
-          nullable: true
-          description: Content of the note
-          example: We should definitely use OAuth2
-        archivedAt:
-          type: string
-          nullable: true
-          format: date-time
-          description: Set to an ISO 8601 timestamp to archive, or null to unarchive
-          example: 2024-06-01T12:00:00.000Z
-    ConvertNoteToTaskResponse:
-      type: object
-      properties:
-        task:
-          $ref: "#/components/schemas/Task"
-        note:
-          $ref: "#/components/schemas/Note"
-      required:
-        - task
-        - note
-    ConvertNoteToTaskRequest:
-      type: object
-      properties:
-        startAt:
-          type: string
-          format: date-time
-          description: Start date for the task in ISO 8601 format
-          example: 2024-01-01T09:00:00.000Z
-        endAt:
-          type: string
-          format: date-time
-          description: End date for the task in ISO 8601 format
-          example: 2024-01-01T10:00:00.000Z
+        - message
     WebhookResponse:
       type: object
       properties: {}
@@ -1192,176 +891,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
-  /api/tasks:
+  /api/v1/todos:
     get:
-      summary: Get all tasks
-      description: Retrieve all tasks
+      summary: List todos
+      description: Retrieve todos with optional date range and completion filters
       parameters:
         - schema:
-            type: array
-            items:
-              type: integer
-              minimum: 0
-              exclusiveMinimum: true
-              description: Numeric ID
-              example: 1
-            description: Filter tasks by IDs (comma-separated)
-            example:
-              - 1
-              - 2
+            type: integer
+            nullable: true
+            description: Range start (UTC Unix timestamp)
           required: false
-          description: Filter tasks by IDs (comma-separated)
-          name: ids
+          description: Range start (UTC Unix timestamp)
+          name: from
+          in: query
+        - schema:
+            type: integer
+            nullable: true
+            description: Range end (UTC Unix timestamp)
+          required: false
+          description: Range end (UTC Unix timestamp)
+          name: to
           in: query
         - schema:
             type: string
             enum:
               - "true"
               - "false"
-            description: Filter tasks by completion status
-            example: false
+            description: Filter by completion status
           required: false
-          description: Filter tasks by completion status
-          name: completed
-          in: query
-        - schema:
-            type: string
-            enum:
-              - "true"
-              - "false"
-            description: Filter tasks by whether they have an active timer running
-            example: true
-          required: false
-          description: Filter tasks by whether they have an active timer running
-          name: hasActiveTimer
-          in: query
-        - schema:
-            type: string
-            enum:
-              - "true"
-              - "false"
-            description: "Filter tasks by whether they have a scheduled start time
-              (startAt). true = only scheduled tasks, false = only unscheduled
-              tasks. When false is combined with startAtFrom/startAtTo, uses OR
-              logic: shows tasks in the date range OR unscheduled tasks"
-            example: true
-          required: false
-          description: "Filter tasks by whether they have a scheduled start time
-            (startAt). true = only scheduled tasks, false = only unscheduled
-            tasks. When false is combined with startAtFrom/startAtTo, uses OR
-            logic: shows tasks in the date range OR unscheduled tasks"
-          name: scheduled
-          in: query
-        - schema:
-            type: string
-            format: date-time
-            description: Filter tasks with startAt >= this timestamp (inclusive). When
-              combined with scheduled=false, uses OR logic to also include
-              unscheduled tasks
-            example: 2024-01-01T00:00:00.000Z
-          required: false
-          description: Filter tasks with startAt >= this timestamp (inclusive). When
-            combined with scheduled=false, uses OR logic to also include
-            unscheduled tasks
-          name: startAtFrom
-          in: query
-        - schema:
-            type: string
-            format: date-time
-            description: Filter tasks with startAt < this timestamp (exclusive). When
-              combined with scheduled=false, uses OR logic to also include
-              unscheduled tasks
-            example: 2024-01-02T00:00:00.000Z
-          required: false
-          description: Filter tasks with startAt < this timestamp (exclusive). When
-            combined with scheduled=false, uses OR logic to also include
-            unscheduled tasks
-          name: startAtTo
-          in: query
-        - schema:
-            type: string
-            enum:
-              - createdAt
-              - startAt
-              - dueDate
-            description: Sort tasks by field (createdAt, startAt, or dueDate)
-            example: startAt
-          required: false
-          description: Sort tasks by field (createdAt, startAt, or dueDate)
-          name: sortBy
-          in: query
-        - schema:
-            type: string
-            enum:
-              - asc
-              - desc
-            description: "Sort order: asc (ascending/oldest first) or desc
-              (descending/newest first). Defaults to desc"
-            example: asc
-          required: false
-          description: "Sort order: asc (ascending/oldest first) or desc
-            (descending/newest first). Defaults to desc"
-          name: order
-          in: query
-        - schema:
-            type: string
-            enum:
-              - "true"
-              - "false"
-            description: When true, tasks with null values for the sort field appear last.
-              Useful for sorting by startAt to show scheduled tasks first, then
-              unscheduled tasks
-            example: true
-          required: false
-          description: When true, tasks with null values for the sort field appear last.
-            Useful for sorting by startAt to show scheduled tasks first, then
-            unscheduled tasks
-          name: nullsLast
-          in: query
-        - schema:
-            type: array
-            items:
-              type: integer
-              minimum: 0
-              exclusiveMinimum: true
-              description: Numeric ID
-              example: 1
-            description: Filter tasks by tag IDs (comma-separated). Returns tasks with ANY
-              of the specified tags (OR logic)
-            example: 1,2
-          required: false
-          description: Filter tasks by tag IDs (comma-separated). Returns tasks with ANY
-            of the specified tags (OR logic)
-          name: tags
+          description: Filter by completion status
+          name: done
           in: query
       responses:
         "200":
-          description: Tasks retrieved successfully
+          description: Todos retrieved
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskListResponse"
+                $ref: "#/components/schemas/TodoListResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     post:
-      summary: Create a task
-      description: Create a new task
+      summary: Create a todo
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateTask"
+              $ref: "#/components/schemas/CreateTodo"
       responses:
         "201":
-          description: Task created successfully
+          description: Todo created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskResponse"
+                $ref: "#/components/schemas/TodoResponse"
         "400":
           description: Bad request
           content:
@@ -1369,745 +956,331 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/tasks/{id}:
-    get:
-      summary: Get a task
-      description: Retrieve a specific task by ID
+  /api/v1/todos/{id}:
+    patch:
+      summary: Update a todo
       parameters:
         - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID
-            example: 1
+            type: string
+            format: uuid
+            description: UUID identifier
+            example: 550e8400-e29b-41d4-a716-446655440000
           required: true
-          description: Task ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Task retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TaskResponse"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    put:
-      summary: Update a task
-      description: Update an existing task by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID
-            example: 1
-          required: true
-          description: Task ID
+          description: UUID identifier
           name: id
           in: path
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateTask"
+              $ref: "#/components/schemas/UpdateTodo"
       responses:
         "200":
-          description: Task updated successfully
+          description: Todo updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskResponse"
-        "400":
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/TodoResponse"
         "404":
-          description: Task not found
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     delete:
-      summary: Delete a task
-      description: Delete a task by ID
+      summary: Delete a todo
       parameters:
         - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID
-            example: 1
+            type: string
+            format: uuid
+            description: UUID identifier
+            example: 550e8400-e29b-41d4-a716-446655440000
           required: true
-          description: Task ID
+          description: UUID identifier
           name: id
           in: path
       responses:
         "200":
-          description: Task deleted successfully
+          description: Todo deleted
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskResponse"
+                $ref: "#/components/schemas/TodoResponse"
         "404":
-          description: Task not found
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/tasks/{taskId}/comments:
+  /api/v1/posts:
     get:
-      summary: List comments for a task
+      summary: List posts
+      description: Retrieve posts in a time range, with linked events and todos
       parameters:
         - schema:
             type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for comment operations
-            example: 1
-          required: true
-          description: Task ID for comment operations
-          name: taskId
-          in: path
+            nullable: true
+            description: Range start (UTC Unix timestamp)
+          required: false
+          description: Range start (UTC Unix timestamp)
+          name: from
+          in: query
+        - schema:
+            type: integer
+            nullable: true
+            description: Range end (UTC Unix timestamp)
+          required: false
+          description: Range end (UTC Unix timestamp)
+          name: to
+          in: query
       responses:
         "200":
-          description: Comments retrieved successfully
+          description: Posts retrieved
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskCommentListResponse"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/PostListResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     post:
-      summary: Create a comment for a task
+      summary: Create a post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePost"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/posts/{id}:
+    patch:
+      summary: Update a post
       parameters:
         - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for comment operations
-            example: 1
+            type: string
+            format: uuid
           required: true
-          description: Task ID for comment operations
-          name: taskId
+          name: id
           in: path
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateTaskComment"
+              $ref: "#/components/schemas/UpdatePost"
       responses:
-        "201":
-          description: Comment created successfully
+        "200":
+          description: Post updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskCommentResponse"
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/PostResponse"
         "404":
-          description: Task not found
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/tasks/{taskId}/comments/{commentId}:
-    get:
-      summary: Get a single task comment
+    delete:
+      summary: Delete a post
       parameters:
         - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for comment operations
-            example: 1
+            type: string
+            format: uuid
           required: true
-          description: Task ID for comment operations
-          name: taskId
-          in: path
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Comment ID
-            example: 1
-          required: true
-          description: Comment ID
-          name: commentId
+          name: id
           in: path
       responses:
         "200":
-          description: Comment retrieved successfully
+          description: Post deleted
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TaskCommentResponse"
+                $ref: "#/components/schemas/PostResponse"
         "404":
-          description: Task or comment not found
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/notes:
+    get:
+      summary: List notes
+      description: Retrieve all notes, pinned first, sorted by updated_at desc
+      responses:
+        "200":
+          description: Notes retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteListResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a note
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNote"
+      responses:
+        "201":
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/v1/notes/{id}:
+    get:
+      summary: Get a note
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+          required: true
+          name: id
+          in: path
+      responses:
+        "200":
+          description: Note retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
     patch:
-      summary: Update a task comment
+      summary: Update a note
+      description: Update title, body, or pinned status. Used by auto-save (debounced).
       parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for comment operations
-            example: 1
-          required: true
-          description: Task ID for comment operations
-          name: taskId
-          in: path
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Comment ID
-            example: 1
-          required: true
-          description: Comment ID
-          name: commentId
-          in: path
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateTaskComment"
-      responses:
-        "200":
-          description: Comment updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TaskCommentResponse"
-        "400":
-          description: Validation error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Task or comment not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      summary: Delete a task comment
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for comment operations
-            example: 1
-          required: true
-          description: Task ID for comment operations
-          name: taskId
-          in: path
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Comment ID
-            example: 1
-          required: true
-          description: Comment ID
-          name: commentId
-          in: path
-      responses:
-        "200":
-          description: Comment deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TaskCommentResponse"
-        "404":
-          description: Task or comment not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/tasks/{id}/activities:
-    get:
-      summary: Get combined task activity timeline
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID
-            example: 1
-          required: true
-          description: Task ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Activities retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TaskActivitiesResponse"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/timers:
-    get:
-      summary: Get all timers
-      description: Retrieve all timers across all tasks
-      parameters:
-        - schema:
-            type: array
-            items:
-              type: integer
-              minimum: 0
-              exclusiveMinimum: true
-              description: Numeric ID
-              example: 1
-            description: IDs of the tasks to get timers for
-            example:
-              - 1
-              - 2
-          required: false
-          description: IDs of the tasks to get timers for
-          name: taskIds
-          in: query
         - schema:
             type: string
-            format: date-time
-            description: Filter timers with startTime >= this timestamp
-            example: 2024-01-01T00:00:00.000Z
-          required: false
-          description: Filter timers with startTime >= this timestamp
-          name: startTimeFrom
-          in: query
+            format: uuid
+          required: true
+          name: id
+          in: path
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNote"
+      responses:
+        "200":
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoteResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Delete a note
+      parameters:
         - schema:
             type: string
-            format: date-time
-            description: Filter timers with startTime < this timestamp
-            example: 2024-01-15T00:00:00.000Z
-          required: false
-          description: Filter timers with startTime < this timestamp
-          name: startTimeTo
-          in: query
-      responses:
-        "200":
-          description: Timers retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TimerListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    post:
-      summary: Create a new timer
-      description: Start a new timer for a task
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateTimer"
-      responses:
-        "201":
-          description: Timer created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TimerResponse"
-        "400":
-          description: Invalid request data
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/tasks/{taskId}/timers:
-    get:
-      summary: Get timers for a task
-      description: Retrieve all timers for a specific task
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Task ID for timer operations
-            example: 1
+            format: uuid
           required: true
-          description: Task ID for timer operations
-          name: taskId
-          in: path
-      responses:
-        "200":
-          description: Timers retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TimerListResponse"
-        "404":
-          description: Task not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/timers/{id}:
-    get:
-      summary: Get a timer by ID
-      description: Retrieve a specific timer by its ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Timer ID
-            example: 1
-          required: true
-          description: Timer ID
           name: id
           in: path
       responses:
         "200":
-          description: Timer retrieved successfully
+          description: Note deleted
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TimerResponse"
+                $ref: "#/components/schemas/NoteResponse"
         "404":
-          description: Timer not found
+          description: Not found
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    put:
-      summary: Update a timer
-      description: Update an existing timer (typically to set end time)
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Timer ID
-            example: 1
-          required: true
-          description: Timer ID
-          name: id
-          in: path
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateTimer"
-      responses:
-        "200":
-          description: Timer updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TimerResponse"
-        "404":
-          description: Timer not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      summary: Delete a timer
-      description: Delete a timer
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Timer ID
-            example: 1
-          required: true
-          description: Timer ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Timer deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TimerResponse"
-        "404":
-          description: Timer not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/tags:
-    get:
-      summary: Get all tags
-      description: Retrieve all tags for the current user
-      responses:
-        "200":
-          description: Tags retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TagListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    post:
-      summary: Create a tag
-      description: Create a new tag
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateTag"
-      responses:
-        "201":
-          description: Tag created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TagResponse"
-        "400":
-          description: Bad request - duplicate tag name or invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/tags/{id}:
-    get:
-      summary: Get a tag
-      description: Retrieve a specific tag by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Tag ID
-            example: 1
-          required: true
-          description: Tag ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Tag retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TagResponse"
-        "404":
-          description: Tag not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    put:
-      summary: Update a tag
-      description: Update an existing tag by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Tag ID
-            example: 1
-          required: true
-          description: Tag ID
-          name: id
-          in: path
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateTag"
-      responses:
-        "200":
-          description: Tag updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TagResponse"
-        "400":
-          description: Bad request - duplicate tag name or invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Tag not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    delete:
-      summary: Delete a tag
-      description: Delete a tag by ID. This will also remove the tag from all
-        associated tasks.
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Tag ID
-            example: 1
-          required: true
-          description: Tag ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Tag deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TagResponse"
-        "404":
-          description: Tag not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
+          description: Internal error
           content:
             application/json:
               schema:
@@ -2627,208 +1800,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/notes:
-    get:
-      summary: Get all notes
-      description: Retrieve all notes for the current user. By default, archived notes
-        are excluded.
-      parameters:
-        - schema:
-            type: string
-            enum:
-              - "true"
-              - "false"
-            description: Include archived notes in the list
-            example: false
-          required: false
-          description: Include archived notes in the list
-          name: includeArchived
-          in: query
-      responses:
-        "200":
-          description: Notes retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NoteListResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    post:
-      summary: Create a note
-      description: Create a new note
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateNote"
-      responses:
-        "201":
-          description: Note created successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NoteResponse"
-        "400":
-          description: Bad request - invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/notes/{id}:
-    get:
-      summary: Get a note
-      description: Retrieve a specific note by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Note ID
-            example: 1
-          required: true
-          description: Note ID
-          name: id
-          in: path
-      responses:
-        "200":
-          description: Note retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NoteResponse"
-        "404":
-          description: Note not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-    put:
-      summary: Update a note
-      description: Update an existing note by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Note ID
-            example: 1
-          required: true
-          description: Note ID
-          name: id
-          in: path
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateNote"
-      responses:
-        "200":
-          description: Note updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NoteResponse"
-        "400":
-          description: Bad request - invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: Note not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+  /api/account:
     delete:
-      summary: Delete a note
-      description: Delete a note by ID
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Note ID
-            example: 1
-          required: true
-          description: Note ID
-          name: id
-          in: path
+      summary: Delete account
+      description: Delete the authenticated user and all their data including tenant
+        database.
       responses:
         "200":
-          description: Note deleted successfully
+          description: Account deleted successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/NoteResponse"
-        "404":
-          description: Note not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/notes/{id}/task_conversions:
-    post:
-      summary: Convert a note to a task
-      description: Atomically creates a task from the note, records the conversion,
-        and archives the note.
-      parameters:
-        - schema:
-            type: integer
-            minimum: 0
-            exclusiveMinimum: true
-            description: Note ID
-            example: 1
-          required: true
-          description: Note ID
-          name: id
-          in: path
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ConvertNoteToTaskRequest"
-      responses:
-        "201":
-          description: Note converted to task successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConvertNoteToTaskResponse"
-        "404":
-          description: Note not found
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/DeleteAccountResponse"
         "500":
           description: Internal server error
           content:

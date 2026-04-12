@@ -86,6 +86,7 @@ Exact layouts may evolve; the **roles** of calendar, posts, and notes stay stabl
 ## Technical Context
 
 - **Desktop app** (Electron) with a Hono API backend (Cloudflare Workers)
+- **Mobile companion** (Expo, `apps/mobile`) uses the same API for today’s to-dos, posts, calendar context, and notes
 - **Multi-tenant data** with per-user databases; authentication and OAuth for services such as Google Calendar
 - **Auto-generated API client** from OpenAPI spec keeps frontend and backend in sync
 - **SWR** for data fetching with optimistic updates so the UI stays responsive
@@ -100,5 +101,5 @@ Possible extensions—not committed roadmap—used to test whether ideas still f
 
 - **Deeper “day review”** — A single end-of-day read that contrasts planned blocks, completed to-dos, and posts.
 - **Lightweight AI assistance** — Suggestions or summaries that respect the user’s private data and the day-as-one-page idea.
-- **Mobile companion** — Quick capture for posts or notes when away from the desktop.
+- **Mobile companion** — Extend capture and day views on the go (see `apps/mobile` README).
 - **Richer linking** — Stronger connections between posts, events, and to-dos without turning the product into a graph database for casual users.

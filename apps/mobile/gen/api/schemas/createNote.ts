@@ -8,11 +8,9 @@
 
 export interface CreateNote {
   /**
-   * Title of the note
    * @minLength 1
    * @maxLength 200
    */
   title: string;
-  /** Content of the note */
-  content?: string;
+  body?: string;
 }

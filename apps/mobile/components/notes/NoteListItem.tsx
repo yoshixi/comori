@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { View, Pressable, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { Archive, Trash2 } from 'lucide-react-native';
+import { Pin, Trash2 } from 'lucide-react-native';
 import type { Note } from '@/gen/api/schemas';
 import { Text } from '@/components/ui/text';
 import { getRelativeTime } from '@/lib/time';
@@ -11,101 +11,70 @@ const FADE_OUT_DURATION = 300;
 export interface NoteListItemProps {
   note: Note;
   onPress: () => void;
-  onArchive: (noteId: number) => Promise<void>;
-  onDelete: (noteId: number) => Promise<void>;
+  onDelete: (noteId: string) => Promise<void>;
+  onTogglePin: (noteId: string, pinned: number) => Promise<void>;
 }
 
-export function NoteListItem({ note, onPress, onArchive, onDelete }: NoteListItemProps) {
+export function NoteListItem({ note, onPress, onDelete, onTogglePin }: NoteListItemProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const [isHiding, setIsHiding] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const heightAnim = useRef(new Animated.Value(1)).current;
-
-  const isArchived = !!note.archivedAt;
 
   const animateOut = useCallback(
     (action: () => Promise<void>) => {
       swipeableRef.current?.close();
       setIsHiding(true);
       Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: FADE_OUT_DURATION,
-          useNativeDriver: false,
-        }),
-        Animated.timing(heightAnim, {
-          toValue: 0,
-          duration: FADE_OUT_DURATION,
-          useNativeDriver: false,
-        }),
+        Animated.timing(fadeAnim, { toValue: 0, duration: FADE_OUT_DURATION, useNativeDriver: false }),
+        Animated.timing(heightAnim, { toValue: 0, duration: FADE_OUT_DURATION, useNativeDriver: false }),
       ]).start(() => {
-        action();
+        void action();
       });
     },
     [fadeAnim, heightAnim]
   );
 
-  const handleArchive = useCallback(() => {
-    animateOut(() => onArchive(note.id));
-  }, [animateOut, onArchive, note.id]);
-
   const handleDelete = useCallback(() => {
     animateOut(() => onDelete(note.id));
   }, [animateOut, onDelete, note.id]);
+
+  const handlePin = useCallback(() => {
+    swipeableRef.current?.close();
+    const next = note.pinned === 1 ? 0 : 1;
+    void onTogglePin(note.id, next);
+  }, [note.id, note.pinned, onTogglePin]);
 
   const renderRightActions = (
     _progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
   ) => {
     const scale = dragX.interpolate({
-      inputRange: [-100, 0],
+      inputRange: [-160, 0],
       outputRange: [1, 0.5],
       extrapolate: 'clamp',
     });
-    const opacity = dragX.interpolate({
-      inputRange: [-100, -50, 0],
-      outputRange: [1, 0.8, 0],
-      extrapolate: 'clamp',
-    });
-
     return (
-      <Pressable
-        onPress={handleArchive}
-        className="bg-orange-500 justify-center items-center rounded-lg mb-2 px-6"
-      >
-        <Animated.View style={{ transform: [{ scale }], opacity }} className="items-center">
-          <Archive size={24} color="white" />
-          <Text className="text-white text-xs mt-1 font-medium">Archive</Text>
-        </Animated.View>
-      </Pressable>
-    );
-  };
-
-  const renderLeftActions = (
-    _progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0.5, 1],
-      extrapolate: 'clamp',
-    });
-    const opacity = dragX.interpolate({
-      inputRange: [0, 50, 100],
-      outputRange: [0, 0.8, 1],
-      extrapolate: 'clamp',
-    });
-
-    return (
-      <Pressable
-        onPress={handleDelete}
-        className="bg-destructive justify-center items-center rounded-lg mb-2 px-6"
-      >
-        <Animated.View style={{ transform: [{ scale }], opacity }} className="items-center">
-          <Trash2 size={24} color="white" />
-          <Text className="text-white text-xs mt-1 font-medium">Delete</Text>
-        </Animated.View>
-      </Pressable>
+      <View className="mb-2 flex-row">
+        <Pressable
+          onPress={handlePin}
+          className="mr-1 items-center justify-center rounded-lg bg-amber-500 px-4"
+        >
+          <Animated.View style={{ transform: [{ scale }] }} className="items-center">
+            <Pin size={22} color="white" />
+            <Text className="mt-1 text-xs font-medium text-white">{note.pinned ? 'Unpin' : 'Pin'}</Text>
+          </Animated.View>
+        </Pressable>
+        <Pressable
+          onPress={handleDelete}
+          className="items-center justify-center rounded-lg bg-destructive px-4"
+        >
+          <Animated.View style={{ transform: [{ scale }] }} className="items-center">
+            <Trash2 size={22} color="white" />
+            <Text className="mt-1 text-xs font-medium text-white">Delete</Text>
+          </Animated.View>
+        </Pressable>
+      </View>
     );
   };
 
@@ -114,40 +83,34 @@ export function NoteListItem({ note, onPress, onArchive, onDelete }: NoteListIte
       style={{
         opacity: fadeAnim,
         transform: [{ scaleY: heightAnim }],
-        marginBottom: heightAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-8, 0],
-        }),
+        marginBottom: heightAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }),
       }}
     >
       <Swipeable
         ref={swipeableRef}
         renderRightActions={renderRightActions}
-        renderLeftActions={renderLeftActions}
-        onSwipeableOpen={(direction) => {
-          if (direction === 'left') handleArchive();
-          else handleDelete();
-        }}
         overshootRight={false}
-        overshootLeft={false}
         friction={2}
         enabled={!isHiding}
       >
         <Pressable
           onPress={onPress}
           disabled={isHiding}
-          className={`py-3 px-3 bg-card rounded-lg mb-2 border border-border active:opacity-70 ${isArchived ? 'opacity-50' : ''}`}
+          className="mb-2 rounded-lg border border-border bg-card px-3 py-3 active:opacity-70"
         >
-          <Text className="font-medium" numberOfLines={1}>
-            {note.title}
-          </Text>
-          {note.content && (
-            <Text className="text-sm text-muted-foreground mt-1" numberOfLines={2}>
-              {note.content}
+          <View className="flex-row items-center gap-2">
+            {note.pinned === 1 ? <Pin size={14} className="text-amber-600" /> : null}
+            <Text className="flex-1 font-medium" numberOfLines={1}>
+              {note.title}
             </Text>
-          )}
-          <Text className="text-xs text-muted-foreground mt-2">
-            {getRelativeTime(note.updatedAt)}
+          </View>
+          {note.body ? (
+            <Text className="mt-1 text-sm text-muted-foreground" numberOfLines={2}>
+              {note.body}
+            </Text>
+          ) : null}
+          <Text className="mt-2 text-xs text-muted-foreground">
+            {getRelativeTime(new Date(note.updated_at * 1000))}
           </Text>
         </Pressable>
       </Swipeable>

@@ -1,6 +1,6 @@
 import { Tabs, Redirect } from 'expo-router';
 import { useColorScheme } from 'nativewind';
-import { CalendarDays, CheckSquare, Settings, StickyNote } from 'lucide-react-native';
+import { Home, Library } from 'lucide-react-native';
 import { ActivityIndicator, View } from 'react-native';
 import { NAV_THEME } from '@/lib/theme';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +12,14 @@ export default function TabLayout() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme.colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
@@ -31,40 +38,28 @@ export default function TabLayout() {
           backgroundColor: theme.colors.card,
           borderTopColor: theme.colors.border,
         },
-        headerStyle: {
-          backgroundColor: theme.colors.card,
-        },
-        headerTintColor: theme.colors.text,
+        headerShown: false,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tasks',
-          tabBarIcon: ({ color, size }) => <CheckSquare color={color} size={size} />,
+          title: 'Today',
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="library"
         options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} />,
+          title: 'Library',
+          tabBarIcon: ({ color, size }) => <Library color={color} size={size} />,
         }}
       />
-      <Tabs.Screen
-        name="notes"
-        options={{
-          title: 'Notes',
-          tabBarIcon: ({ color, size }) => <StickyNote color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
-        }}
-      />
+      <Tabs.Screen name="calendar" options={{ href: null }} />
+      <Tabs.Screen name="todos" options={{ href: null }} />
+      <Tabs.Screen name="logbook" options={{ href: null }} />
+      <Tabs.Screen name="notes" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }

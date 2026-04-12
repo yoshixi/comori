@@ -6,7 +6,8 @@ import Animated, {
   useAnimatedStyle,
   runOnJS,
 } from 'react-native-reanimated';
-import type { Task, CalendarEvent } from '@/gen/api/schemas';
+import type { CalendarEvent } from '@/gen/api/schemas';
+import type { CalendarTimedItem } from '@/lib/todoCalendar';
 import { Text } from '@/components/ui/text';
 import { TaskBlock } from './TaskBlock';
 import { EventBlock } from './EventBlock';
@@ -20,15 +21,14 @@ export interface TimeRange {
 
 export interface DayColumnProps {
   date: Date;
-  tasks: Task[];
+  tasks: CalendarTimedItem[];
   events?: CalendarEvent[];
   calendarColorMap?: Record<string, string | null>;
-  activeTimerTaskIds: Set<number>;
   hourHeight: number;
   columnWidth: number;
-  onTaskPress: (task: Task) => void;
+  onTaskPress: (task: CalendarTimedItem) => void;
   onCreateRange?: (range: TimeRange) => void;
-  onTaskMove?: (task: Task, deltaMinutes: number) => void;
+  onTaskMove?: (task: CalendarTimedItem, deltaMinutes: number) => void;
   showDayLabel?: boolean;
 }
 
@@ -40,7 +40,6 @@ export function DayColumn({
   tasks,
   events = [],
   calendarColorMap = {},
-  activeTimerTaskIds,
   hourHeight,
   columnWidth,
   onTaskPress,
@@ -254,8 +253,8 @@ export function DayColumn({
             const top = (startMinutes / 60) * hourHeight;
             const duration = (endDate.getTime() - startDate.getTime()) / 60000;
             const height = (duration / 60) * hourHeight;
-            const isActive = activeTimerTaskIds.has(task.id);
-            const isCompleted = !!task.completedAt;
+            const isActive = false;
+            const isCompleted = task.done === 1;
 
             // Calculate width and left position based on lane assignment
             const availableWidth = columnWidth - 4; // 2px padding on each side

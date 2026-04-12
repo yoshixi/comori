@@ -13,7 +13,7 @@ export default function NoteDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1">
-        <NoteDetailContent noteId={Number(id)} />
+        <NoteDetailContent noteId={id} />
       </View>
     </SafeAreaView>
   );

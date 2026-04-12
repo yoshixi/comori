@@ -14,8 +14,8 @@ declare namespace Cloudflare {
 		NODE_ENV: "production";
 		BETTER_AUTH_URL: "https://api.techoo.app";
 		GOOGLE_REDIRECT_URI: "https://api.techoo.app/api/auth/callback/google";
-		TURSO_AUTH_TOKEN?: "";
-		TURSO_CONNECTION_URL?: "";
+		TURSO_MAIN_DB_URL?: "";
+		TURSO_MAIN_DB_AUTH_TOKEN?: "";
 		BETTER_AUTH_SECRET?: "your-random-secret-at-least-32-chars";
 		GOOGLE_CLIENT_ID?: "";
 		GOOGLE_CLIENT_SECRET?: "";
@@ -26,7 +26,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NODE_ENV" | "BETTER_AUTH_URL" | "GOOGLE_REDIRECT_URI" | "TURSO_AUTH_TOKEN" | "TURSO_CONNECTION_URL" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "NODE_ENV" | "BETTER_AUTH_URL" | "GOOGLE_REDIRECT_URI" | "TURSO_MAIN_DB_URL" | "TURSO_MAIN_DB_AUTH_TOKEN" | "BETTER_AUTH_SECRET" | "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET">> {}
 }
 
 // Begin runtime types

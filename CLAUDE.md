@@ -19,6 +19,8 @@ This project uses **Nix flakes** for environment management. The development she
 nix develop  # Enter the development environment
 ```
 
+**Agents and automation:** run repo commands via `nix develop --command …` from the repo root so the correct toolchain is used and host shell hooks do not interfere. See `AGENTS.md` → *Development environment (read this first)*.
+
 The flake provides:
 - Git, pnpm, and turso-cli
 - Python environment for SQLite operations (node-gyp / better-sqlite3)

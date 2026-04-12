@@ -1,5 +1,6 @@
 import pino from 'pino'
 import type { Logger } from 'pino'
+import { getEnv } from '../core/env'
 
 export type { Logger } from 'pino'
 
@@ -9,8 +10,9 @@ let _logger: Logger | undefined
 
 function getLogger(): Logger {
   if (!_logger) {
+    const env = getEnv()
     _logger = pino({
-      level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+      level: env.LOG_LEVEL || (env.NODE_ENV === 'production' ? 'info' : 'debug'),
       timestamp: pino.stdTimeFunctions.isoTime,
       serializers: {
         err(err: unknown) {

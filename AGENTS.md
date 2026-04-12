@@ -1,5 +1,15 @@
 # Repository Guidelines
 
+## Development environment (read this first)
+
+The repo defines its toolchain with **Nix flakes** (`flake.nix`). **Agents and scripted terminals should run pnpm and other project commands inside that environment** so tool versions match the project and host shell plugins (e.g. `cd` hooks) do not break automation.
+
+- Interactive shell: `nix develop` (from the repo root)
+- One-shot command: `nix develop --command pnpm run check-types`
+- If you use [direnv](https://direnv.net/) with `use flake`, an interactive shell may already be in the dev environment; for **non-interactive** runs, still prefer `nix develop --command …`.
+
+Human-oriented setup details may also appear in `docs/DEV_ENVIROMENT.md` or `README.md`; when those disagree with `flake.nix`, **trust the flake** for what is actually installed.
+
 ## Project Structure & Module Organization
 - `apps/web`: Next.js web app and API routes. Core logic in `apps/web/app/core`, DB schema in `apps/web/app/db`, and tests under `apps/web/**/**/*.test.ts`.
 - `apps/electron`: Electron + React app (main, preload, renderer). Renderer UI lives in `apps/electron/src/renderer/src`.
@@ -10,14 +20,16 @@
 - `ai-docs`: Planning docs and project notes.
 
 ## Build, Test, and Development Commands
-- `devenv shell`: Enter the dev environment required by this repo.
-- `devenv shell -- pnpm run dev`: Run all apps via Turbo from the repo root.
-- `devenv shell -- pnpm run build`: Build all apps/packages via Turbo.
-- `devenv shell -- pnpm run lint`: Lint all apps/packages via Turbo.
-- `devenv shell -- pnpm run test`: Run all tests via Turbo (currently mainly `apps/web`).
-- `devenv tasks run web:test`: Example of a custom devenv task for web tests.
-- `devenv shell -- pnpm --filter web dev`: Run only the web app (port 3000). `--filter docs` uses port 3001.
-- `devenv shell -- pnpm --filter electron dev`: Run the Electron app locally.
+
+Prefix these with `nix develop --command` when not already inside `nix develop` (see **Development environment** above).
+
+- `pnpm run dev`: Run all apps via Turbo from the repo root.
+- `pnpm run build`: Build all apps/packages via Turbo.
+- `pnpm run lint`: Lint all apps/packages via Turbo.
+- `pnpm run test`: Run all tests via Turbo.
+- `pnpm --filter web dev`: Run only the web app (port 3000). `--filter docs` uses port 3001.
+- `pnpm --filter electron dev`: Run the Electron app locally.
+- `pnpm --filter mobile run dev`: Run the mobile app locally (Expo dev server).
 
 ## Coding Style & Naming Conventions
 - TypeScript-first, React/Next for web/docs, Electron + Vite for desktop.

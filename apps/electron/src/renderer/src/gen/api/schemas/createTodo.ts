@@ -9,6 +9,8 @@
 export interface CreateTodo {
   /** @minLength 1 */
   title: string
+  /** @nullable */
+  description?: string | null
   /**
    * UTC Unix timestamp (seconds)
    * @minimum 0

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import {
   useGetApiV1Posts,
   postApiV1Posts,
+  patchApiV1PostsId,
   deleteApiV1PostsId
 } from '../gen/api/endpoints/techooAPI.gen'
 import type { ErrorResponse, Post } from '../gen/api/schemas'
@@ -21,6 +22,7 @@ export function usePosts(options?: { from: number; to: number }): {
   isLoading: boolean
   error: ErrorResponse | undefined
   createPost: (body: string, eventIds: number[], todoIds: string[]) => Promise<void>
+  updatePost: (id: string, body: string) => Promise<void>
   deletePost: (id: string) => Promise<void>
 } {
   const params = useMemo(() => options ?? todayBoundaries(), [options])
@@ -61,6 +63,39 @@ export function usePosts(options?: { from: number; to: number }): {
     [mutate]
   )
 
+  const updatePost = useCallback(
+    async (id: string, body: string) => {
+      const trimmed = body.trim()
+      if (!trimmed) return
+
+      mutate(
+        (current) => {
+          if (!current) return current
+          return {
+            data: current.data.map((p) => (p.id === id ? { ...p, body: trimmed } : p))
+          }
+        },
+        { revalidate: false }
+      )
+
+      try {
+        const res = await patchApiV1PostsId(id, { body: trimmed })
+        mutate(
+          (current) => {
+            if (!current) return current
+            return {
+              data: current.data.map((p) => (p.id === id ? res.data : p))
+            }
+          },
+          { revalidate: false }
+        )
+      } catch {
+        await mutate()
+      }
+    },
+    [mutate]
+  )
+
   const deletePost = useCallback(
     async (id: string) => {
       await deleteApiV1PostsId(id)
@@ -69,5 +104,5 @@ export function usePosts(options?: { from: number; to: number }): {
     [mutate]
   )
 
-  return { posts, isLoading, error, createPost, deletePost }
+  return { posts, isLoading, error, createPost, updatePost, deletePost }
 }

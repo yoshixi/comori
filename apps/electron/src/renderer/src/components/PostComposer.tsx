@@ -11,6 +11,8 @@ export type PostComposerContext =
   | { type: 'todo'; id: string; title: string }
   | null
 
+type DraftPayload = { body: string; context: PostComposerContext }
+
 function ContextBar({
   context,
   onClear
@@ -44,7 +46,8 @@ export function PostComposer({
   onSubmit,
   onSelectContext,
   todosForSuggestion,
-  compact
+  compact,
+  draftStorageKey
 }: {
   currentContext: PostComposerContext
   onClearContext: () => void
@@ -53,11 +56,15 @@ export function PostComposer({
   todosForSuggestion: Todo[]
   /** Narrow layout for Today sidebar */
   compact?: boolean
+  /** When set, draft text + context are persisted to localStorage under this key */
+  draftStorageKey?: string
 }): React.JSX.Element {
   const [value, setValue] = useState('')
   const [showHashPanel, setShowHashPanel] = useState(false)
   const [hashQuery, setHashQuery] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  /** Avoid clobbering storage before the first read from localStorage completes */
+  const draftHydratedRef = useRef(false)
   const isMacPlatform = typeof navigator !== 'undefined' && navigator.platform.includes('Mac')
 
   useEffect(() => {
@@ -66,6 +73,46 @@ export function PostComposer({
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [value])
+
+  // Restore draft when key changes (e.g. new calendar day)
+  useEffect(() => {
+    draftHydratedRef.current = false
+    if (!draftStorageKey || typeof localStorage === 'undefined') {
+      setValue('')
+      draftHydratedRef.current = true
+      return
+    }
+    try {
+      const raw = localStorage.getItem(draftStorageKey)
+      if (!raw) {
+        setValue('')
+      } else {
+        const parsed = JSON.parse(raw) as DraftPayload
+        if (typeof parsed.body === 'string') setValue(parsed.body)
+        if (parsed.context && (parsed.context.type === 'event' || parsed.context.type === 'todo')) {
+          onSelectContext(parsed.context)
+        }
+      }
+    } catch {
+      setValue('')
+    } finally {
+      draftHydratedRef.current = true
+    }
+  }, [draftStorageKey, onSelectContext])
+
+  useEffect(() => {
+    if (!draftStorageKey || typeof localStorage === 'undefined') return
+    if (!draftHydratedRef.current) return
+    const id = window.setTimeout(() => {
+      try {
+        const payload: DraftPayload = { body: value, context: currentContext }
+        localStorage.setItem(draftStorageKey, JSON.stringify(payload))
+      } catch {
+        /* quota or private mode */
+      }
+    }, 300)
+    return () => window.clearTimeout(id)
+  }, [value, currentContext, draftStorageKey])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const v = e.target.value
@@ -110,7 +157,14 @@ export function PostComposer({
     onSubmit(trimmed)
     setValue('')
     setShowHashPanel(false)
-  }, [value, onSubmit])
+    if (draftStorageKey && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(draftStorageKey)
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [value, onSubmit, draftStorageKey])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

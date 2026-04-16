@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Label } from './ui/label'
 import { Switch } from './ui/switch'
 import { Separator } from './ui/separator'
+import { Textarea } from './ui/textarea'
 import { useTodos } from '../hooks/useTodos'
 import { usePosts } from '../hooks/usePosts'
 import { useLocalDayBounds } from '../hooks/useLocalDayBounds'
@@ -141,10 +142,20 @@ function TodoComposer({
       const trimmed = title.trim()
       if (!trimmed) return
 
+      if (!showTime) {
+        onCreateTodo(trimmed)
+        setTitle('')
+        setStartTime('')
+        setEndTime('')
+        setShowDatePicker(false)
+        inputRef.current?.focus()
+        return
+      }
+
       const baseDate = new Date(selectedDate + 'T00:00:00')
       let startsAt: number
 
-      if (showTime && startTime) {
+      if (startTime) {
         const [h, m] = startTime.split(':').map(Number)
         baseDate.setHours(h, m, 0, 0)
         startsAt = Math.floor(baseDate.getTime() / 1000)
@@ -154,7 +165,7 @@ function TodoComposer({
       }
 
       let endsAt: number | undefined
-      if (showTime && endTime) {
+      if (endTime) {
         const [eh, em] = endTime.split(':').map(Number)
         const ed = new Date(selectedDate + 'T00:00:00')
         ed.setHours(eh, em, 0, 0)
@@ -385,6 +396,7 @@ function TodoDetailDialog({
     id: string,
     data: {
       title?: string
+      description?: string | null
       starts_at?: number | null
       ends_at?: number | null
       is_all_day?: number
@@ -393,17 +405,19 @@ function TodoDetailDialog({
   onDeleteTodo: (id: string) => Promise<void>
   onToggleDone: (id: string, done: number) => Promise<void>
 }): React.JSX.Element {
-  const anchorTs = todo.starts_at ?? todo.created_at
-  const postsRange = useMemo(() => {
-    const d = new Date(anchorTs * 1000)
-    d.setHours(0, 0, 0, 0)
-    const from = Math.floor(d.getTime() / 1000)
-    return { from, to: from + 86400 }
-  }, [anchorTs])
+  /** Wide window so linked posts from any day appear in the thread */
+  const threadRange = useMemo(
+    () => ({
+      from: 0,
+      to: Math.floor(Date.now() / 1000) + 86400 * 365 * 10
+    }),
+    []
+  )
 
-  const { posts } = usePosts(postsRange)
+  const { posts, createPost, isLoading: postsLoading } = usePosts(threadRange)
 
   const [title, setTitle] = useState(todo.title)
+  const [description, setDescription] = useState(() => todo.description ?? '')
   const [dateStr, setDateStr] = useState(() =>
     todo.starts_at != null ? toDateInputValue(todo.starts_at) : toDateInputValue(todo.created_at)
   )
@@ -419,9 +433,12 @@ function TodoDetailDialog({
   )
   const [allDay, setAllDay] = useState(todo.is_all_day === 1)
   const [saving, setSaving] = useState(false)
+  const [threadReply, setThreadReply] = useState('')
+  const [postingThread, setPostingThread] = useState(false)
 
   useEffect(() => {
     setTitle(todo.title)
+    setDescription(todo.description ?? '')
     setDateStr(
       todo.starts_at != null ? toDateInputValue(todo.starts_at) : toDateInputValue(todo.created_at)
     )
@@ -436,12 +453,13 @@ function TodoDetailDialog({
         : ''
     )
     setAllDay(todo.is_all_day === 1)
-  }, [todo.id, todo.title, todo.starts_at, todo.ends_at, todo.is_all_day, todo.created_at])
+    setThreadReply('')
+  }, [todo.id, todo.title, todo.description, todo.starts_at, todo.ends_at, todo.is_all_day, todo.created_at])
 
-  const relatedPosts = useMemo(
-    () => posts.filter((p) => p.todos.some((t) => t.id === todo.id)),
-    [posts, todo.id]
-  )
+  const relatedPosts = useMemo(() => {
+    const linked = posts.filter((p) => p.todos.some((t) => t.id === todo.id))
+    return [...linked].sort((a, b) => a.posted_at - b.posted_at)
+  }, [posts, todo.id])
 
   const buildSchedulePatch = useCallback(() => {
     if (allDay) {
@@ -475,8 +493,10 @@ function TodoDetailDialog({
     setSaving(true)
     try {
       const sched = buildSchedulePatch()
+      const descTrim = description.trim()
       await onUpdateTodo(todo.id, {
         title: trimmed,
+        description: descTrim.length > 0 ? descTrim : null,
         starts_at: sched.starts_at,
         ends_at: sched.ends_at,
         is_all_day: sched.is_all_day
@@ -485,7 +505,19 @@ function TodoDetailDialog({
     } finally {
       setSaving(false)
     }
-  }, [title, todo.id, buildSchedulePatch, onUpdateTodo, onClose])
+  }, [title, description, todo.id, buildSchedulePatch, onUpdateTodo, onClose])
+
+  const handleAddThreadPost = useCallback(async () => {
+    const trimmed = threadReply.trim()
+    if (!trimmed) return
+    setPostingThread(true)
+    try {
+      await createPost(trimmed, [], [todo.id])
+      setThreadReply('')
+    } finally {
+      setPostingThread(false)
+    }
+  }, [threadReply, createPost, todo.id])
 
   const handleDelete = useCallback(async () => {
     if (!window.confirm('Delete this todo? Linked posts stay in the log.')) return
@@ -529,6 +561,20 @@ function TodoDetailDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="h-9 text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="todo-detail-description" className="text-xs text-muted-foreground">
+            Description
+          </Label>
+          <Textarea
+            id="todo-detail-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Notes, context, links…"
+            rows={4}
+            className="min-h-[88px] resize-y text-sm"
           />
         </div>
 
@@ -586,12 +632,17 @@ function TodoDetailDialog({
 
         <div className="space-y-2">
           <h4 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            Related posts
+            Post thread
           </h4>
-          {relatedPosts.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No posts linked to this todo.</p>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Chronological log entries linked to this todo (from Today / Work or #tags).
+          </p>
+          {postsLoading && relatedPosts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Loading posts…</p>
+          ) : relatedPosts.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No posts linked yet.</p>
           ) : (
-            <div className="max-h-44 space-y-2 overflow-y-auto pr-0.5">
+            <div className="max-h-52 space-y-2 overflow-y-auto pr-0.5">
               {relatedPosts.map((post) => (
                 <div
                   key={post.id}
@@ -604,12 +655,41 @@ function TodoDetailDialog({
                 >
                   <p className="whitespace-pre-wrap text-[13px] leading-snug">{post.body}</p>
                   <span className="mt-1 block text-[10px] text-muted-foreground">
-                    {formatTime(post.posted_at)}
+                    {formatTime(post.posted_at)} · {formatDate(post.posted_at)}
                   </span>
                 </div>
               ))}
             </div>
           )}
+          <div className="space-y-1.5 pt-1">
+            <Label htmlFor="todo-thread-reply" className="text-xs text-muted-foreground">
+              Add to thread
+            </Label>
+            <Textarea
+              id="todo-thread-reply"
+              value={threadReply}
+              onChange={(e) => setThreadReply(e.target.value)}
+              placeholder="Write a log entry for this todo…"
+              rows={2}
+              className="min-h-[52px] resize-y text-sm"
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  void handleAddThreadPost()
+                }
+              }}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-8 text-xs"
+              disabled={postingThread || !threadReply.trim()}
+              onClick={() => void handleAddThreadPost()}
+            >
+              {postingThread ? 'Posting…' : 'Post to thread'}
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">

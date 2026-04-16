@@ -6,7 +6,7 @@ import { useTodos } from '../hooks/useTodos'
 import { useLocalDayBounds } from '../hooks/useLocalDayBounds'
 export function PostsView(): React.JSX.Element {
   const { from, to } = useLocalDayBounds()
-  const { posts, isLoading, createPost, deletePost } = usePosts({ from, to })
+  const { posts, isLoading, createPost, updatePost, deletePost } = usePosts({ from, to })
 
   const { todos: todayTodos } = useTodos({ from, to })
 
@@ -41,6 +41,7 @@ export function PostsView(): React.JSX.Element {
         </div>
 
         <PostComposer
+          draftStorageKey={`techoo.posts.postDraft.v1.${from}`}
           currentContext={currentContext}
           onClearContext={handleClearContext}
           onSubmit={handleSubmit}
@@ -58,7 +59,9 @@ export function PostsView(): React.JSX.Element {
               <p>No posts yet. Add one here or from the Today tab.</p>
             </div>
           ) : (
-            postsTimeline.map((post) => <PostRow key={post.id} post={post} onDelete={deletePost} />)
+            postsTimeline.map((post) => (
+              <PostRow key={post.id} post={post} onUpdatePost={updatePost} onDelete={deletePost} />
+            ))
           )}
         </div>
       </main>

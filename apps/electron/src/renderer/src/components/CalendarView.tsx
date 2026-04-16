@@ -53,6 +53,7 @@ import {
 export interface Todo {
   id: string
   title: string
+  description?: string | null
   starts_at: number | null
   ends_at: number | null
   is_all_day: number

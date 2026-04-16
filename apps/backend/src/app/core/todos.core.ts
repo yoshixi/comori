@@ -17,6 +17,7 @@ const UnixTimestampSchema = z.number().int().min(0).openapi({
 export const TodoModel = z.object({
   id: UuidSchema,
   title: z.string().openapi({ example: 'Reply to client email' }),
+  description: z.string().nullable().optional().openapi({ description: 'Optional longer notes for this todo' }),
   starts_at: UnixTimestampSchema.nullable().openapi({ description: 'Start time (nullable for unscheduled todos)' }),
   ends_at: UnixTimestampSchema.nullable().openapi({ description: 'End time (nullable)' }),
   is_all_day: z.number().int().min(0).max(1).openapi({ description: '1 = all-day todo' }),
@@ -27,6 +28,7 @@ export const TodoModel = z.object({
 
 export const CreateTodoModel = z.object({
   title: z.string().min(1).openapi({ example: 'Reply to client email' }),
+  description: z.string().nullable().optional(),
   starts_at: UnixTimestampSchema.optional(),
   ends_at: UnixTimestampSchema.optional(),
   is_all_day: z.number().int().min(0).max(1).optional().default(0),
@@ -34,6 +36,7 @@ export const CreateTodoModel = z.object({
 
 export const UpdateTodoModel = z.object({
   title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
   starts_at: UnixTimestampSchema.nullable().optional(),
   ends_at: UnixTimestampSchema.nullable().optional(),
   is_all_day: z.number().int().min(0).max(1).optional(),

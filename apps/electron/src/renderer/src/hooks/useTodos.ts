@@ -5,7 +5,6 @@ import {
   deleteApiV1TodosId
 } from '../gen/api/endpoints/techooAPI.gen'
 import type { ErrorResponse, GetApiV1TodosParams, Todo } from '../gen/api/schemas'
-import { useSWRConfig } from 'swr'
 import { useCallback, useMemo } from 'react'
 
 export function useTodos(options?: {
@@ -28,6 +27,7 @@ export function useTodos(options?: {
     id: string,
     updates: {
       title?: string
+      description?: string | null
       starts_at?: number | null
       ends_at?: number | null
       is_all_day?: number
@@ -38,8 +38,6 @@ export function useTodos(options?: {
   deleteTodo: (id: string) => Promise<void>
   mutate: ReturnType<typeof useGetApiV1Todos>['mutate']
 } {
-  const { mutate: globalMutate } = useSWRConfig()
-
   const params: GetApiV1TodosParams | undefined = useMemo(() => {
     if (options?.fetchAll) {
       return {}
@@ -61,24 +59,37 @@ export function useTodos(options?: {
 
   const todos = data?.data ?? []
 
-  const revalidateAll = useCallback(() => {
-    globalMutate(
-      (key) => {
-        if (Array.isArray(key) && key[0] === '/api/v1/todos') return true
-        return false
-      },
-      undefined,
-      { revalidate: true }
-    )
-  }, [globalMutate])
+  const mergeTodoFromServer = useCallback(
+    (id: string, server: Todo) => {
+      mutate(
+        (current) => {
+          if (!current) return current
+          return {
+            data: current.data.map((t) => (t.id === id ? server : t))
+          }
+        },
+        { revalidate: false }
+      )
+    },
+    [mutate]
+  )
 
-  // Optimistic create: add a temporary todo to the list immediately
+  const stripTempTodos = useCallback(
+    (current: { data: Todo[] } | undefined, server: Todo) => {
+      if (!current) return { data: [server] }
+      const noTemp = current.data.filter((t) => !String(t.id).startsWith('temp-'))
+      return { data: [...noTemp, server] }
+    },
+    []
+  )
+
   const createTodo = useCallback(
     async (title: string, startsAt?: number, endsAt?: number) => {
       const now = Math.floor(Date.now() / 1000)
       const optimisticTodo: Todo = {
         id: `temp-${Date.now()}`,
         title,
+        description: null,
         starts_at: startsAt ?? null,
         ends_at: endsAt ?? null,
         is_all_day: 0,
@@ -87,7 +98,6 @@ export function useTodos(options?: {
         created_at: now
       }
 
-      // Optimistically update local cache
       mutate(
         (current) => {
           if (!current) return { data: [optimisticTodo] }
@@ -96,15 +106,20 @@ export function useTodos(options?: {
         { revalidate: false }
       )
 
-      // Fire API in background, then revalidate to get real ID
-      postApiV1Todos({ title, starts_at: startsAt, ends_at: endsAt })
-        .then(() => revalidateAll())
-        .catch(() => mutate()) // revert on error
+      try {
+        const res = await postApiV1Todos({
+          title,
+          starts_at: startsAt,
+          ends_at: endsAt
+        })
+        mutate((current) => stripTempTodos(current, res.data), { revalidate: false })
+      } catch {
+        await mutate()
+      }
     },
-    [mutate, revalidateAll]
+    [mutate, stripTempTodos]
   )
 
-  // Optimistic toggle: update done state immediately, animate in UI
   const toggleDone = useCallback(
     async (id: string, currentDone: number) => {
       const newDone = currentDone === 1 ? 0 : 1
@@ -122,11 +137,14 @@ export function useTodos(options?: {
         { revalidate: false }
       )
 
-      patchApiV1TodosId(id, { done: newDone })
-        .then(() => revalidateAll())
-        .catch(() => mutate())
+      try {
+        const res = await patchApiV1TodosId(id, { done: newDone })
+        mergeTodoFromServer(id, res.data)
+      } catch {
+        await mutate()
+      }
     },
-    [mutate, revalidateAll]
+    [mutate, mergeTodoFromServer]
   )
 
   const updateTodo = useCallback(
@@ -134,6 +152,7 @@ export function useTodos(options?: {
       id: string,
       updates: {
         title?: string
+        description?: string | null
         starts_at?: number | null
         ends_at?: number | null
         is_all_day?: number
@@ -150,14 +169,16 @@ export function useTodos(options?: {
         { revalidate: false }
       )
 
-      patchApiV1TodosId(id, updates)
-        .then(() => revalidateAll())
-        .catch(() => mutate())
+      try {
+        const res = await patchApiV1TodosId(id, updates)
+        mergeTodoFromServer(id, res.data)
+      } catch {
+        await mutate()
+      }
     },
-    [mutate, revalidateAll]
+    [mutate, mergeTodoFromServer]
   )
 
-  // Optimistic delete: remove from list immediately
   const deleteTodo = useCallback(
     async (id: string) => {
       mutate(
@@ -168,11 +189,13 @@ export function useTodos(options?: {
         { revalidate: false }
       )
 
-      deleteApiV1TodosId(id)
-        .then(() => revalidateAll())
-        .catch(() => mutate())
+      try {
+        await deleteApiV1TodosId(id)
+      } catch {
+        await mutate()
+      }
     },
-    [mutate, revalidateAll]
+    [mutate]
   )
 
   return { todos, isLoading, error, createTodo, updateTodo, toggleDone, deleteTodo, mutate }

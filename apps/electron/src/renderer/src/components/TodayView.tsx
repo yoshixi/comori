@@ -391,17 +391,20 @@ function TodayLogPanel({
   posts,
   isLoading,
   createPost,
+  updatePost,
   deletePost,
   todosForHashSuggest,
   composerContext,
   onComposerContextChange,
   layout,
   showStatusLine,
-  todosForStatus
+  todosForStatus,
+  postDraftStorageKey
 }: {
   posts: Post[]
   isLoading: boolean
   createPost: (body: string, eventIds: number[], todoIds: string[]) => Promise<void>
+  updatePost: (id: string, body: string) => Promise<void>
   deletePost: (id: string) => Promise<void>
   todosForHashSuggest: Todo[]
   composerContext: PostComposerContext
@@ -409,6 +412,8 @@ function TodayLogPanel({
   layout: 'compact' | 'comfortable'
   showStatusLine?: boolean
   todosForStatus?: Todo[]
+  /** Persists composer draft per local calendar day */
+  postDraftStorageKey: string
 }): React.JSX.Element {
   const nowSec = usePeriodicNow()
   const handleSubmit = useCallback(
@@ -435,6 +440,7 @@ function TodayLogPanel({
 
       <PostComposer
         compact={!comfortable}
+        draftStorageKey={postDraftStorageKey}
         currentContext={composerContext}
         onClearContext={() => onComposerContextChange(null)}
         onSubmit={handleSubmit}
@@ -459,6 +465,7 @@ function TodayLogPanel({
             <PostRow
               key={post.id}
               post={post}
+              onUpdatePost={updatePost}
               onDelete={deletePost}
               variant={comfortable ? 'default' : 'compact'}
             />
@@ -500,11 +507,12 @@ function RailTabButton({
 
 export function TodayView(): React.JSX.Element {
   const { from: dayStart, to: dayEnd } = useLocalDayBounds()
+  const postDraftStorageKey = `techoo.today.postDraft.v1.${dayStart}`
   const { todos, createTodo, updateTodo, deleteTodo, toggleDone } = useTodos({
     from: dayStart,
     to: dayEnd
   })
-  const { posts, isLoading: postsLoading, createPost, deletePost } = usePosts({
+  const { posts, isLoading: postsLoading, createPost, updatePost, deletePost } = usePosts({
     from: dayStart,
     to: dayEnd
   })
@@ -649,10 +657,12 @@ export function TodayView(): React.JSX.Element {
                     posts={posts}
                     isLoading={postsLoading}
                     createPost={createPost}
+                    updatePost={updatePost}
                     deletePost={deletePost}
                     todosForHashSuggest={todosForPostHash}
                     composerContext={logComposerContext}
                     onComposerContextChange={setLogComposerContext}
+                    postDraftStorageKey={postDraftStorageKey}
                   />
                 )}
               </div>
@@ -677,10 +687,12 @@ export function TodayView(): React.JSX.Element {
                 posts={posts}
                 isLoading={postsLoading}
                 createPost={createPost}
+                updatePost={updatePost}
                 deletePost={deletePost}
                 todosForHashSuggest={todosForPostHash}
                 composerContext={logComposerContext}
                 onComposerContextChange={setLogComposerContext}
+                postDraftStorageKey={postDraftStorageKey}
               />
             </main>
           </>

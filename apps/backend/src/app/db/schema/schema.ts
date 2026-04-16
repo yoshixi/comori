@@ -73,6 +73,7 @@ export const todosTable = sqliteTable('todos', {
   id: text('id').primaryKey(), // UUID
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
+  description: text('description'),
   startsAt: integer('starts_at', { mode: 'number' }),
   endsAt: integer('ends_at', { mode: 'number' }),
   isAllDay: integer('is_all_day', { mode: 'number' }).notNull().default(0),

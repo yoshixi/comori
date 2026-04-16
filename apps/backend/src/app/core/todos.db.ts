@@ -7,6 +7,7 @@ function convertDbTodoToApi(row: SelectTodo): Todo {
   return {
     id: row.id,
     title: row.title,
+    description: row.description ?? null,
     starts_at: row.startsAt ?? null,
     ends_at: row.endsAt ?? null,
     is_all_day: row.isAllDay,
@@ -94,6 +95,7 @@ export async function createTodo(db: DB, userId: number, data: CreateTodo): Prom
     id,
     userId,
     title: data.title.trim(),
+    description: data.description?.trim() ?? null,
     startsAt: data.starts_at ?? null,
     endsAt: data.ends_at ?? null,
     isAllDay: data.is_all_day ?? 0,
@@ -111,6 +113,10 @@ export async function updateTodo(db: DB, userId: number, todoId: string, data: U
 
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title.trim()
+  if (data.description !== undefined) {
+    updateData.description =
+      data.description === null || data.description === '' ? null : data.description.trim()
+  }
   if (data.starts_at !== undefined) updateData.startsAt = data.starts_at
   if (data.ends_at !== undefined) updateData.endsAt = data.ends_at
   if (data.is_all_day !== undefined) updateData.isAllDay = data.is_all_day

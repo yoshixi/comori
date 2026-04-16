@@ -92,6 +92,10 @@ components:
         title:
           type: string
           example: Reply to client email
+        description:
+          type: string
+          nullable: true
+          description: Optional longer notes for this todo
         starts_at:
           type: integer
           nullable: true
@@ -157,6 +161,9 @@ components:
           type: string
           minLength: 1
           example: Reply to client email
+        description:
+          type: string
+          nullable: true
         starts_at:
           type: integer
           minimum: 0
@@ -180,6 +187,9 @@ components:
         title:
           type: string
           minLength: 1
+        description:
+          type: string
+          nullable: true
         starts_at:
           type: integer
           nullable: true

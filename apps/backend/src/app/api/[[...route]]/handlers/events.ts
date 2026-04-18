@@ -2,6 +2,7 @@ import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
 import { listEventsRoute, getEventRoute } from '../routes/events'
 import { getAllEvents, getEventById } from '../../../core/events.db'
+import { clampGenericListLimit } from '../../../core/list-limits'
 
 // GET /events - List calendar events with optional filters
 export const listEventsHandler: RouteHandler<typeof listEventsRoute, AppBindings> = async (c) => {
@@ -9,12 +10,18 @@ export const listEventsHandler: RouteHandler<typeof listEventsRoute, AppBindings
     const db = c.get('db')
     const user = c.get('user')
     const query = c.req.valid('query')
+    const lim = clampGenericListLimit(query.limit ?? undefined)
 
-    const events = await getAllEvents(db, user.id, {
-      calendarId: query.calendarId,
-      startDate: query.startDate,
-      endDate: query.endDate
-    })
+    const events = await getAllEvents(
+      db,
+      user.id,
+      {
+        calendarId: query.calendarId,
+        startDate: query.startDate,
+        endDate: query.endDate
+      },
+      lim
+    )
 
     return c.json({ events, total: events.length }, 200)
   } catch (error) {

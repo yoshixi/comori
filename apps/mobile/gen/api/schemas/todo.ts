@@ -11,6 +11,11 @@ export interface Todo {
   id: string;
   title: string;
   /**
+   * Optional longer notes for this todo
+   * @nullable
+   */
+  description?: string | null;
+  /**
    * Start time (nullable for unscheduled todos)
    * @minimum 0
    * @nullable

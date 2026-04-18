@@ -22,4 +22,10 @@ export type GetApiV1TodosParams = {
    * Filter by completion status
    */
   done?: GetApiV1TodosDone;
+  /**
+   * Max rows to return (default 100, max 500)
+   * @minimum 1
+   * @maximum 500
+   */
+  limit?: number;
 };

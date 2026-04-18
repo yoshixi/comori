@@ -21,4 +21,10 @@ export type GetApiEventsParams = {
    * Filter events ending before this date (inclusive)
    */
   endDate?: string;
+  /**
+   * Max events to return (default 100, max 500)
+   * @minimum 1
+   * @maximum 500
+   */
+  limit?: number;
 };

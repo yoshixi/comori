@@ -80,7 +80,10 @@ export const CalendarEventQueryParamsModel = z.object({
   endDate: z.string().optional().openapi({
     description: 'Filter events ending before this date (inclusive)',
     example: '2024-01-31T23:59:59.000Z'
-  })
+  }),
+  limit: z.coerce.number().int().min(1).max(500).optional().openapi({
+    description: 'Max events to return (default 100, max 500)',
+  }),
 }).openapi('CalendarEventQueryParams')
 
 // Path parameter models

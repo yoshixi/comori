@@ -8,6 +8,8 @@ import {
 } from '@/gen/api/endpoints/techooAPI.gen'
 import type { ErrorResponse, GetApiV1TodosParams, Todo } from '@/gen/api/schemas'
 
+const TODO_LIST_LIMIT = 500
+
 export function useTodos(options?: {
   from?: number
   to?: number
@@ -34,20 +36,26 @@ export function useTodos(options?: {
   mutate: ReturnType<typeof useGetApiV1Todos>['mutate']
 } {
   const params: GetApiV1TodosParams | undefined = useMemo(() => {
-    if (options?.fetchAll) return {}
-    if (options?.showAll) return { done: 'false' as const }
+    if (options?.fetchAll) return { limit: TODO_LIST_LIMIT }
+    if (options?.showAll) return { done: 'false' as const, limit: TODO_LIST_LIMIT }
     if (options?.from != null && options?.to != null) {
       const includeCompleted = options.includeCompletedInRange !== false
-      if (includeCompleted) return { from: options.from, to: options.to }
-      return { from: options.from, to: options.to, done: 'false' as const }
+      if (includeCompleted) return { from: options.from, to: options.to, limit: TODO_LIST_LIMIT }
+      return { from: options.from, to: options.to, done: 'false' as const, limit: TODO_LIST_LIMIT }
     }
-    return { done: 'false' as const }
+    return { done: 'false' as const, limit: TODO_LIST_LIMIT }
   }, [options?.from, options?.to, options?.showAll, options?.fetchAll, options?.includeCompletedInRange])
 
   /** Primitive tuple so SWR cache always tracks range/filters (avoids stale lists when the day changes). */
   const swrKey = useMemo<Key>(
-    () => ['/api/v1/todos', params?.from ?? null, params?.to ?? null, params?.done ?? null],
-    [params?.from, params?.to, params?.done]
+    () => [
+      '/api/v1/todos',
+      params?.from ?? null,
+      params?.to ?? null,
+      params?.done ?? null,
+      params?.limit ?? null,
+    ],
+    [params?.from, params?.to, params?.done, params?.limit]
   )
 
   const { data, isLoading, error, mutate } = useGetApiV1Todos(params, {

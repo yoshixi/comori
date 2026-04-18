@@ -4,7 +4,7 @@ import {
   postApiV1Posts,
   deleteApiV1PostsId,
 } from '@/gen/api/endpoints/techooAPI.gen'
-import type { ErrorResponse, Post } from '@/gen/api/schemas'
+import type { ErrorResponse, GetApiV1PostsParams, Post } from '@/gen/api/schemas'
 
 function todayBoundaries(): { from: number; to: number } {
   const now = new Date()
@@ -16,7 +16,7 @@ function todayBoundaries(): { from: number; to: number } {
   }
 }
 
-export function usePosts(options?: { from: number; to: number }): {
+export function usePosts(options?: { from: number; to: number; limit?: number }): {
   posts: Post[]
   isLoading: boolean
   error: ErrorResponse | undefined
@@ -24,7 +24,14 @@ export function usePosts(options?: { from: number; to: number }): {
   deletePost: (id: string) => Promise<void>
   mutate: ReturnType<typeof useGetApiV1Posts>['mutate']
 } {
-  const params = useMemo(() => options ?? todayBoundaries(), [options])
+  const params = useMemo((): GetApiV1PostsParams => {
+    const base = options ?? todayBoundaries()
+    return {
+      from: base.from,
+      to: base.to,
+      ...(options?.limit !== undefined ? { limit: options.limit } : {})
+    }
+  }, [options])
   const { data, error, isLoading, mutate } = useGetApiV1Posts(params)
   const posts: Post[] = data?.data ?? []
 

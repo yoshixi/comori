@@ -1,7 +1,8 @@
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and, sql, desc } from 'drizzle-orm'
 import { postsTable, postEventsTable, postTodosTable, calendarEventsTable, todosTable, type SelectPost } from '../db/schema/schema'
 import { type DB } from './common.db'
 import type { Post, CreatePost, UpdatePost } from './posts.core'
+import { MAX_POSTS_PAGINATED_LIMIT } from './list-limits'
 
 interface LinkedEvent { id: number; title: string }
 interface LinkedTodo { id: string; title: string }
@@ -33,7 +34,13 @@ async function convertDbPostToApi(db: DB, row: SelectPost): Promise<Post> {
   }
 }
 
-export async function getPostsByRange(db: DB, userId: number, from: number, to: number): Promise<Post[]> {
+export async function getPostsByRange(
+  db: DB,
+  userId: number,
+  from: number,
+  to: number,
+  limitRows: number
+): Promise<Post[]> {
   const rows = await db
     .select()
     .from(postsTable)
@@ -43,8 +50,32 @@ export async function getPostsByRange(db: DB, userId: number, from: number, to: 
       sql`${postsTable.postedAt} < ${to}`,
     ))
     .orderBy(postsTable.postedAt)
+    .limit(limitRows)
 
   return Promise.all(rows.map(row => convertDbPostToApi(db, row)))
+}
+
+/** All posts for the user, newest first, with offset pagination. */
+export async function getPostsPaginated(
+  db: DB,
+  userId: number,
+  opts: { limit: number; offset: number }
+): Promise<{ posts: Post[]; has_more: boolean }> {
+  const cap = Math.min(opts.limit, MAX_POSTS_PAGINATED_LIMIT)
+  const take = cap + 1
+
+  const rows = await db
+    .select()
+    .from(postsTable)
+    .where(eq(postsTable.userId, userId))
+    .orderBy(desc(postsTable.postedAt), desc(postsTable.id))
+    .limit(take)
+    .offset(opts.offset)
+
+  const hasMore = rows.length > cap
+  const slice = hasMore ? rows.slice(0, cap) : rows
+  const posts = await Promise.all(slice.map((row) => convertDbPostToApi(db, row)))
+  return { posts, has_more: hasMore }
 }
 
 export async function getPostById(db: DB, userId: number, postId: string): Promise<Post | null> {

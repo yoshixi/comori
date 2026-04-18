@@ -4,8 +4,11 @@ import {
   patchApiV1NotesId,
   deleteApiV1NotesId
 } from '../gen/api/endpoints/techooAPI.gen'
-import type { ErrorResponse, Note, UpdateNote } from '../gen/api/schemas'
+import type { ErrorResponse, GetApiV1NotesParams, Note, UpdateNote } from '../gen/api/schemas'
 import { useCallback } from 'react'
+
+/** Match backend `MAX_LIST_LIMIT` for notes list pagination. */
+const NOTES_PAGE: GetApiV1NotesParams = { limit: 500, offset: 0 }
 
 export function useNotes(): {
   notes: Note[]
@@ -15,7 +18,7 @@ export function useNotes(): {
   updateNote: (id: string, update: UpdateNote) => Promise<void>
   deleteNote: (id: string) => Promise<void>
 } {
-  const { data, error, isLoading, mutate } = useGetApiV1Notes()
+  const { data, error, isLoading, mutate } = useGetApiV1Notes(NOTES_PAGE)
 
   const notes = data?.data ?? []
 

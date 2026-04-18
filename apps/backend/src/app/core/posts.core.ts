@@ -35,18 +35,55 @@ export const UpdatePostModel = z.object({
   todo_ids: z.array(UuidSchema).optional(),
 }).openapi('UpdatePost')
 
-export const PostQueryParamsModel = z.object({
-  from: z.coerce.number().int().openapi({ description: 'Range start (UTC Unix timestamp)' }),
-  to: z.coerce.number().int().openapi({ description: 'Range end (UTC Unix timestamp)' }),
-}).openapi('PostQueryParams')
+export const PostQueryParamsModel = z
+  .object({
+    from: z.coerce.number().int().optional().openapi({
+      description: 'Range start (UTC Unix seconds). Use with `to` for a time window.',
+    }),
+    to: z.coerce.number().int().optional().openapi({
+      description: 'Range end (UTC Unix seconds). Use with `from` for a time window.',
+    }),
+    limit: z.coerce.number().int().min(1).max(10000).optional().openapi({
+      description:
+        'Max rows: with from/to (range) caps that window (default 1000, max 10000). Without from/to (paginated feed) default 30, max 100.',
+    }),
+    offset: z.coerce.number().int().min(0).optional().openapi({
+      description: 'Skip this many posts (newest-first order) when not using from/to.',
+    }),
+  })
+  .superRefine((q, ctx) => {
+    const hasFrom = q.from !== undefined
+    const hasTo = q.to !== undefined
+    if (hasFrom !== hasTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide both `from` and `to`, or neither (for paginated all-posts listing).',
+        path: hasFrom ? ['to'] : ['from'],
+      })
+    }
+    const range = hasFrom && hasTo
+    const hasOffset = (q.offset ?? 0) > 0
+    if (range && hasOffset) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '`offset` is only for paginated listing (omit from/to). Use `limit` to cap range results.',
+        path: ['offset'],
+      })
+    }
+  })
+  .openapi('PostQueryParams')
 
 export const PostIdParamModel = z.object({
   id: UuidSchema.openapi({ param: { name: 'id', in: 'path' } }),
 }).openapi('PostIdParam')
 
-export const PostListResponseModel = z.object({
-  data: z.array(PostModel),
-}).openapi('PostListResponse')
+export const PostListResponseModel = z
+  .object({
+    data: z.array(PostModel),
+    /** Present when listing with limit/offset (not range mode). */
+    has_more: z.boolean().optional(),
+  })
+  .openapi('PostListResponse')
 
 export const PostResponseModel = z.object({
   data: PostModel,

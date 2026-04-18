@@ -40,7 +40,8 @@ export interface EventQueryParams {
 export async function getAllEvents(
   db: DB,
   userId: number,
-  params?: EventQueryParams
+  params: EventQueryParams | undefined,
+  limitRows: number
 ): Promise<CalendarEvent[]> {
   // Get user's calendar IDs first
   const userCalendars = await db
@@ -84,6 +85,7 @@ export async function getAllEvents(
     .from(calendarEventsTable)
     .where(and(...conditions))
     .orderBy(calendarEventsTable.startAt)
+    .limit(limitRows)
 
   return dbEvents.map(convertDbEventToApi)
 }

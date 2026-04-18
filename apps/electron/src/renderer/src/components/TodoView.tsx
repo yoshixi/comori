@@ -409,7 +409,9 @@ function TodoDetailDialog({
   const threadRange = useMemo(
     () => ({
       from: 0,
-      to: Math.floor(Date.now() / 1000) + 86400 * 365 * 10
+      to: Math.floor(Date.now() / 1000) + 86400 * 365 * 10,
+      /** Backend range cap; load full thread instead of default range limit. */
+      limit: 10_000
     }),
     []
   )

@@ -7,6 +7,9 @@ import {
 import type { ErrorResponse, GetApiV1TodosParams, Todo } from '../gen/api/schemas'
 import { useCallback, useMemo } from 'react'
 
+/** Match backend `MAX_LIST_LIMIT` so the client can request the full allowed page. */
+const TODO_LIST_LIMIT = 500
+
 export function useTodos(options?: {
   from?: number
   to?: number
@@ -40,19 +43,19 @@ export function useTodos(options?: {
 } {
   const params: GetApiV1TodosParams | undefined = useMemo(() => {
     if (options?.fetchAll) {
-      return {}
+      return { limit: TODO_LIST_LIMIT }
     }
     if (options?.showAll) {
-      return { done: 'false' as const }
+      return { done: 'false' as const, limit: TODO_LIST_LIMIT }
     }
     if (options?.from != null && options?.to != null) {
       const includeCompleted = options.includeCompletedInRange !== false
       if (includeCompleted) {
-        return { from: options.from, to: options.to }
+        return { from: options.from, to: options.to, limit: TODO_LIST_LIMIT }
       }
-      return { from: options.from, to: options.to, done: 'false' as const }
+      return { from: options.from, to: options.to, done: 'false' as const, limit: TODO_LIST_LIMIT }
     }
-    return { done: 'false' as const }
+    return { done: 'false' as const, limit: TODO_LIST_LIMIT }
   }, [options?.from, options?.to, options?.showAll, options?.fetchAll, options?.includeCompletedInRange])
 
   const { data, isLoading, error, mutate } = useGetApiV1Todos(params)

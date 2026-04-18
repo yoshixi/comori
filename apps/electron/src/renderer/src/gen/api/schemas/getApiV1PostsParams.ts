@@ -8,13 +8,25 @@
 
 export type GetApiV1PostsParams = {
   /**
-   * Range start (UTC Unix timestamp)
+   * Range start (UTC Unix seconds). Use with `to` for a time window.
    * @nullable
    */
   from?: number | null
   /**
-   * Range end (UTC Unix timestamp)
+   * Range end (UTC Unix seconds). Use with `from` for a time window.
    * @nullable
    */
   to?: number | null
+  /**
+   * Max rows: with from/to (range) caps that window (default 1000, max 10000). Without from/to (paginated feed) default 30, max 100.
+   * @minimum 1
+   * @maximum 10000
+   */
+  limit?: number
+  /**
+   * Skip this many posts (newest-first order) when not using from/to.
+   * @minimum 0
+   * @nullable
+   */
+  offset?: number | null
 }

@@ -27,8 +27,18 @@ export const NoteIdParamModel = z.object({
   id: UuidSchema.openapi({ param: { name: 'id', in: 'path' } }),
 }).openapi('NoteIdParam')
 
+export const NoteQueryParamsModel = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional().openapi({
+    description: 'Max notes to return (default 100, max 500)',
+  }),
+  offset: z.coerce.number().int().min(0).optional().openapi({
+    description: 'Skip this many notes (same order: pinned first, then updated_at desc)',
+  }),
+}).openapi('NoteQueryParams')
+
 export const NoteListResponseModel = z.object({
   data: z.array(NoteModel),
+  has_more: z.boolean().optional(),
 }).openapi('NoteListResponse')
 
 export const NoteResponseModel = z.object({

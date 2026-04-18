@@ -14,14 +14,24 @@ function convertDbNoteToApi(row: SelectNote): Note {
   }
 }
 
-export async function getAllNotes(db: DB, userId: number): Promise<Note[]> {
+export async function getNotesPage(
+  db: DB,
+  userId: number,
+  limit: number,
+  offset: number
+): Promise<{ notes: Note[]; has_more: boolean }> {
+  const take = limit + 1
   const rows = await db
     .select()
     .from(notesTable)
     .where(eq(notesTable.userId, userId))
     .orderBy(desc(notesTable.pinned), desc(notesTable.updatedAt))
+    .limit(take)
+    .offset(offset)
 
-  return rows.map(convertDbNoteToApi)
+  const hasMore = rows.length > limit
+  const slice = hasMore ? rows.slice(0, limit) : rows
+  return { notes: slice.map(convertDbNoteToApi), has_more: hasMore }
 }
 
 export async function getNoteById(db: DB, userId: number, noteId: string): Promise<Note | null> {

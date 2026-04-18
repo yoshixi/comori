@@ -6,7 +6,9 @@ import {
   patchApiV1NotesId,
   useGetApiV1Notes,
 } from '@/gen/api/endpoints/techooAPI.gen'
-import type { Note } from '@/gen/api/schemas'
+import type { GetApiV1NotesParams, Note } from '@/gen/api/schemas'
+
+const NOTES_PAGE: GetApiV1NotesParams = { limit: 500, offset: 0 }
 
 export function splitNoteText(text: string): { title: string; body: string | null } {
   const lines = text.split('\n')
@@ -39,7 +41,7 @@ export function useNotesData(): UseNotesDataReturn {
     error: notesError,
     isLoading: notesLoading,
     mutate: mutateNotes,
-  } = useGetApiV1Notes()
+  } = useGetApiV1Notes(NOTES_PAGE)
 
   const notes = notesResponse?.data ?? []
 

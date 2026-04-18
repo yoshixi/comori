@@ -27,6 +27,7 @@ export * from './errorResponse';
 export * from './getApiCalendarsAvailableParams';
 export * from './getApiEventsParams';
 export * from './getApiOauthGoogleStatusParams';
+export * from './getApiV1NotesParams';
 export * from './getApiV1PostsParams';
 export * from './getApiV1TodosDone';
 export * from './getApiV1TodosParams';

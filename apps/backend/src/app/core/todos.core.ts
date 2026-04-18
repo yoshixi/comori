@@ -47,6 +47,9 @@ export const TodoQueryParamsModel = z.object({
   from: z.coerce.number().int().optional().openapi({ description: 'Range start (UTC Unix timestamp)' }),
   to: z.coerce.number().int().optional().openapi({ description: 'Range end (UTC Unix timestamp)' }),
   done: z.enum(['true', 'false']).optional().openapi({ description: 'Filter by completion status' }),
+  limit: z.coerce.number().int().min(1).max(500).optional().openapi({
+    description: 'Max rows to return (default 100, max 500)',
+  }),
 }).openapi('TodoQueryParams')
 
 export const TodoIdParamModel = z.object({

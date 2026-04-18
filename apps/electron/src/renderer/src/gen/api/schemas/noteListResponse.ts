@@ -9,4 +9,5 @@ import type { Note } from './note'
 
 export interface NoteListResponse {
   data: Note[]
+  has_more?: boolean
 }

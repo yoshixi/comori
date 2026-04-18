@@ -349,6 +349,9 @@
             "items": {
               "$ref": "#/components/schemas/Post"
             }
+          },
+          "has_more": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -468,6 +471,9 @@
             "items": {
               "$ref": "#/components/schemas/Note"
             }
+          },
+          "has_more": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1286,6 +1292,18 @@
             "description": "Filter by completion status",
             "name": "done",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "description": "Max rows to return (default 100, max 500)"
+            },
+            "required": false,
+            "description": "Max rows to return (default 100, max 500)",
+            "name": "limit",
+            "in": "query"
           }
         ],
         "responses": {
@@ -1468,16 +1486,16 @@
     "/api/v1/posts": {
       "get": {
         "summary": "List posts",
-        "description": "Retrieve posts in a time range, with linked events and todos",
+        "description": "List posts with linked events and todos. Use `from`+`to` for a time window, or `limit`+`offset` (newest first, paginated) for all posts.",
         "parameters": [
           {
             "schema": {
               "type": "integer",
               "nullable": true,
-              "description": "Range start (UTC Unix timestamp)"
+              "description": "Range start (UTC Unix seconds). Use with `to` for a time window."
             },
             "required": false,
-            "description": "Range start (UTC Unix timestamp)",
+            "description": "Range start (UTC Unix seconds). Use with `to` for a time window.",
             "name": "from",
             "in": "query"
           },
@@ -1485,11 +1503,35 @@
             "schema": {
               "type": "integer",
               "nullable": true,
-              "description": "Range end (UTC Unix timestamp)"
+              "description": "Range end (UTC Unix seconds). Use with `from` for a time window."
             },
             "required": false,
-            "description": "Range end (UTC Unix timestamp)",
+            "description": "Range end (UTC Unix seconds). Use with `from` for a time window.",
             "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000,
+              "description": "Max rows: with from/to (range) caps that window (default 1000, max 10000). Without from/to (paginated feed) default 30, max 100."
+            },
+            "required": false,
+            "description": "Max rows: with from/to (range) caps that window (default 1000, max 10000). Without from/to (paginated feed) default 30, max 100.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "description": "Skip this many posts (newest-first order) when not using from/to."
+            },
+            "required": false,
+            "description": "Skip this many posts (newest-first order) when not using from/to.",
+            "name": "offset",
             "in": "query"
           }
         ],
@@ -1667,7 +1709,33 @@
     "/api/v1/notes": {
       "get": {
         "summary": "List notes",
-        "description": "Retrieve all notes, pinned first, sorted by updated_at desc",
+        "description": "Notes list, pinned first, sorted by updated_at desc. Use limit/offset for paging.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "description": "Max notes to return (default 100, max 500)"
+            },
+            "required": false,
+            "description": "Max notes to return (default 100, max 500)",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "description": "Skip this many notes (same order: pinned first, then updated_at desc)"
+            },
+            "required": false,
+            "description": "Skip this many notes (same order: pinned first, then updated_at desc)",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Notes retrieved",
@@ -2440,6 +2508,18 @@
             "required": false,
             "description": "Filter events ending before this date (inclusive)",
             "name": "endDate",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "description": "Max events to return (default 100, max 500)"
+            },
+            "required": false,
+            "description": "Max events to return (default 100, max 500)",
+            "name": "limit",
             "in": "query"
           }
         ],

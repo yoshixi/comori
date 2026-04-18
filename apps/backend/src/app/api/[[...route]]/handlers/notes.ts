@@ -1,14 +1,18 @@
 import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
 import { listNotesRoute, getNoteRoute, createNoteRoute, updateNoteRoute, deleteNoteRoute } from '../routes/notes'
-import { getAllNotes, getNoteById, createNote, updateNote, deleteNote } from '../../../core/notes.db'
+import { getNotesPage, getNoteById, createNote, updateNote, deleteNote } from '../../../core/notes.db'
+import { clampGenericListLimit } from '../../../core/list-limits'
 
 export const listNotesHandler: RouteHandler<typeof listNotesRoute, AppBindings> = async (c) => {
   try {
     const db = c.get('db')
     const user = c.get('user')
-    const notes = await getAllNotes(db, user.id)
-    return c.json({ data: notes }, 200)
+    const q = c.req.valid('query')
+    const limit = clampGenericListLimit(q.limit ?? undefined)
+    const offset = q.offset ?? 0
+    const { notes, has_more } = await getNotesPage(db, user.id, limit, offset)
+    return c.json({ data: notes, has_more }, 200)
   } catch (error) {
     c.get('logger').error({ err: error }, 'failed to fetch notes')
     return c.json({ error: 'Failed to fetch notes' }, 500)

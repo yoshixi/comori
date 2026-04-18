@@ -1,15 +1,23 @@
 import type { RouteHandler } from '@hono/zod-openapi'
 import type { AppBindings } from '../types'
 import { listPostsRoute, createPostRoute, updatePostRoute, deletePostRoute } from '../routes/posts'
-import { getPostsByRange, createPost, updatePost, deletePost } from '../../../core/posts.db'
+import { getPostsByRange, getPostsPaginated, createPost, updatePost, deletePost } from '../../../core/posts.db'
+import { clampPostsPaginatedLimit, clampPostsRangeLimit } from '../../../core/list-limits'
 
 export const listPostsHandler: RouteHandler<typeof listPostsRoute, AppBindings> = async (c) => {
   try {
     const db = c.get('db')
     const user = c.get('user')
-    const { from, to } = c.req.valid('query')
-    const posts = await getPostsByRange(db, user.id, from, to)
-    return c.json({ data: posts }, 200)
+    const q = c.req.valid('query')
+    if (q.from != null && q.to != null) {
+      const rangeLimit = clampPostsRangeLimit(q.limit)
+      const posts = await getPostsByRange(db, user.id, q.from, q.to, rangeLimit)
+      return c.json({ data: posts }, 200)
+    }
+    const limit = clampPostsPaginatedLimit(q.limit ?? undefined)
+    const offset = q.offset ?? 0
+    const { posts, has_more } = await getPostsPaginated(db, user.id, { limit, offset })
+    return c.json({ data: posts, has_more }, 200)
   } catch (error) {
     c.get('logger').error({ err: error }, 'failed to fetch posts')
     return c.json({ error: 'Failed to fetch posts' }, 500)

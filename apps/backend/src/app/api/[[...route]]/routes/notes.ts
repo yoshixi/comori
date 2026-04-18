@@ -3,6 +3,7 @@ import {
   NoteListResponseModel,
   NoteResponseModel,
   NoteIdParamModel,
+  NoteQueryParamsModel,
   CreateNoteModel,
   UpdateNoteModel,
 } from '../../../core/notes.core'
@@ -12,7 +13,8 @@ export const listNotesRoute = createRoute({
   method: 'get',
   path: '/v1/notes',
   summary: 'List notes',
-  description: 'Retrieve all notes, pinned first, sorted by updated_at desc',
+  description: 'Notes list, pinned first, sorted by updated_at desc. Use limit/offset for paging.',
+  request: { query: NoteQueryParamsModel },
   responses: {
     200: { content: { 'application/json': { schema: NoteListResponseModel } }, description: 'Notes retrieved' },
     500: { content: { 'application/json': { schema: ErrorResponseModel } }, description: 'Internal error' },

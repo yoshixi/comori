@@ -28,6 +28,7 @@ import type {
   GetApiCalendarsAvailableParams,
   GetApiEventsParams,
   GetApiOauthGoogleStatusParams,
+  GetApiV1NotesParams,
   GetApiV1PostsParams,
   GetApiV1TodosParams,
   HealthResponse,
@@ -408,7 +409,7 @@ export const useDeleteApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
 }
 
 /**
- * Retrieve posts in a time range, with linked events and todos
+ * List posts with linked events and todos. Use `from`+`to` for a time window, or `limit`+`offset` (newest first, paginated) for all posts.
  * @summary List posts
  */
 export const getApiV1Posts = (params?: GetApiV1PostsParams) => {
@@ -594,14 +595,15 @@ export const useDeleteApiV1PostsId = <TError = ErrorResponse | ErrorResponse>(
 }
 
 /**
- * Retrieve all notes, pinned first, sorted by updated_at desc
+ * Notes list, pinned first, sorted by updated_at desc. Use limit/offset for paging.
  * @summary List notes
  */
-export const getApiV1Notes = () => {
-  return customInstance<NoteListResponse>({ url: `/api/v1/notes`, method: 'GET' })
+export const getApiV1Notes = (params?: GetApiV1NotesParams) => {
+  return customInstance<NoteListResponse>({ url: `/api/v1/notes`, method: 'GET', params })
 }
 
-export const getGetApiV1NotesKey = () => [`/api/v1/notes`] as const
+export const getGetApiV1NotesKey = (params?: GetApiV1NotesParams) =>
+  [`/api/v1/notes`, ...(params ? [params] : [])] as const
 
 export type GetApiV1NotesQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1Notes>>>
 export type GetApiV1NotesQueryError = ErrorResponse
@@ -609,17 +611,20 @@ export type GetApiV1NotesQueryError = ErrorResponse
 /**
  * @summary List notes
  */
-export const useGetApiV1Notes = <TError = ErrorResponse>(options?: {
-  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1Notes>>, TError> & {
-    swrKey?: Key
-    enabled?: boolean
+export const useGetApiV1Notes = <TError = ErrorResponse>(
+  params?: GetApiV1NotesParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1Notes>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
   }
-}) => {
+) => {
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1NotesKey() : null))
-  const swrFn = () => getApiV1Notes()
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1NotesKey(params) : null))
+  const swrFn = () => getApiV1Notes(params)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 

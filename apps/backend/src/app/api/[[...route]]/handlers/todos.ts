@@ -9,22 +9,24 @@ import {
   updateTodo,
   deleteTodo
 } from '../../../core/todos.db'
+import { clampGenericListLimit } from '../../../core/list-limits'
 
 export const listTodosHandler: RouteHandler<typeof listTodosRoute, AppBindings> = async (c) => {
   try {
     const db = c.get('db')
     const user = c.get('user')
-    const { from, to, done } = c.req.valid('query')
+    const { from, to, done, limit } = c.req.valid('query')
+    const lim = clampGenericListLimit(limit ?? undefined)
 
     let todos
     if (done === 'false') {
       if (from !== undefined && to !== undefined) {
-        todos = await getIncompleteTodosInRange(db, user.id, from, to)
+        todos = await getIncompleteTodosInRange(db, user.id, from, to, lim)
       } else {
-        todos = await getIncompleteTodos(db, user.id)
+        todos = await getIncompleteTodos(db, user.id, lim)
       }
     } else {
-      todos = await getTodosByRange(db, user.id, from, to)
+      todos = await getTodosByRange(db, user.id, from, to, lim)
     }
 
     return c.json({ data: todos }, 200)

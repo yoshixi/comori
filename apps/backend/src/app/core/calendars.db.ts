@@ -2,6 +2,7 @@ import { eq, and } from 'drizzle-orm'
 import { calendarsTable, type InsertCalendar, type SelectCalendar } from '../db/schema/schema'
 import { type DB } from './common.db'
 import { formatTimestamp, getCurrentTimestamp } from './common.core'
+import { DEFAULT_LIST_LIMIT } from './list-limits'
 import type { ProviderType } from './oauth.core'
 import type { Calendar, CreateCalendar, UpdateCalendar } from './calendars.core'
 
@@ -31,30 +32,35 @@ export async function getAllCalendars(
   providerType?: ProviderType,
   providerAccountId?: string
 ): Promise<Calendar[]> {
-  let query = db.select().from(calendarsTable)
-
   if (providerType && providerAccountId) {
-    const dbCalendars = await query.where(
-      and(
-        eq(calendarsTable.userId, userId),
-        eq(calendarsTable.providerType, providerType),
-        eq(calendarsTable.providerAccountId, providerAccountId)
+    const dbCalendars = await db
+      .select()
+      .from(calendarsTable)
+      .where(
+        and(
+          eq(calendarsTable.userId, userId),
+          eq(calendarsTable.providerType, providerType),
+          eq(calendarsTable.providerAccountId, providerAccountId)
+        )
       )
-    )
+      .limit(DEFAULT_LIST_LIMIT)
     return dbCalendars.map(convertDbCalendarToApi)
   }
 
   if (providerType) {
-    const dbCalendars = await query.where(
-      and(
-        eq(calendarsTable.userId, userId),
-        eq(calendarsTable.providerType, providerType)
-      )
-    )
+    const dbCalendars = await db
+      .select()
+      .from(calendarsTable)
+      .where(and(eq(calendarsTable.userId, userId), eq(calendarsTable.providerType, providerType)))
+      .limit(DEFAULT_LIST_LIMIT)
     return dbCalendars.map(convertDbCalendarToApi)
   }
 
-  const dbCalendars = await query.where(eq(calendarsTable.userId, userId))
+  const dbCalendars = await db
+    .select()
+    .from(calendarsTable)
+    .where(eq(calendarsTable.userId, userId))
+    .limit(DEFAULT_LIST_LIMIT)
   return dbCalendars.map(convertDbCalendarToApi)
 }
 

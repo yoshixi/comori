@@ -9,4 +9,5 @@ import type { Post } from './post';
 
 export interface PostListResponse {
   data: Post[];
+  has_more?: boolean;
 }

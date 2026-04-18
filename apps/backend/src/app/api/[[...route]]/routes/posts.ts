@@ -13,7 +13,8 @@ export const listPostsRoute = createRoute({
   method: 'get',
   path: '/v1/posts',
   summary: 'List posts',
-  description: 'Retrieve posts in a time range, with linked events and todos',
+  description:
+    'List posts with linked events and todos. Use `from`+`to` for a time window, or `limit`+`offset` (newest first, paginated) for all posts.',
   request: { query: PostQueryParamsModel },
   responses: {
     200: { content: { 'application/json': { schema: PostListResponseModel } }, description: 'Posts retrieved' },

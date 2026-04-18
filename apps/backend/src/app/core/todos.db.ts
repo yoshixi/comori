@@ -17,7 +17,13 @@ function convertDbTodoToApi(row: SelectTodo): Todo {
   }
 }
 
-export async function getTodosByRange(db: DB, userId: number, from?: number, to?: number): Promise<Todo[]> {
+export async function getTodosByRange(
+  db: DB,
+  userId: number,
+  from: number | undefined,
+  to: number | undefined,
+  limitRows: number
+): Promise<Todo[]> {
   const conditions = [eq(todosTable.userId, userId)]
   // Single-day (and similar) windows should include unscheduled inbox todos (null starts_at),
   // matching getIncompleteTodosInRange behavior but without filtering by done.
@@ -39,16 +45,18 @@ export async function getTodosByRange(db: DB, userId: number, from?: number, to?
     .from(todosTable)
     .where(and(...conditions))
     .orderBy(sql`${todosTable.startsAt} IS NULL`, todosTable.startsAt, todosTable.createdAt)
+    .limit(limitRows)
 
   return rows.map(convertDbTodoToApi)
 }
 
-export async function getIncompleteTodos(db: DB, userId: number): Promise<Todo[]> {
+export async function getIncompleteTodos(db: DB, userId: number, limitRows: number): Promise<Todo[]> {
   const rows = await db
     .select()
     .from(todosTable)
     .where(and(eq(todosTable.userId, userId), eq(todosTable.done, 0)))
     .orderBy(sql`${todosTable.startsAt} IS NULL`, todosTable.startsAt, todosTable.createdAt)
+    .limit(limitRows)
 
   return rows.map(convertDbTodoToApi)
 }
@@ -58,7 +66,8 @@ export async function getIncompleteTodosInRange(
   db: DB,
   userId: number,
   from: number,
-  to: number
+  to: number,
+  limitRows: number
 ): Promise<Todo[]> {
   const rows = await db
     .select()
@@ -74,6 +83,7 @@ export async function getIncompleteTodosInRange(
       )
     )
     .orderBy(sql`${todosTable.startsAt} IS NULL`, todosTable.startsAt, todosTable.createdAt)
+    .limit(limitRows)
 
   return rows.map(convertDbTodoToApi)
 }

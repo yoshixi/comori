@@ -271,8 +271,8 @@ function TodoItem({
   onSelect
 }: {
   todo: Todo
-  onToggleDone: (id: string, done: number) => void
-  onDeleteTodo: (id: string) => void
+  onToggleDone: (id: number, done: number) => void
+  onDeleteTodo: (id: number) => void
   onSelect: (todo: Todo) => void
 }): React.JSX.Element {
   const isDone = todo.done === 1
@@ -393,7 +393,7 @@ function TodoDetailDialog({
   todo: Todo
   onClose: () => void
   onUpdateTodo: (
-    id: string,
+    id: number,
     data: {
       title?: string
       description?: string | null
@@ -402,8 +402,8 @@ function TodoDetailDialog({
       is_all_day?: number
     }
   ) => Promise<void>
-  onDeleteTodo: (id: string) => Promise<void>
-  onToggleDone: (id: string, done: number) => Promise<void>
+  onDeleteTodo: (id: number) => Promise<void>
+  onToggleDone: (id: number, done: number) => Promise<void>
 }): React.JSX.Element {
   /** Wide window so linked posts from any day appear in the thread */
   const threadRange = useMemo(

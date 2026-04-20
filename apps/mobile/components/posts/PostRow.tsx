@@ -15,7 +15,7 @@ export function PostRow({
   onDelete,
 }: {
   post: Post;
-  onDelete: (id: string) => void;
+  onDelete: (id: number) => void;
 }) {
   const confirmDelete = () => {
     Alert.alert('Delete post', 'Remove this log entry?', [

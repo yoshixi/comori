@@ -27,7 +27,7 @@ export function useTodos(options?: {
   error: ErrorResponse | undefined
   createTodo: (title: string, startsAt?: number, endsAt?: number) => Promise<void>
   updateTodo: (
-    id: string,
+    id: number,
     updates: {
       title?: string
       description?: string | null
@@ -37,8 +37,8 @@ export function useTodos(options?: {
       done?: number
     }
   ) => Promise<void>
-  toggleDone: (id: string, currentDone: number) => Promise<void>
-  deleteTodo: (id: string) => Promise<void>
+  toggleDone: (id: number, currentDone: number) => Promise<void>
+  deleteTodo: (id: number) => Promise<void>
   mutate: ReturnType<typeof useGetApiV1Todos>['mutate']
 } {
   const params: GetApiV1TodosParams | undefined = useMemo(() => {
@@ -63,7 +63,7 @@ export function useTodos(options?: {
   const todos = data?.data ?? []
 
   const mergeTodoFromServer = useCallback(
-    (id: string, server: Todo) => {
+    (id: number, server: Todo) => {
       mutate(
         (current) => {
           if (!current) return current
@@ -80,7 +80,7 @@ export function useTodos(options?: {
   const stripTempTodos = useCallback(
     (current: { data: Todo[] } | undefined, server: Todo) => {
       if (!current) return { data: [server] }
-      const noTemp = current.data.filter((t) => !String(t.id).startsWith('temp-'))
+      const noTemp = current.data.filter((t) => t.id > 0)
       return { data: [...noTemp, server] }
     },
     []
@@ -90,7 +90,7 @@ export function useTodos(options?: {
     async (title: string, startsAt?: number, endsAt?: number) => {
       const now = Math.floor(Date.now() / 1000)
       const optimisticTodo: Todo = {
-        id: `temp-${Date.now()}`,
+        id: -Math.abs(Date.now()),
         title,
         description: null,
         starts_at: startsAt ?? null,
@@ -124,7 +124,7 @@ export function useTodos(options?: {
   )
 
   const toggleDone = useCallback(
-    async (id: string, currentDone: number) => {
+    async (id: number, currentDone: number) => {
       const newDone = currentDone === 1 ? 0 : 1
       const now = Math.floor(Date.now() / 1000)
 
@@ -152,7 +152,7 @@ export function useTodos(options?: {
 
   const updateTodo = useCallback(
     async (
-      id: string,
+      id: number,
       updates: {
         title?: string
         description?: string | null
@@ -183,7 +183,7 @@ export function useTodos(options?: {
   )
 
   const deleteTodo = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       mutate(
         (current) => {
           if (!current) return current

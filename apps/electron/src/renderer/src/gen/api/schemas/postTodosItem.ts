@@ -7,6 +7,11 @@
  */
 
 export type PostTodosItem = {
-  id: string
+  /**
+   * Numeric ID
+   * @minimum 0
+   * @exclusiveMinimum
+   */
+  id: number
   title: string
 }

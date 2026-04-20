@@ -9,7 +9,12 @@ import type { PostEventsItem } from './postEventsItem';
 import type { PostTodosItem } from './postTodosItem';
 
 export interface Post {
-  id: string;
+  /**
+   * Numeric ID
+   * @minimum 0
+   * @exclusiveMinimum
+   */
+  id: number;
   body: string;
   /** @minimum 0 */
   posted_at: number;

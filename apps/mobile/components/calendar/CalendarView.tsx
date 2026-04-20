@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/text';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useTodos } from '@/hooks/useTodos';
-import { todoToCalendarTimedItem } from '@/lib/todoCalendar';
+import { todoToCalendarTimedItem, type CalendarTimedItem } from '@/lib/todoCalendar';
 import { CalendarHeader } from './CalendarHeader';
 import { DayColumn, type TimeRange } from './DayColumn';
 import { CurrentTimeIndicator } from './CurrentTimeIndicator';
@@ -111,7 +111,7 @@ export function CalendarView() {
   }, []);
 
   const handleTaskPress = useCallback(
-    (task: { id: string }) => {
+    (task: CalendarTimedItem) => {
       router.push(`/todo/${task.id}`);
     },
     [router]
@@ -132,7 +132,7 @@ export function CalendarView() {
   }, []);
 
   const handleTaskMove = useCallback(
-    async (task: { id: string; startAt: string; endAt: string | null }, deltaMinutes: number) => {
+    async (task: CalendarTimedItem, deltaMinutes: number) => {
       const currentStart = new Date(task.startAt);
       const newStart = new Date(currentStart.getTime() + deltaMinutes * 60 * 1000);
       let newEndUnix: number | null = null;

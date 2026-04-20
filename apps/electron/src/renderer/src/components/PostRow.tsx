@@ -12,16 +12,16 @@ export function PostRow({
   variant = 'default'
 }: {
   post: Post
-  onDelete: (id: string) => void
+  onDelete: (id: number) => void
   /** When set, user can edit post body (Posts / Today log) */
-  onUpdatePost?: (id: string, body: string) => Promise<void>
+  onUpdatePost?: (id: number, body: string) => Promise<void>
   variant?: 'default' | 'compact'
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(post.body)
   const [saving, setSaving] = useState(false)
 
-  const canEdit = Boolean(onUpdatePost) && !post.id.startsWith('temp-')
+  const canEdit = Boolean(onUpdatePost) && post.id > 0
 
   useEffect(() => {
     if (!editing) setDraft(post.body)

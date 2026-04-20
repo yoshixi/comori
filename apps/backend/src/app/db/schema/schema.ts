@@ -70,7 +70,7 @@ export const oauthExchangeCodesTable = sqliteTable('oauth_exchange_codes', {
 
 // Todos table
 export const todosTable = sqliteTable('todos', {
-  id: text('id').primaryKey(), // UUID
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
@@ -84,7 +84,7 @@ export const todosTable = sqliteTable('todos', {
 
 // Posts table
 export const postsTable = sqliteTable('posts', {
-  id: text('id').primaryKey(), // UUID
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   body: text('body').notNull(),
   postedAt: integer('posted_at', { mode: 'number' }).notNull().default(sql`(unixepoch())`),
@@ -92,7 +92,7 @@ export const postsTable = sqliteTable('posts', {
 
 // Post-Events junction table (many-to-many)
 export const postEventsTable = sqliteTable('post_events', {
-  postId: text('post_id').notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
+  postId: integer('post_id', { mode: 'number' }).notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
   eventId: integer('event_id', { mode: 'number' }).notNull().references(() => calendarEventsTable.id, { onDelete: 'cascade' }),
 }, (table) => ({
   pk: unique().on(table.postId, table.eventId),
@@ -100,8 +100,8 @@ export const postEventsTable = sqliteTable('post_events', {
 
 // Post-Todos junction table (many-to-many)
 export const postTodosTable = sqliteTable('post_todos', {
-  postId: text('post_id').notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
-  todoId: text('todo_id').notNull().references(() => todosTable.id, { onDelete: 'cascade' }),
+  postId: integer('post_id', { mode: 'number' }).notNull().references(() => postsTable.id, { onDelete: 'cascade' }),
+  todoId: integer('todo_id', { mode: 'number' }).notNull().references(() => todosTable.id, { onDelete: 'cascade' }),
 }, (table) => ({
   pk: unique().on(table.postId, table.todoId),
 }));
@@ -164,7 +164,7 @@ export const calendarWatchChannelsTable = sqliteTable('calendar_watch_channels',
 
 // Notes table
 export const notesTable = sqliteTable('notes', {
-  id: text('id').primaryKey(), // UUID
+  id: integer('id', { mode: 'number' }).primaryKey({ autoIncrement: true }),
   userId: integer('user_id', { mode: 'number' }).notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   body: text('body'),

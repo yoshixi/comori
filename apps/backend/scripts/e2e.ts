@@ -200,7 +200,7 @@ async function testCrudTodos(jwt: string) {
   console.log('\n--- CRUD Todos ---')
 
   const auth = { Authorization: `Bearer ${jwt}` }
-  let todoId: string
+  let todoId: number
 
   await test('GET /v1/todos?done=false → empty list', async () => {
     const res = await api('/v1/todos?done=false', { headers: auth })
@@ -217,14 +217,14 @@ async function testCrudTodos(jwt: string) {
     })
     assertStatus(res, 201)
     assert(res.data.data.title === 'E2E Todo', `title: ${res.data.data.title}`)
-    assert(typeof res.data.data.id === 'string', 'should return string id')
+    assert(typeof res.data.data.id === 'number', 'should return numeric id')
     todoId = res.data.data.id
   })
 
   await test('GET /v1/todos?done=false → list includes created todo', async () => {
     const res = await api('/v1/todos?done=false', { headers: auth })
     assertStatus(res, 200)
-    const found = res.data.data.find((t: { id: string }) => t.id === todoId)
+    const found = res.data.data.find((t: { id: number }) => t.id === todoId)
     assert(found !== undefined, 'list should include created todo')
     assert(found.title === 'E2E Todo', `title: ${found.title}`)
   })

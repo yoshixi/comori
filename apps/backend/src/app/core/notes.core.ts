@@ -1,10 +1,10 @@
 import { z } from '@hono/zod-openapi'
+import { IdSchema } from './common.core'
 
-const UuidSchema = z.string().uuid()
 const UnixTimestampSchema = z.number().int().min(0)
 
 export const NoteModel = z.object({
-  id: UuidSchema,
+  id: IdSchema,
   title: z.string().openapi({ example: 'Quick idea about auth flow' }),
   body: z.string().nullable().openapi({ description: 'Full Markdown content' }),
   pinned: z.number().int().min(0).max(1).openapi({ description: '1 = pinned to top' }),
@@ -24,7 +24,7 @@ export const UpdateNoteModel = z.object({
 }).openapi('UpdateNote')
 
 export const NoteIdParamModel = z.object({
-  id: UuidSchema.openapi({ param: { name: 'id', in: 'path' } }),
+  id: IdSchema.openapi({ param: { name: 'id', in: 'path' } }),
 }).openapi('NoteIdParam')
 
 export const NoteQueryParamsModel = z.object({

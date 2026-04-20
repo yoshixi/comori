@@ -187,7 +187,7 @@ describe('migrate-tenants script', () => {
         sql`INSERT INTO users (name, email) VALUES ('Test User', 'test@example.com')`
       )
       await (db as any).run(
-        sql`INSERT INTO todos (id, user_id, title) VALUES ('550e8400-e29b-41d4-a716-446655440000', 1, 'Migration test')`
+        sql`INSERT INTO todos (user_id, title) VALUES (1, 'Migration test')`
       )
     })
 

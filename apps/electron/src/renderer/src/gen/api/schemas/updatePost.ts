@@ -10,5 +10,5 @@ export interface UpdatePost {
   /** @minLength 1 */
   body?: string
   event_ids?: number[]
-  todo_ids?: string[]
+  todo_ids?: number[]
 }

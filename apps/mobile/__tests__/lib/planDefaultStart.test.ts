@@ -29,28 +29,28 @@ describe('planDefaultStart', () => {
     it('returns null when no timed open todos', () => {
       expect(latestOpenTimedMarkerOnDay([], dayFrom, dayTo)).toBeNull();
       expect(
-        latestOpenTimedMarkerOnDay([todo({ id: '1', starts_at: null })], dayFrom, dayTo)
+        latestOpenTimedMarkerOnDay([todo({ id: 1, starts_at: null })], dayFrom, dayTo)
       ).toBeNull();
     });
 
     it('uses ends_at when present', () => {
       const todos = [
-        todo({ id: 'a', starts_at: dayFrom + 3600, ends_at: dayFrom + 7200 }),
-        todo({ id: 'b', starts_at: dayFrom + 4000, ends_at: dayFrom + 9000 }),
+        todo({ id: 2, starts_at: dayFrom + 3600, ends_at: dayFrom + 7200 }),
+        todo({ id: 3, starts_at: dayFrom + 4000, ends_at: dayFrom + 9000 }),
       ];
       expect(latestOpenTimedMarkerOnDay(todos, dayFrom, dayTo)).toBe(dayFrom + 9000);
     });
 
     it('falls back to starts_at when no ends_at', () => {
-      const todos = [todo({ id: 'a', starts_at: dayFrom + 5000, ends_at: null })];
+      const todos = [todo({ id: 4, starts_at: dayFrom + 5000, ends_at: null })];
       expect(latestOpenTimedMarkerOnDay(todos, dayFrom, dayTo)).toBe(dayFrom + 5000);
     });
 
     it('ignores all-day and done', () => {
       const todos = [
-        todo({ id: 'd', starts_at: dayFrom + 100, ends_at: dayFrom + 200, done: 1 }),
-        todo({ id: 'a', starts_at: dayFrom + 1000, is_all_day: 1 }),
-        todo({ id: 'b', starts_at: dayFrom + 3000, ends_at: dayFrom + 4000 }),
+        todo({ id: 5, starts_at: dayFrom + 100, ends_at: dayFrom + 200, done: 1 }),
+        todo({ id: 6, starts_at: dayFrom + 1000, is_all_day: 1 }),
+        todo({ id: 7, starts_at: dayFrom + 3000, ends_at: dayFrom + 4000 }),
       ];
       expect(latestOpenTimedMarkerOnDay(todos, dayFrom, dayTo)).toBe(dayFrom + 4000);
     });
@@ -73,7 +73,7 @@ describe('planDefaultStart', () => {
 
     it('uses max(now, lastMarker) when last ends before now', () => {
       const nowSec = dayFrom + 16 * 3600;
-      const todos = [todo({ id: 'x', starts_at: dayFrom + 3600, ends_at: dayFrom + 7200 })];
+      const todos = [todo({ id: 8, starts_at: dayFrom + 3600, ends_at: dayFrom + 7200 })];
       const { start } = getSmartPlanRange(true, dayFrom, dayTo, todos, nowSec * 1000, PLAN_DEFAULT_DURATION_MIN);
       expect(Math.floor(start.getTime() / 1000)).toBe(nowSec);
     });
@@ -81,7 +81,7 @@ describe('planDefaultStart', () => {
     it('uses lastMarker when now is before last block end', () => {
       const nowSec = dayFrom + 8 * 3600;
       const lastEnd = dayFrom + 14 * 3600;
-      const todos = [todo({ id: 'x', starts_at: dayFrom + 3600, ends_at: lastEnd })];
+      const todos = [todo({ id: 9, starts_at: dayFrom + 3600, ends_at: lastEnd })];
       const { start } = getSmartPlanRange(true, dayFrom, dayTo, todos, nowSec * 1000, PLAN_DEFAULT_DURATION_MIN);
       expect(Math.floor(start.getTime() / 1000)).toBe(lastEnd);
     });

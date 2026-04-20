@@ -51,7 +51,7 @@ import {
 
 /** A todo item from the new data model */
 export interface Todo {
-  id: string
+  id: number
   title: string
   description?: string | null
   starts_at: number | null

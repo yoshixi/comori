@@ -7,7 +7,12 @@
  */
 
 export interface Note {
-  id: string;
+  /**
+   * Numeric ID
+   * @minimum 0
+   * @exclusiveMinimum
+   */
+  id: number;
   title: string;
   /**
    * Full Markdown content

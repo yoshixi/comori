@@ -15,8 +15,8 @@ export function useNotes(): {
   isLoading: boolean
   error: ErrorResponse | undefined
   createNote: (title: string) => Promise<void>
-  updateNote: (id: string, update: UpdateNote) => Promise<void>
-  deleteNote: (id: string) => Promise<void>
+  updateNote: (id: number, update: UpdateNote) => Promise<void>
+  deleteNote: (id: number) => Promise<void>
 } {
   const { data, error, isLoading, mutate } = useGetApiV1Notes(NOTES_PAGE)
 
@@ -31,7 +31,7 @@ export function useNotes(): {
   )
 
   const updateNote = useCallback(
-    async (id: string, update: UpdateNote) => {
+    async (id: number, update: UpdateNote) => {
       await patchApiV1NotesId(id, update)
       await mutate()
     },
@@ -39,7 +39,7 @@ export function useNotes(): {
   )
 
   const deleteNote = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       await deleteApiV1NotesId(id)
       await mutate()
     },

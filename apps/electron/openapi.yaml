@@ -85,10 +85,11 @@ components:
       type: object
       properties:
         id:
-          type: string
-          format: uuid
-          description: UUID identifier
-          example: 550e8400-e29b-41d4-a716-446655440000
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          description: Numeric ID
+          example: 1
         title:
           type: string
           example: Reply to client email
@@ -214,8 +215,11 @@ components:
       type: object
       properties:
         id:
-          type: string
-          format: uuid
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          description: Numeric ID
+          example: 1
         body:
           type: string
         posted_at:
@@ -239,8 +243,11 @@ components:
             type: object
             properties:
               id:
-                type: string
-                format: uuid
+                type: integer
+                minimum: 0
+                exclusiveMinimum: true
+                description: Numeric ID
+                example: 1
               title:
                 type: string
             required:
@@ -288,8 +295,11 @@ components:
         todo_ids:
           type: array
           items:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           default: []
       required:
         - body
@@ -306,14 +316,20 @@ components:
         todo_ids:
           type: array
           items:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
     Note:
       type: object
       properties:
         id:
-          type: string
-          format: uuid
+          type: integer
+          minimum: 0
+          exclusiveMinimum: true
+          description: Numeric ID
+          example: 1
         title:
           type: string
           example: Quick idea about auth flow
@@ -989,12 +1005,13 @@ paths:
       summary: Update a todo
       parameters:
         - schema:
-            type: string
-            format: uuid
-            description: UUID identifier
-            example: 550e8400-e29b-41d4-a716-446655440000
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
-          description: UUID identifier
+          description: Numeric ID
           name: id
           in: path
       requestBody:
@@ -1025,12 +1042,13 @@ paths:
       summary: Delete a todo
       parameters:
         - schema:
-            type: string
-            format: uuid
-            description: UUID identifier
-            example: 550e8400-e29b-41d4-a716-446655440000
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
-          description: UUID identifier
+          description: Numeric ID
           name: id
           in: path
       responses:
@@ -1138,9 +1156,13 @@ paths:
       summary: Update a post
       parameters:
         - schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
+          description: Numeric ID
           name: id
           in: path
       requestBody:
@@ -1171,9 +1193,13 @@ paths:
       summary: Delete a post
       parameters:
         - schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
+          description: Numeric ID
           name: id
           in: path
       responses:
@@ -1265,9 +1291,13 @@ paths:
       summary: Get a note
       parameters:
         - schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
+          description: Numeric ID
           name: id
           in: path
       responses:
@@ -1294,9 +1324,13 @@ paths:
       description: Update title, body, or pinned status. Used by auto-save (debounced).
       parameters:
         - schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
+          description: Numeric ID
           name: id
           in: path
       requestBody:
@@ -1327,9 +1361,13 @@ paths:
       summary: Delete a note
       parameters:
         - schema:
-            type: string
-            format: uuid
+            type: integer
+            minimum: 0
+            exclusiveMinimum: true
+            description: Numeric ID
+            example: 1
           required: true
+          description: Numeric ID
           name: id
           in: path
       responses:

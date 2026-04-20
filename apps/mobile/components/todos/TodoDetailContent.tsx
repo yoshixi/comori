@@ -14,7 +14,7 @@ import { formatDateTime } from '@/lib/time';
 import type { Todo } from '@/gen/api/schemas';
 
 export interface TodoDetailContentProps {
-  todoId: string;
+  todoId: number;
 }
 
 export function TodoDetailContent({ todoId }: TodoDetailContentProps) {
@@ -23,7 +23,7 @@ export function TodoDetailContent({ todoId }: TodoDetailContentProps) {
   const todo = todos.find((t) => t.id === todoId) ?? null;
 
   /** Survives brief SWR gaps during global revalidation so the screen doesn’t flash to skeleton. */
-  const lastGoodTodoRef = useRef<{ id: string; todo: Todo } | null>(null);
+  const lastGoodTodoRef = useRef<{ id: number; todo: Todo } | null>(null);
   const prevTodoIdRef = useRef(todoId);
 
   useEffect(() => {

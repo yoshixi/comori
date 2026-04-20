@@ -5,15 +5,16 @@ import { TodoDetailContent } from '@/components/todos/TodoDetailContent';
 
 export default function TodoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const numericId = id != null ? Number(id) : NaN;
 
-  if (!id || typeof id !== 'string') {
+  if (id == null || Number.isNaN(numericId)) {
     return null;
   }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1">
-        <TodoDetailContent todoId={id} />
+        <TodoDetailContent todoId={numericId} />
       </View>
     </SafeAreaView>
   );

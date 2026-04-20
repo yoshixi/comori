@@ -8,7 +8,7 @@ import type { Todo } from '../gen/api/schemas'
 
 export type PostComposerContext =
   | { type: 'event'; id: number; title: string }
-  | { type: 'todo'; id: string; title: string }
+  | { type: 'todo'; id: number; title: string }
   | null
 
 type DraftPayload = { body: string; context: PostComposerContext }

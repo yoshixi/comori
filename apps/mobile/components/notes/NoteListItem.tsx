@@ -11,8 +11,8 @@ const FADE_OUT_DURATION = 300;
 export interface NoteListItemProps {
   note: Note;
   onPress: () => void;
-  onDelete: (noteId: string) => Promise<void>;
-  onTogglePin: (noteId: string, pinned: number) => Promise<void>;
+  onDelete: (noteId: number) => Promise<void>;
+  onTogglePin: (noteId: number, pinned: number) => Promise<void>;
 }
 
 export function NoteListItem({ note, onPress, onDelete, onTogglePin }: NoteListItemProps) {

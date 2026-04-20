@@ -312,7 +312,7 @@ export const usePostApiV1Todos = <TError = ErrorResponse | ErrorResponse>(option
 /**
  * @summary Update a todo
  */
-export const patchApiV1TodosId = (id: string, updateTodo: UpdateTodo) => {
+export const patchApiV1TodosId = (id: number, updateTodo: UpdateTodo) => {
   return customInstance<TodoResponse>({
     url: `/api/v1/todos/${id}`,
     method: 'PATCH',
@@ -321,12 +321,12 @@ export const patchApiV1TodosId = (id: string, updateTodo: UpdateTodo) => {
   })
 }
 
-export const getPatchApiV1TodosIdMutationFetcher = (id: string) => {
+export const getPatchApiV1TodosIdMutationFetcher = (id: number) => {
   return (_: Key, { arg }: { arg: UpdateTodo }) => {
     return patchApiV1TodosId(id, arg)
   }
 }
-export const getPatchApiV1TodosIdMutationKey = (id: string) => [`/api/v1/todos/${id}`] as const
+export const getPatchApiV1TodosIdMutationKey = (id: number) => [`/api/v1/todos/${id}`] as const
 
 export type PatchApiV1TodosIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof patchApiV1TodosId>>
@@ -337,7 +337,7 @@ export type PatchApiV1TodosIdMutationError = ErrorResponse | ErrorResponse
  * @summary Update a todo
  */
 export const usePatchApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof patchApiV1TodosId>>,
@@ -364,16 +364,16 @@ export const usePatchApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
 /**
  * @summary Delete a todo
  */
-export const deleteApiV1TodosId = (id: string) => {
+export const deleteApiV1TodosId = (id: number) => {
   return customInstance<TodoResponse>({ url: `/api/v1/todos/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiV1TodosIdMutationFetcher = (id: string) => {
+export const getDeleteApiV1TodosIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
     return deleteApiV1TodosId(id)
   }
 }
-export const getDeleteApiV1TodosIdMutationKey = (id: string) => [`/api/v1/todos/${id}`] as const
+export const getDeleteApiV1TodosIdMutationKey = (id: number) => [`/api/v1/todos/${id}`] as const
 
 export type DeleteApiV1TodosIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteApiV1TodosId>>
@@ -384,7 +384,7 @@ export type DeleteApiV1TodosIdMutationError = ErrorResponse | ErrorResponse
  * @summary Delete a todo
  */
 export const useDeleteApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof deleteApiV1TodosId>>,
@@ -498,7 +498,7 @@ export const usePostApiV1Posts = <TError = ErrorResponse | ErrorResponse>(option
 /**
  * @summary Update a post
  */
-export const patchApiV1PostsId = (id: string, updatePost: UpdatePost) => {
+export const patchApiV1PostsId = (id: number, updatePost: UpdatePost) => {
   return customInstance<PostResponse>({
     url: `/api/v1/posts/${id}`,
     method: 'PATCH',
@@ -507,12 +507,12 @@ export const patchApiV1PostsId = (id: string, updatePost: UpdatePost) => {
   })
 }
 
-export const getPatchApiV1PostsIdMutationFetcher = (id: string) => {
+export const getPatchApiV1PostsIdMutationFetcher = (id: number) => {
   return (_: Key, { arg }: { arg: UpdatePost }) => {
     return patchApiV1PostsId(id, arg)
   }
 }
-export const getPatchApiV1PostsIdMutationKey = (id: string) => [`/api/v1/posts/${id}`] as const
+export const getPatchApiV1PostsIdMutationKey = (id: number) => [`/api/v1/posts/${id}`] as const
 
 export type PatchApiV1PostsIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof patchApiV1PostsId>>
@@ -523,7 +523,7 @@ export type PatchApiV1PostsIdMutationError = ErrorResponse | ErrorResponse
  * @summary Update a post
  */
 export const usePatchApiV1PostsId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof patchApiV1PostsId>>,
@@ -550,16 +550,16 @@ export const usePatchApiV1PostsId = <TError = ErrorResponse | ErrorResponse>(
 /**
  * @summary Delete a post
  */
-export const deleteApiV1PostsId = (id: string) => {
+export const deleteApiV1PostsId = (id: number) => {
   return customInstance<PostResponse>({ url: `/api/v1/posts/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiV1PostsIdMutationFetcher = (id: string) => {
+export const getDeleteApiV1PostsIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
     return deleteApiV1PostsId(id)
   }
 }
-export const getDeleteApiV1PostsIdMutationKey = (id: string) => [`/api/v1/posts/${id}`] as const
+export const getDeleteApiV1PostsIdMutationKey = (id: number) => [`/api/v1/posts/${id}`] as const
 
 export type DeleteApiV1PostsIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteApiV1PostsId>>
@@ -570,7 +570,7 @@ export type DeleteApiV1PostsIdMutationError = ErrorResponse | ErrorResponse
  * @summary Delete a post
  */
 export const useDeleteApiV1PostsId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof deleteApiV1PostsId>>,
@@ -684,11 +684,11 @@ export const usePostApiV1Notes = <TError = ErrorResponse | ErrorResponse>(option
 /**
  * @summary Get a note
  */
-export const getApiV1NotesId = (id: string) => {
+export const getApiV1NotesId = (id: number) => {
   return customInstance<NoteResponse>({ url: `/api/v1/notes/${id}`, method: 'GET' })
 }
 
-export const getGetApiV1NotesIdKey = (id: string) => [`/api/v1/notes/${id}`] as const
+export const getGetApiV1NotesIdKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
 export type GetApiV1NotesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1NotesId>>>
 export type GetApiV1NotesIdQueryError = ErrorResponse | ErrorResponse
@@ -697,7 +697,7 @@ export type GetApiV1NotesIdQueryError = ErrorResponse | ErrorResponse
  * @summary Get a note
  */
 export const useGetApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1NotesId>>, TError> & {
       swrKey?: Key
@@ -723,7 +723,7 @@ export const useGetApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
  * Update title, body, or pinned status. Used by auto-save (debounced).
  * @summary Update a note
  */
-export const patchApiV1NotesId = (id: string, updateNote: UpdateNote) => {
+export const patchApiV1NotesId = (id: number, updateNote: UpdateNote) => {
   return customInstance<NoteResponse>({
     url: `/api/v1/notes/${id}`,
     method: 'PATCH',
@@ -732,12 +732,12 @@ export const patchApiV1NotesId = (id: string, updateNote: UpdateNote) => {
   })
 }
 
-export const getPatchApiV1NotesIdMutationFetcher = (id: string) => {
+export const getPatchApiV1NotesIdMutationFetcher = (id: number) => {
   return (_: Key, { arg }: { arg: UpdateNote }) => {
     return patchApiV1NotesId(id, arg)
   }
 }
-export const getPatchApiV1NotesIdMutationKey = (id: string) => [`/api/v1/notes/${id}`] as const
+export const getPatchApiV1NotesIdMutationKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
 export type PatchApiV1NotesIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof patchApiV1NotesId>>
@@ -748,7 +748,7 @@ export type PatchApiV1NotesIdMutationError = ErrorResponse | ErrorResponse
  * @summary Update a note
  */
 export const usePatchApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof patchApiV1NotesId>>,
@@ -775,16 +775,16 @@ export const usePatchApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
 /**
  * @summary Delete a note
  */
-export const deleteApiV1NotesId = (id: string) => {
+export const deleteApiV1NotesId = (id: number) => {
   return customInstance<NoteResponse>({ url: `/api/v1/notes/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiV1NotesIdMutationFetcher = (id: string) => {
+export const getDeleteApiV1NotesIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
     return deleteApiV1NotesId(id)
   }
 }
-export const getDeleteApiV1NotesIdMutationKey = (id: string) => [`/api/v1/notes/${id}`] as const
+export const getDeleteApiV1NotesIdMutationKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
 export type DeleteApiV1NotesIdMutationResult = NonNullable<
   Awaited<ReturnType<typeof deleteApiV1NotesId>>
@@ -795,7 +795,7 @@ export type DeleteApiV1NotesIdMutationError = ErrorResponse | ErrorResponse
  * @summary Delete a note
  */
 export const useDeleteApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
-  id: string,
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
       Awaited<ReturnType<typeof deleteApiV1NotesId>>,

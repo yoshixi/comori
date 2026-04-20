@@ -5,9 +5,9 @@ import type { Post, CreatePost, UpdatePost } from './posts.core'
 import { MAX_POSTS_PAGINATED_LIMIT } from './list-limits'
 
 interface LinkedEvent { id: number; title: string }
-interface LinkedTodo { id: string; title: string }
+interface LinkedTodo { id: number; title: string }
 
-async function loadPostRelations(db: DB, postId: string): Promise<{ events: LinkedEvent[]; todos: LinkedTodo[] }> {
+async function loadPostRelations(db: DB, postId: number): Promise<{ events: LinkedEvent[]; todos: LinkedTodo[] }> {
   const eventRows = await db
     .select({ id: calendarEventsTable.id, title: calendarEventsTable.title })
     .from(postEventsTable)
@@ -78,7 +78,7 @@ export async function getPostsPaginated(
   return { posts, has_more: hasMore }
 }
 
-export async function getPostById(db: DB, userId: number, postId: string): Promise<Post | null> {
+export async function getPostById(db: DB, userId: number, postId: number): Promise<Post | null> {
   const [row] = await db
     .select()
     .from(postsTable)
@@ -88,17 +88,17 @@ export async function getPostById(db: DB, userId: number, postId: string): Promi
 }
 
 export async function createPost(db: DB, userId: number, data: CreatePost): Promise<Post> {
-  const id = crypto.randomUUID()
   const now = Math.floor(Date.now() / 1000)
 
   const [row] = await db.insert(postsTable).values({
-    id,
     userId,
     body: data.body.trim(),
     postedAt: data.posted_at ?? now,
   }).returning()
 
   if (!row) throw new Error('Failed to create post')
+
+  const id = row.id
 
   // Insert junction records
   if (data.event_ids && data.event_ids.length > 0) {
@@ -115,7 +115,7 @@ export async function createPost(db: DB, userId: number, data: CreatePost): Prom
   return convertDbPostToApi(db, row)
 }
 
-export async function updatePost(db: DB, userId: number, postId: string, data: UpdatePost): Promise<Post | null> {
+export async function updatePost(db: DB, userId: number, postId: number, data: UpdatePost): Promise<Post | null> {
   const [existing] = await db
     .select()
     .from(postsTable)
@@ -151,7 +151,7 @@ export async function updatePost(db: DB, userId: number, postId: string, data: U
   return getPostById(db, userId, postId)
 }
 
-export async function deletePost(db: DB, userId: number, postId: string): Promise<Post | null> {
+export async function deletePost(db: DB, userId: number, postId: number): Promise<Post | null> {
   const post = await getPostById(db, userId, postId)
   if (!post) return null
 

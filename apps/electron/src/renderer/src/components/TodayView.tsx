@@ -174,7 +174,7 @@ function WorkSidePanel({
 }: {
   todos: Todo[]
   createTodo: (title: string, startsAt?: number, endsAt?: number) => Promise<void>
-  toggleDone: (id: string, currentDone: number) => Promise<void>
+  toggleDone: (id: number, currentDone: number) => Promise<void>
   onOpenPlan: () => void
 }): React.JSX.Element {
   const nowSec = usePeriodicNow()
@@ -259,7 +259,7 @@ function TodayTodoPanel({
 }: {
   todos: Todo[]
   createTodo: (title: string, startsAt?: number, endsAt?: number) => Promise<void>
-  toggleDone: (id: string, currentDone: number) => Promise<void>
+  toggleDone: (id: number, currentDone: number) => Promise<void>
   omitHeading?: boolean
   dense?: boolean
 }): React.JSX.Element {
@@ -403,9 +403,9 @@ function TodayLogPanel({
 }: {
   posts: Post[]
   isLoading: boolean
-  createPost: (body: string, eventIds: number[], todoIds: string[]) => Promise<void>
-  updatePost: (id: string, body: string) => Promise<void>
-  deletePost: (id: string) => Promise<void>
+  createPost: (body: string, eventIds: number[], todoIds: number[]) => Promise<void>
+  updatePost: (id: number, body: string) => Promise<void>
+  deletePost: (id: number) => Promise<void>
   todosForHashSuggest: Todo[]
   composerContext: PostComposerContext
   onComposerContextChange: (ctx: PostComposerContext) => void
@@ -419,7 +419,7 @@ function TodayLogPanel({
   const handleSubmit = useCallback(
     (body: string) => {
       const eventIds: number[] = composerContext?.type === 'event' ? [composerContext.id] : []
-      const todoIds: string[] = composerContext?.type === 'todo' ? [composerContext.id] : []
+      const todoIds: number[] = composerContext?.type === 'todo' ? [composerContext.id] : []
       void createPost(body, eventIds, todoIds)
     },
     [composerContext, createPost]
@@ -576,14 +576,14 @@ export function TodayView(): React.JSX.Element {
   }, [])
 
   const handleTodoMove = useCallback(
-    async (todo: { id: string }, range: { starts_at: number; ends_at: number }) => {
+    async (todo: { id: number }, range: { starts_at: number; ends_at: number }) => {
       await updateTodo(todo.id, { starts_at: range.starts_at, ends_at: range.ends_at })
     },
     [updateTodo]
   )
 
   const handleTodoDelete = useCallback(
-    async (todo: { id: string }) => {
+    async (todo: { id: number }) => {
       await deleteTodo(todo.id)
     },
     [deleteTodo]

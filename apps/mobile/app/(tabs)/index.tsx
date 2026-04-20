@@ -171,7 +171,7 @@ export default function TodayScreen() {
     if (!body) return;
     const eventIds: number[] =
       logComposerContext?.type === 'event' ? [logComposerContext.id] : [];
-    const todoIds: string[] =
+    const todoIds: number[] =
       logComposerContext?.type === 'todo' ? [logComposerContext.id] : [];
     setSubmitting(true);
     try {
@@ -400,7 +400,7 @@ export default function TodayScreen() {
           <View className="flex-1">
             <FlatList
               data={sortedPosts}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => String(item.id)}
               ListHeaderComponent={
                 postsLoading ? (
                   <ActivityIndicator className="py-4" />

@@ -7,8 +7,12 @@
  */
 
 export interface Todo {
-  /** UUID identifier */
-  id: string
+  /**
+   * Numeric ID
+   * @minimum 0
+   * @exclusiveMinimum
+   */
+  id: number
   title: string
   /**
    * Optional longer notes for this todo

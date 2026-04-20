@@ -2,7 +2,7 @@ import type { Todo } from '@/gen/api/schemas'
 
 /** Minimal shape for hour-grid layout (ISO times, same as legacy Task calendar fields). */
 export type CalendarTimedItem = {
-  id: string
+  id: number
   title: string
   startAt: string
   endAt: string | null

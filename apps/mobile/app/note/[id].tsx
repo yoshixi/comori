@@ -5,15 +5,16 @@ import { NoteDetailContent } from '@/components/notes/NoteDetailContent';
 
 export default function NoteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const numericId = id != null ? Number(id) : NaN;
 
-  if (!id) {
+  if (id == null || Number.isNaN(numericId)) {
     return null;
   }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1">
-        <NoteDetailContent noteId={id} />
+        <NoteDetailContent noteId={numericId} />
       </View>
     </SafeAreaView>
   );

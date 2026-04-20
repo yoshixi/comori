@@ -28,9 +28,9 @@ export interface UseNotesDataReturn {
   notesError: unknown
   mutateNotes: ReturnType<typeof useGetApiV1Notes>['mutate']
   handleCreateNote: (text: string) => void
-  handleUpdateNote: (noteId: string, text: string) => void
-  handleDeleteNote: (noteId: string) => Promise<void>
-  handleTogglePin: (noteId: string, pinned: number) => Promise<void>
+  handleUpdateNote: (noteId: number, text: string) => void
+  handleDeleteNote: (noteId: number) => Promise<void>
+  handleTogglePin: (noteId: number, pinned: number) => Promise<void>
   refreshNotes: () => Promise<void>
 }
 
@@ -58,7 +58,7 @@ export function useNotesData(): UseNotesDataReturn {
       if (!text.trim()) return
       const { title, body } = splitNoteText(text)
       const now = Math.floor(Date.now() / 1000)
-      const tempId = `temp-${now}`
+      const tempId = -Math.abs(Date.now())
 
       const optimisticNote: Note = {
         id: tempId,
@@ -89,7 +89,7 @@ export function useNotesData(): UseNotesDataReturn {
   )
 
   const handleUpdateNote = useCallback(
-    (noteId: string, text: string) => {
+    (noteId: number, text: string) => {
       const { title, body } = splitNoteText(text)
       const now = Math.floor(Date.now() / 1000)
 
@@ -113,7 +113,7 @@ export function useNotesData(): UseNotesDataReturn {
   )
 
   const handleDeleteNote = useCallback(
-    async (noteId: string): Promise<void> => {
+    async (noteId: number): Promise<void> => {
       mutateNotes(
         (currentData) => {
           if (!currentData) return currentData
@@ -131,7 +131,7 @@ export function useNotesData(): UseNotesDataReturn {
   )
 
   const handleTogglePin = useCallback(
-    async (noteId: string, pinned: number): Promise<void> => {
+    async (noteId: number, pinned: number): Promise<void> => {
       await patchApiV1NotesId(noteId, { pinned })
       await mutateNotes()
     },

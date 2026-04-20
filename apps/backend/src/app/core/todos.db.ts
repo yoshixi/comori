@@ -88,7 +88,7 @@ export async function getIncompleteTodosInRange(
   return rows.map(convertDbTodoToApi)
 }
 
-export async function getTodoById(db: DB, userId: number, todoId: string): Promise<Todo | null> {
+export async function getTodoById(db: DB, userId: number, todoId: number): Promise<Todo | null> {
   const [row] = await db
     .select()
     .from(todosTable)
@@ -98,11 +98,9 @@ export async function getTodoById(db: DB, userId: number, todoId: string): Promi
 }
 
 export async function createTodo(db: DB, userId: number, data: CreateTodo): Promise<Todo> {
-  const id = crypto.randomUUID()
   const now = Math.floor(Date.now() / 1000)
 
   const [row] = await db.insert(todosTable).values({
-    id,
     userId,
     title: data.title.trim(),
     description: data.description?.trim() ?? null,
@@ -117,7 +115,7 @@ export async function createTodo(db: DB, userId: number, data: CreateTodo): Prom
   return convertDbTodoToApi(row)
 }
 
-export async function updateTodo(db: DB, userId: number, todoId: string, data: UpdateTodo): Promise<Todo | null> {
+export async function updateTodo(db: DB, userId: number, todoId: number, data: UpdateTodo): Promise<Todo | null> {
   const existing = await getTodoById(db, userId, todoId)
   if (!existing) return null
 
@@ -144,7 +142,7 @@ export async function updateTodo(db: DB, userId: number, todoId: string, data: U
   return row ? convertDbTodoToApi(row) : null
 }
 
-export async function deleteTodo(db: DB, userId: number, todoId: string): Promise<Todo | null> {
+export async function deleteTodo(db: DB, userId: number, todoId: number): Promise<Todo | null> {
   const existing = await getTodoById(db, userId, todoId)
   if (!existing) return null
 

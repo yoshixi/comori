@@ -54,7 +54,7 @@ function NoteListItem({
 
 export function NotesView(): React.JSX.Element {
   const { notes, isLoading, createNote, updateNote, deleteNote } = useNotes()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)

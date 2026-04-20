@@ -63,7 +63,7 @@ export default function TodosScreen() {
         <Text className="mb-3 text-sm text-muted-foreground">Open items across days. Tap to edit.</Text>
         <FlatList
           data={sorted}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={

@@ -15,5 +15,5 @@ export interface CreatePost {
    */
   posted_at?: number
   event_ids?: number[]
-  todo_ids?: string[]
+  todo_ids?: number[]
 }

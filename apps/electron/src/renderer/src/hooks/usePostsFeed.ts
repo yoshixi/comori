@@ -20,9 +20,9 @@ export function usePostsFeed(pageSize = DEFAULT_PAGE_SIZE): {
   loadingMore: boolean
   error: ErrorResponse | undefined
   loadMore: () => Promise<void>
-  createPost: (body: string, eventIds: number[], todoIds: string[]) => Promise<void>
-  updatePost: (id: string, body: string) => Promise<void>
-  deletePost: (id: string) => Promise<void>
+  createPost: (body: string, eventIds: number[], todoIds: number[]) => Promise<void>
+  updatePost: (id: number, body: string) => Promise<void>
+  deletePost: (id: number) => Promise<void>
   refetch: () => Promise<void>
 } {
   const [posts, setPosts] = useState<Post[]>([])
@@ -86,10 +86,10 @@ export function usePostsFeed(pageSize = DEFAULT_PAGE_SIZE): {
   }, [hasMore, loadingMore, initialLoading, nextOffset, pageSize])
 
   const createPost = useCallback(
-    async (body: string, eventIds: number[], todoIds: string[]) => {
+    async (body: string, eventIds: number[], todoIds: number[]) => {
       const now = Math.floor(Date.now() / 1000)
       const optimistic: Post = {
-        id: `temp-${now}`,
+        id: -Math.abs(Date.now()),
         body,
         posted_at: now,
         events: [],
@@ -102,15 +102,15 @@ export function usePostsFeed(pageSize = DEFAULT_PAGE_SIZE): {
           event_ids: eventIds,
           todo_ids: todoIds
         })
-        setPosts((prev) => [res.data, ...prev.filter((p) => !String(p.id).startsWith('temp-'))])
+        setPosts((prev) => [res.data, ...prev.filter((p) => p.id > 0)])
       } catch {
-        setPosts((prev) => prev.filter((p) => !String(p.id).startsWith('temp-')))
+        setPosts((prev) => prev.filter((p) => p.id > 0))
       }
     },
     []
   )
 
-  const updatePost = useCallback(async (id: string, body: string) => {
+  const updatePost = useCallback(async (id: number, body: string) => {
     const trimmed = body.trim()
     if (!trimmed) return
 
@@ -130,7 +130,7 @@ export function usePostsFeed(pageSize = DEFAULT_PAGE_SIZE): {
     }
   }, [fetchInitial])
 
-  const deletePost = useCallback(async (id: string) => {
+  const deletePost = useCallback(async (id: number) => {
     setPosts((prev) => prev.filter((p) => p.id !== id))
     try {
       await deleteApiV1PostsId(id)

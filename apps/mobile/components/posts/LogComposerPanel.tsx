@@ -191,7 +191,7 @@ export function LogComposerPanel({
           <FlatList
             keyboardShouldPersistTaps="handled"
             data={filteredForHash}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => handleSelectTodoFromHash(item)}
@@ -241,7 +241,7 @@ export function LogComposerPanel({
             <FlatList
               keyboardShouldPersistTaps="handled"
               data={filteredForPicker}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => String(item.id)}
               ListEmptyComponent={
                 <Text className="py-4 text-center text-sm text-muted-foreground">
                   No open to-dos for this day.

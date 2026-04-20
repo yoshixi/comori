@@ -11,7 +11,7 @@ import { useNotesData, mergeNoteText } from '@/hooks/useNotesData';
 import { formatDateTime } from '@/lib/time';
 
 export interface NoteDetailContentProps {
-  noteId: string;
+  noteId: number;
 }
 
 export function NoteDetailContent({ noteId }: NoteDetailContentProps) {

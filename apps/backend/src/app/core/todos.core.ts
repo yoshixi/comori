@@ -1,11 +1,5 @@
 import { z } from '@hono/zod-openapi'
-import { ErrorResponseModel } from './common.core'
-
-// UUID schema for new domain entities
-const UuidSchema = z.string().uuid().openapi({
-  description: 'UUID identifier',
-  example: '550e8400-e29b-41d4-a716-446655440000',
-})
+import { ErrorResponseModel, IdSchema } from './common.core'
 
 // Unix timestamp schema
 const UnixTimestampSchema = z.number().int().min(0).openapi({
@@ -15,7 +9,7 @@ const UnixTimestampSchema = z.number().int().min(0).openapi({
 
 // Todo model
 export const TodoModel = z.object({
-  id: UuidSchema,
+  id: IdSchema,
   title: z.string().openapi({ example: 'Reply to client email' }),
   description: z.string().nullable().optional().openapi({ description: 'Optional longer notes for this todo' }),
   starts_at: UnixTimestampSchema.nullable().openapi({ description: 'Start time (nullable for unscheduled todos)' }),
@@ -53,7 +47,7 @@ export const TodoQueryParamsModel = z.object({
 }).openapi('TodoQueryParams')
 
 export const TodoIdParamModel = z.object({
-  id: UuidSchema.openapi({ param: { name: 'id', in: 'path' } }),
+  id: IdSchema.openapi({ param: { name: 'id', in: 'path' } }),
 }).openapi('TodoIdParam')
 
 export const TodoListResponseModel = z.object({

@@ -22,7 +22,7 @@ export function useTodos(options?: {
   error: ErrorResponse | undefined
   createTodo: (title: string, startsAt?: number, endsAt?: number, isAllDay?: number) => Promise<void>
   updateTodo: (
-    id: string,
+    id: number,
     updates: {
       title?: string
       starts_at?: number | null
@@ -31,8 +31,8 @@ export function useTodos(options?: {
       done?: number
     }
   ) => Promise<void>
-  toggleDone: (id: string, currentDone: number) => Promise<void>
-  deleteTodo: (id: string) => Promise<void>
+  toggleDone: (id: number, currentDone: number) => Promise<void>
+  deleteTodo: (id: number) => Promise<void>
   mutate: ReturnType<typeof useGetApiV1Todos>['mutate']
 } {
   const params: GetApiV1TodosParams | undefined = useMemo(() => {
@@ -70,10 +70,11 @@ export function useTodos(options?: {
     async (title: string, startsAt?: number, endsAt?: number, isAllDay?: number) => {
       const now = Math.floor(Date.now() / 1000)
       const allDay = isAllDay ?? 0
-      const tempId = `temp-${Date.now()}`
+      const tempId = -Math.abs(Date.now())
       const optimisticTodo: Todo = {
         id: tempId,
         title,
+        description: null,
         starts_at: startsAt ?? null,
         ends_at: endsAt ?? null,
         is_all_day: allDay,
@@ -110,7 +111,7 @@ export function useTodos(options?: {
   )
 
   const toggleDone = useCallback(
-    async (id: string, currentDone: number) => {
+    async (id: number, currentDone: number) => {
       const newDone = currentDone === 1 ? 0 : 1
       const now = Math.floor(Date.now() / 1000)
       mutate(
@@ -149,7 +150,7 @@ export function useTodos(options?: {
 
   const updateTodo = useCallback(
     async (
-      id: string,
+      id: number,
       updates: {
         title?: string
         starts_at?: number | null
@@ -189,7 +190,7 @@ export function useTodos(options?: {
   )
 
   const deleteTodo = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       mutate(
         (current) => {
           if (!current) return current

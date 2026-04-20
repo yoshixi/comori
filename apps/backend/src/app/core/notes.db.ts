@@ -34,7 +34,7 @@ export async function getNotesPage(
   return { notes: slice.map(convertDbNoteToApi), has_more: hasMore }
 }
 
-export async function getNoteById(db: DB, userId: number, noteId: string): Promise<Note | null> {
+export async function getNoteById(db: DB, userId: number, noteId: number): Promise<Note | null> {
   const [row] = await db
     .select()
     .from(notesTable)
@@ -44,11 +44,9 @@ export async function getNoteById(db: DB, userId: number, noteId: string): Promi
 }
 
 export async function createNote(db: DB, userId: number, data: CreateNote): Promise<Note> {
-  const id = crypto.randomUUID()
   const now = Math.floor(Date.now() / 1000)
 
   const [row] = await db.insert(notesTable).values({
-    id,
     userId,
     title: data.title.trim(),
     body: data.body?.trim() || null,
@@ -61,7 +59,7 @@ export async function createNote(db: DB, userId: number, data: CreateNote): Prom
   return convertDbNoteToApi(row)
 }
 
-export async function updateNote(db: DB, userId: number, noteId: string, data: UpdateNote): Promise<Note | null> {
+export async function updateNote(db: DB, userId: number, noteId: number, data: UpdateNote): Promise<Note | null> {
   const existing = await getNoteById(db, userId, noteId)
   if (!existing) return null
 
@@ -81,7 +79,7 @@ export async function updateNote(db: DB, userId: number, noteId: string, data: U
   return row ? convertDbNoteToApi(row) : null
 }
 
-export async function deleteNote(db: DB, userId: number, noteId: string): Promise<Note | null> {
+export async function deleteNote(db: DB, userId: number, noteId: number): Promise<Note | null> {
   const existing = await getNoteById(db, userId, noteId)
   if (!existing) return null
 

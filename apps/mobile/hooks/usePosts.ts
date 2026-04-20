@@ -20,8 +20,8 @@ export function usePosts(options?: { from: number; to: number; limit?: number })
   posts: Post[]
   isLoading: boolean
   error: ErrorResponse | undefined
-  createPost: (body: string, eventIds: number[], todoIds: string[]) => Promise<void>
-  deletePost: (id: string) => Promise<void>
+  createPost: (body: string, eventIds: number[], todoIds: number[]) => Promise<void>
+  deletePost: (id: number) => Promise<void>
   mutate: ReturnType<typeof useGetApiV1Posts>['mutate']
 } {
   const params = useMemo((): GetApiV1PostsParams => {
@@ -36,10 +36,10 @@ export function usePosts(options?: { from: number; to: number; limit?: number })
   const posts: Post[] = data?.data ?? []
 
   const createPost = useCallback(
-    async (body: string, eventIds: number[], todoIds: string[]) => {
+    async (body: string, eventIds: number[], todoIds: number[]) => {
       const now = Math.floor(Date.now() / 1000)
       const optimistic: Post = {
-        id: `temp-${now}`,
+        id: -Math.abs(Date.now()),
         body,
         posted_at: now,
         events: [],
@@ -62,7 +62,7 @@ export function usePosts(options?: { from: number; to: number; limit?: number })
   )
 
   const deletePost = useCallback(
-    async (id: string) => {
+    async (id: number) => {
       await deleteApiV1PostsId(id)
       await mutate()
     },

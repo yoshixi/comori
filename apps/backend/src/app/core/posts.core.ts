@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi'
+import { IdSchema } from './common.core'
 
-const UuidSchema = z.string().uuid()
 const UnixTimestampSchema = z.number().int().min(0)
 
 // Linked event/todo summaries included in post responses
@@ -10,12 +10,12 @@ const LinkedEventModel = z.object({
 })
 
 const LinkedTodoModel = z.object({
-  id: UuidSchema,
+  id: IdSchema,
   title: z.string(),
 })
 
 export const PostModel = z.object({
-  id: UuidSchema,
+  id: IdSchema,
   body: z.string(),
   posted_at: UnixTimestampSchema,
   events: z.array(LinkedEventModel),
@@ -26,13 +26,13 @@ export const CreatePostModel = z.object({
   body: z.string().min(1),
   posted_at: UnixTimestampSchema.optional().openapi({ description: 'Defaults to now if omitted' }),
   event_ids: z.array(z.number().int()).optional().default([]),
-  todo_ids: z.array(UuidSchema).optional().default([]),
+  todo_ids: z.array(IdSchema).optional().default([]),
 }).openapi('CreatePost')
 
 export const UpdatePostModel = z.object({
   body: z.string().min(1).optional(),
   event_ids: z.array(z.number().int()).optional(),
-  todo_ids: z.array(UuidSchema).optional(),
+  todo_ids: z.array(IdSchema).optional(),
 }).openapi('UpdatePost')
 
 export const PostQueryParamsModel = z
@@ -74,7 +74,7 @@ export const PostQueryParamsModel = z
   .openapi('PostQueryParams')
 
 export const PostIdParamModel = z.object({
-  id: UuidSchema.openapi({ param: { name: 'id', in: 'path' } }),
+  id: IdSchema.openapi({ param: { name: 'id', in: 'path' } }),
 }).openapi('PostIdParam')
 
 export const PostListResponseModel = z

@@ -54,7 +54,7 @@ export default function LogbookScreen() {
         </Text>
         <FlatList
           data={data}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           ListHeaderComponent={ListHeaderComponent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

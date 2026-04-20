@@ -35,7 +35,7 @@ export function PostsView(): React.JSX.Element {
   const handleSubmit = useCallback(
     (body: string) => {
       const eventIds: number[] = currentContext?.type === 'event' ? [currentContext.id] : []
-      const todoIds: string[] = currentContext?.type === 'todo' ? [currentContext.id] : []
+      const todoIds: number[] = currentContext?.type === 'todo' ? [currentContext.id] : []
       void createPost(body, eventIds, todoIds)
     },
     [currentContext, createPost]

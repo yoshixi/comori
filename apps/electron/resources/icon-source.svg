@@ -1,7 +1,10 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
 
-  <!-- Background: warm cream, same palette as the original icon -->
-  <rect width="1024" height="1024" rx="224" fill="#EDE8DC"/>
+  <!-- Background: warm cream, rx=185 per Apple macOS HIG (18% of 1024) -->
+  <rect width="1024" height="1024" rx="185" fill="#EDE8DC"/>
+
+  <!-- Book scaled to 90% of original, centered — gives ~19% margin each side -->
+  <g transform="translate(512,512) scale(0.9) translate(-512,-512)">
 
   <!-- Book drop shadow -->
   <rect x="166" y="290" width="700" height="462" rx="10" fill="#1C1C1C" opacity="0.10"/>
@@ -118,5 +121,7 @@
   <circle cx="650" cy="688" r="16" fill="#1C1C1C" opacity="0.08"/>
   <circle cx="692" cy="688" r="16" fill="#1C1C1C" opacity="0.08"/>
   <circle cx="734" cy="688" r="16" fill="#1C1C1C" opacity="0.08"/>
+
+  </g><!-- end book scale group -->
 
 </svg>

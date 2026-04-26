@@ -44,6 +44,14 @@ export function formatTime(date: Date | string): string {
   })
 }
 
+/** Todo list times — matches Electron `TodoView` (`hour`/`minute` 2-digit, locale default). */
+export function formatTodoClockTime(unixSeconds: number): string {
+  return new Date(unixSeconds * 1000).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 /**
  * Format a datetime for display (e.g., "Jan 15 at 2:30 PM")
  */

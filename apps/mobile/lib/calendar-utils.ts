@@ -2,7 +2,8 @@
  * Shared calendar utilities for mobile app
  * Ported from apps/electron/src/renderer/src/lib/calendar-utils.ts
  */
-import type { Task, CalendarEvent } from '@/gen/api/schemas';
+import type { CalendarEvent } from '@/gen/api/schemas';
+import type { CalendarTimedItem } from '@/lib/todoCalendar';
 
 // ============================================================================
 // Constants
@@ -26,7 +27,7 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
  * Contains layout information for rendering (lane assignment, slot positions).
  */
 export type TaskLayout = {
-  task: Task;
+  task: CalendarTimedItem;
   /** Which day column (0 for day view, 0-6 for week view) */
   dayIndex: number;
   /** Starting slot index (inclusive) */
@@ -113,7 +114,7 @@ export const assignLanes = (tasks: TaskLayout[]): TaskLayout[] => {
  * @returns Array of TaskLayout items with lane assignments
  */
 export const calculateTaskLayoutsForDay = (
-  tasks: Task[],
+  tasks: CalendarTimedItem[],
   baseDate: Date,
   slotMinutes: number = 15
 ): TaskLayout[] => {

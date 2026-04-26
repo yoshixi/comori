@@ -96,7 +96,7 @@ The planning view is a single scrollable screen with three sections:
 
 ## Data Architecture
 
-Following the centralized SWR cache pattern from `docs/REACT_DATA_ARCHITECTURE.md`:
+Following the centralized SWR cache pattern for the renderer (historical; see root `CLAUDE.md` for the current architecture):
 
 ### New SWR Cache: Carryover Tasks
 

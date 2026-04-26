@@ -74,10 +74,7 @@ function TableCell({ className, ...props }: ComponentProps<'td'>) {
   return (
     <td
       data-slot="table-cell"
-      className={cn(
-        'p-3 align-middle whitespace-nowrap text-foreground/90 text-sm',
-        className
-      )}
+      className={cn('p-3 align-middle whitespace-nowrap text-foreground/90 text-sm', className)}
       {...props}
     />
   )

@@ -191,7 +191,10 @@ export const AccordionContent = React.forwardRef<HTMLDivElement, AccordionConten
       <div
         ref={ref}
         data-state={open ? 'open' : 'closed'}
-        className={cn(open ? 'block border-t border-border/40' : 'hidden border-t border-border/40', className)}
+        className={cn(
+          open ? 'block border-t border-border/40' : 'hidden border-t border-border/40',
+          className
+        )}
         {...props}
       >
         <div className="px-3 py-3">{children}</div>

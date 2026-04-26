@@ -18,48 +18,38 @@ import type {
   CalendarListResponse,
   CalendarResponse,
   CalendarSyncResponse,
-  ConvertNoteToTaskRequest,
-  ConvertNoteToTaskResponse,
   CreateCalendar,
   CreateNote,
-  CreateTag,
-  CreateTask,
-  CreateTaskComment,
-  CreateTimer,
+  CreatePost,
+  CreateTodo,
+  DeleteAccountResponse,
   DeleteApiOauthGoogleParams,
   ErrorResponse,
   GetApiCalendarsAvailableParams,
   GetApiEventsParams,
-  GetApiNotesParams,
   GetApiOauthGoogleStatusParams,
-  GetApiTasksParams,
-  GetApiTimersParams,
+  GetApiV1NotesParams,
+  GetApiV1PostsParams,
+  GetApiV1TodosParams,
   HealthResponse,
   NoteListResponse,
   NoteResponse,
   OAuthAccountsResponse,
   OAuthDisconnectResponse,
   OAuthStatusResponse,
+  PostListResponse,
+  PostResponse,
   SessionCodeResponse,
   SessionResponse,
   StopWatchResponse,
-  TagListResponse,
-  TagResponse,
-  TaskActivitiesResponse,
-  TaskCommentListResponse,
-  TaskCommentResponse,
-  TaskListResponse,
-  TaskResponse,
-  TimerListResponse,
-  TimerResponse,
+  TodoListResponse,
+  TodoResponse,
   TokenRequest,
   TokenResponse,
   UpdateCalendar,
   UpdateNote,
-  UpdateTag,
-  UpdateTask,
-  UpdateTaskComment,
-  UpdateTimer,
+  UpdatePost,
+  UpdateTodo,
   WatchChannelResponse,
   WatchChannelStatus,
   WebhookResponse
@@ -233,26 +223,26 @@ export const useGetApiHealth = <TError = unknown>(options?: {
 }
 
 /**
- * Retrieve all tasks
- * @summary Get all tasks
+ * Retrieve todos with optional date range and completion filters
+ * @summary List todos
  */
-export const getApiTasks = (params?: GetApiTasksParams) => {
-  return customInstance<TaskListResponse>({ url: `/api/tasks`, method: 'GET', params })
+export const getApiV1Todos = (params?: GetApiV1TodosParams) => {
+  return customInstance<TodoListResponse>({ url: `/api/v1/todos`, method: 'GET', params })
 }
 
-export const getGetApiTasksKey = (params?: GetApiTasksParams) =>
-  [`/api/tasks`, ...(params ? [params] : [])] as const
+export const getGetApiV1TodosKey = (params?: GetApiV1TodosParams) =>
+  [`/api/v1/todos`, ...(params ? [params] : [])] as const
 
-export type GetApiTasksQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTasks>>>
-export type GetApiTasksQueryError = ErrorResponse
+export type GetApiV1TodosQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1Todos>>>
+export type GetApiV1TodosQueryError = ErrorResponse
 
 /**
- * @summary Get all tasks
+ * @summary List todos
  */
-export const useGetApiTasks = <TError = ErrorResponse>(
-  params?: GetApiTasksParams,
+export const useGetApiV1Todos = <TError = ErrorResponse>(
+  params?: GetApiV1TodosParams,
   options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasks>>, TError> & {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1Todos>>, TError> & {
       swrKey?: Key
       enabled?: boolean
     }
@@ -261,8 +251,8 @@ export const useGetApiTasks = <TError = ErrorResponse>(
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksKey(params) : null))
-  const swrFn = () => getApiTasks(params)
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1TodosKey(params) : null))
+  const swrFn = () => getApiV1Todos(params)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 
@@ -273,44 +263,43 @@ export const useGetApiTasks = <TError = ErrorResponse>(
 }
 
 /**
- * Create a new task
- * @summary Create a task
+ * @summary Create a todo
  */
-export const postApiTasks = (createTask: CreateTask) => {
-  return customInstance<TaskResponse>({
-    url: `/api/tasks`,
+export const postApiV1Todos = (createTodo: CreateTodo) => {
+  return customInstance<TodoResponse>({
+    url: `/api/v1/todos`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    data: createTask
+    data: createTodo
   })
 }
 
-export const getPostApiTasksMutationFetcher = () => {
-  return (_: Key, { arg }: { arg: CreateTask }) => {
-    return postApiTasks(arg)
+export const getPostApiV1TodosMutationFetcher = () => {
+  return (_: Key, { arg }: { arg: CreateTodo }) => {
+    return postApiV1Todos(arg)
   }
 }
-export const getPostApiTasksMutationKey = () => [`/api/tasks`] as const
+export const getPostApiV1TodosMutationKey = () => [`/api/v1/todos`] as const
 
-export type PostApiTasksMutationResult = NonNullable<Awaited<ReturnType<typeof postApiTasks>>>
-export type PostApiTasksMutationError = ErrorResponse | ErrorResponse
+export type PostApiV1TodosMutationResult = NonNullable<Awaited<ReturnType<typeof postApiV1Todos>>>
+export type PostApiV1TodosMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Create a task
+ * @summary Create a todo
  */
-export const usePostApiTasks = <TError = ErrorResponse | ErrorResponse>(options?: {
+export const usePostApiV1Todos = <TError = ErrorResponse | ErrorResponse>(options?: {
   swr?: SWRMutationConfiguration<
-    Awaited<ReturnType<typeof postApiTasks>>,
+    Awaited<ReturnType<typeof postApiV1Todos>>,
     TError,
     Key,
-    CreateTask,
-    Awaited<ReturnType<typeof postApiTasks>>
+    CreateTodo,
+    Awaited<ReturnType<typeof postApiV1Todos>>
   > & { swrKey?: string }
 }) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPostApiTasksMutationKey()
-  const swrFn = getPostApiTasksMutationFetcher()
+  const swrKey = swrOptions?.swrKey ?? getPostApiV1TodosMutationKey()
+  const swrFn = getPostApiV1TodosMutationFetcher()
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -321,353 +310,48 @@ export const usePostApiTasks = <TError = ErrorResponse | ErrorResponse>(options?
 }
 
 /**
- * Retrieve a specific task by ID
- * @summary Get a task
+ * @summary Update a todo
  */
-export const getApiTasksId = (id: number) => {
-  return customInstance<TaskResponse>({ url: `/api/tasks/${id}`, method: 'GET' })
-}
-
-export const getGetApiTasksIdKey = (id: number) => [`/api/tasks/${id}`] as const
-
-export type GetApiTasksIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTasksId>>>
-export type GetApiTasksIdQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Get a task
- */
-export const useGetApiTasksId = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksId>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!id
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksIdKey(id) : null))
-  const swrFn = () => getApiTasksId(id)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Update an existing task by ID
- * @summary Update a task
- */
-export const putApiTasksId = (id: number, updateTask: UpdateTask) => {
-  return customInstance<TaskResponse>({
-    url: `/api/tasks/${id}`,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    data: updateTask
-  })
-}
-
-export const getPutApiTasksIdMutationFetcher = (id: number) => {
-  return (_: Key, { arg }: { arg: UpdateTask }) => {
-    return putApiTasksId(id, arg)
-  }
-}
-export const getPutApiTasksIdMutationKey = (id: number) => [`/api/tasks/${id}`] as const
-
-export type PutApiTasksIdMutationResult = NonNullable<Awaited<ReturnType<typeof putApiTasksId>>>
-export type PutApiTasksIdMutationError = ErrorResponse | ErrorResponse | ErrorResponse
-
-/**
- * @summary Update a task
- */
-export const usePutApiTasksId = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof putApiTasksId>>,
-      TError,
-      Key,
-      UpdateTask,
-      Awaited<ReturnType<typeof putApiTasksId>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getPutApiTasksIdMutationKey(id)
-  const swrFn = getPutApiTasksIdMutationFetcher(id)
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Delete a task by ID
- * @summary Delete a task
- */
-export const deleteApiTasksId = (id: number) => {
-  return customInstance<TaskResponse>({ url: `/api/tasks/${id}`, method: 'DELETE' })
-}
-
-export const getDeleteApiTasksIdMutationFetcher = (id: number) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return deleteApiTasksId(id)
-  }
-}
-export const getDeleteApiTasksIdMutationKey = (id: number) => [`/api/tasks/${id}`] as const
-
-export type DeleteApiTasksIdMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteApiTasksId>>
->
-export type DeleteApiTasksIdMutationError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Delete a task
- */
-export const useDeleteApiTasksId = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof deleteApiTasksId>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof deleteApiTasksId>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getDeleteApiTasksIdMutationKey(id)
-  const swrFn = getDeleteApiTasksIdMutationFetcher(id)
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * @summary List comments for a task
- */
-export const getApiTasksTaskIdComments = (taskId: number) => {
-  return customInstance<TaskCommentListResponse>({
-    url: `/api/tasks/${taskId}/comments`,
-    method: 'GET'
-  })
-}
-
-export const getGetApiTasksTaskIdCommentsKey = (taskId: number) =>
-  [`/api/tasks/${taskId}/comments`] as const
-
-export type GetApiTasksTaskIdCommentsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getApiTasksTaskIdComments>>
->
-export type GetApiTasksTaskIdCommentsQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary List comments for a task
- */
-export const useGetApiTasksTaskIdComments = <TError = ErrorResponse | ErrorResponse>(
-  taskId: number,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksTaskIdComments>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!taskId
-  const swrKey =
-    swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksTaskIdCommentsKey(taskId) : null))
-  const swrFn = () => getApiTasksTaskIdComments(taskId)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * @summary Create a comment for a task
- */
-export const postApiTasksTaskIdComments = (
-  taskId: number,
-  createTaskComment: CreateTaskComment
-) => {
-  return customInstance<TaskCommentResponse>({
-    url: `/api/tasks/${taskId}/comments`,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    data: createTaskComment
-  })
-}
-
-export const getPostApiTasksTaskIdCommentsMutationFetcher = (taskId: number) => {
-  return (_: Key, { arg }: { arg: CreateTaskComment }) => {
-    return postApiTasksTaskIdComments(taskId, arg)
-  }
-}
-export const getPostApiTasksTaskIdCommentsMutationKey = (taskId: number) =>
-  [`/api/tasks/${taskId}/comments`] as const
-
-export type PostApiTasksTaskIdCommentsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof postApiTasksTaskIdComments>>
->
-export type PostApiTasksTaskIdCommentsMutationError = ErrorResponse | ErrorResponse | ErrorResponse
-
-/**
- * @summary Create a comment for a task
- */
-export const usePostApiTasksTaskIdComments = <
-  TError = ErrorResponse | ErrorResponse | ErrorResponse
->(
-  taskId: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof postApiTasksTaskIdComments>>,
-      TError,
-      Key,
-      CreateTaskComment,
-      Awaited<ReturnType<typeof postApiTasksTaskIdComments>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getPostApiTasksTaskIdCommentsMutationKey(taskId)
-  const swrFn = getPostApiTasksTaskIdCommentsMutationFetcher(taskId)
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * @summary Get a single task comment
- */
-export const getApiTasksTaskIdCommentsCommentId = (taskId: number, commentId: number) => {
-  return customInstance<TaskCommentResponse>({
-    url: `/api/tasks/${taskId}/comments/${commentId}`,
-    method: 'GET'
-  })
-}
-
-export const getGetApiTasksTaskIdCommentsCommentIdKey = (taskId: number, commentId: number) =>
-  [`/api/tasks/${taskId}/comments/${commentId}`] as const
-
-export type GetApiTasksTaskIdCommentsCommentIdQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getApiTasksTaskIdCommentsCommentId>>
->
-export type GetApiTasksTaskIdCommentsCommentIdQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Get a single task comment
- */
-export const useGetApiTasksTaskIdCommentsCommentId = <TError = ErrorResponse | ErrorResponse>(
-  taskId: number,
-  commentId: number,
-  options?: {
-    swr?: SWRConfiguration<
-      Awaited<ReturnType<typeof getApiTasksTaskIdCommentsCommentId>>,
-      TError
-    > & { swrKey?: Key; enabled?: boolean }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!(taskId && commentId)
-  const swrKey =
-    swrOptions?.swrKey ??
-    (() => (isEnabled ? getGetApiTasksTaskIdCommentsCommentIdKey(taskId, commentId) : null))
-  const swrFn = () => getApiTasksTaskIdCommentsCommentId(taskId, commentId)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * @summary Update a task comment
- */
-export const patchApiTasksTaskIdCommentsCommentId = (
-  taskId: number,
-  commentId: number,
-  updateTaskComment: UpdateTaskComment
-) => {
-  return customInstance<TaskCommentResponse>({
-    url: `/api/tasks/${taskId}/comments/${commentId}`,
+export const patchApiV1TodosId = (id: number, updateTodo: UpdateTodo) => {
+  return customInstance<TodoResponse>({
+    url: `/api/v1/todos/${id}`,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    data: updateTaskComment
+    data: updateTodo
   })
 }
 
-export const getPatchApiTasksTaskIdCommentsCommentIdMutationFetcher = (
-  taskId: number,
-  commentId: number
-) => {
-  return (_: Key, { arg }: { arg: UpdateTaskComment }) => {
-    return patchApiTasksTaskIdCommentsCommentId(taskId, commentId, arg)
+export const getPatchApiV1TodosIdMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: UpdateTodo }) => {
+    return patchApiV1TodosId(id, arg)
   }
 }
-export const getPatchApiTasksTaskIdCommentsCommentIdMutationKey = (
-  taskId: number,
-  commentId: number
-) => [`/api/tasks/${taskId}/comments/${commentId}`] as const
+export const getPatchApiV1TodosIdMutationKey = (id: number) => [`/api/v1/todos/${id}`] as const
 
-export type PatchApiTasksTaskIdCommentsCommentIdMutationResult = NonNullable<
-  Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>
+export type PatchApiV1TodosIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApiV1TodosId>>
 >
-export type PatchApiTasksTaskIdCommentsCommentIdMutationError =
-  | ErrorResponse
-  | ErrorResponse
-  | ErrorResponse
+export type PatchApiV1TodosIdMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Update a task comment
+ * @summary Update a todo
  */
-export const usePatchApiTasksTaskIdCommentsCommentId = <
-  TError = ErrorResponse | ErrorResponse | ErrorResponse
->(
-  taskId: number,
-  commentId: number,
+export const usePatchApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>,
+      Awaited<ReturnType<typeof patchApiV1TodosId>>,
       TError,
       Key,
-      UpdateTaskComment,
-      Awaited<ReturnType<typeof patchApiTasksTaskIdCommentsCommentId>>
+      UpdateTodo,
+      Awaited<ReturnType<typeof patchApiV1TodosId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey =
-    swrOptions?.swrKey ?? getPatchApiTasksTaskIdCommentsCommentIdMutationKey(taskId, commentId)
-  const swrFn = getPatchApiTasksTaskIdCommentsCommentIdMutationFetcher(taskId, commentId)
+  const swrKey = swrOptions?.swrKey ?? getPatchApiV1TodosIdMutationKey(id)
+  const swrFn = getPatchApiV1TodosIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -678,54 +362,43 @@ export const usePatchApiTasksTaskIdCommentsCommentId = <
 }
 
 /**
- * @summary Delete a task comment
+ * @summary Delete a todo
  */
-export const deleteApiTasksTaskIdCommentsCommentId = (taskId: number, commentId: number) => {
-  return customInstance<TaskCommentResponse>({
-    url: `/api/tasks/${taskId}/comments/${commentId}`,
-    method: 'DELETE'
-  })
+export const deleteApiV1TodosId = (id: number) => {
+  return customInstance<TodoResponse>({ url: `/api/v1/todos/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiTasksTaskIdCommentsCommentIdMutationFetcher = (
-  taskId: number,
-  commentId: number
-) => {
+export const getDeleteApiV1TodosIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return deleteApiTasksTaskIdCommentsCommentId(taskId, commentId)
+    return deleteApiV1TodosId(id)
   }
 }
-export const getDeleteApiTasksTaskIdCommentsCommentIdMutationKey = (
-  taskId: number,
-  commentId: number
-) => [`/api/tasks/${taskId}/comments/${commentId}`] as const
+export const getDeleteApiV1TodosIdMutationKey = (id: number) => [`/api/v1/todos/${id}`] as const
 
-export type DeleteApiTasksTaskIdCommentsCommentIdMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>
+export type DeleteApiV1TodosIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiV1TodosId>>
 >
-export type DeleteApiTasksTaskIdCommentsCommentIdMutationError = ErrorResponse | ErrorResponse
+export type DeleteApiV1TodosIdMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Delete a task comment
+ * @summary Delete a todo
  */
-export const useDeleteApiTasksTaskIdCommentsCommentId = <TError = ErrorResponse | ErrorResponse>(
-  taskId: number,
-  commentId: number,
+export const useDeleteApiV1TodosId = <TError = ErrorResponse | ErrorResponse>(
+  id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>,
+      Awaited<ReturnType<typeof deleteApiV1TodosId>>,
       TError,
       Key,
       Arguments,
-      Awaited<ReturnType<typeof deleteApiTasksTaskIdCommentsCommentId>>
+      Awaited<ReturnType<typeof deleteApiV1TodosId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey =
-    swrOptions?.swrKey ?? getDeleteApiTasksTaskIdCommentsCommentIdMutationKey(taskId, commentId)
-  const swrFn = getDeleteApiTasksTaskIdCommentsCommentIdMutationFetcher(taskId, commentId)
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiV1TodosIdMutationKey(id)
+  const swrFn = getDeleteApiV1TodosIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -736,71 +409,26 @@ export const useDeleteApiTasksTaskIdCommentsCommentId = <TError = ErrorResponse 
 }
 
 /**
- * @summary Get combined task activity timeline
+ * List posts with linked events and todos. Use `from`+`to` for a time window, or `limit`+`offset` (newest first, paginated) for all posts.
+ * @summary List posts
  */
-export const getApiTasksIdActivities = (id: number) => {
-  return customInstance<TaskActivitiesResponse>({
-    url: `/api/tasks/${id}/activities`,
-    method: 'GET'
-  })
+export const getApiV1Posts = (params?: GetApiV1PostsParams) => {
+  return customInstance<PostListResponse>({ url: `/api/v1/posts`, method: 'GET', params })
 }
 
-export const getGetApiTasksIdActivitiesKey = (id: number) =>
-  [`/api/tasks/${id}/activities`] as const
+export const getGetApiV1PostsKey = (params?: GetApiV1PostsParams) =>
+  [`/api/v1/posts`, ...(params ? [params] : [])] as const
 
-export type GetApiTasksIdActivitiesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getApiTasksIdActivities>>
->
-export type GetApiTasksIdActivitiesQueryError = ErrorResponse | ErrorResponse
+export type GetApiV1PostsQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1Posts>>>
+export type GetApiV1PostsQueryError = ErrorResponse
 
 /**
- * @summary Get combined task activity timeline
+ * @summary List posts
  */
-export const useGetApiTasksIdActivities = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
+export const useGetApiV1Posts = <TError = ErrorResponse>(
+  params?: GetApiV1PostsParams,
   options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksIdActivities>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!id
-  const swrKey =
-    swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksIdActivitiesKey(id) : null))
-  const swrFn = () => getApiTasksIdActivities(id)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Retrieve all timers across all tasks
- * @summary Get all timers
- */
-export const getApiTimers = (params?: GetApiTimersParams) => {
-  return customInstance<TimerListResponse>({ url: `/api/timers`, method: 'GET', params })
-}
-
-export const getGetApiTimersKey = (params?: GetApiTimersParams) =>
-  [`/api/timers`, ...(params ? [params] : [])] as const
-
-export type GetApiTimersQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTimers>>>
-export type GetApiTimersQueryError = ErrorResponse
-
-/**
- * @summary Get all timers
- */
-export const useGetApiTimers = <TError = ErrorResponse>(
-  params?: GetApiTimersParams,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTimers>>, TError> & {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1Posts>>, TError> & {
       swrKey?: Key
       enabled?: boolean
     }
@@ -809,8 +437,8 @@ export const useGetApiTimers = <TError = ErrorResponse>(
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTimersKey(params) : null))
-  const swrFn = () => getApiTimers(params)
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1PostsKey(params) : null))
+  const swrFn = () => getApiV1Posts(params)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 
@@ -821,44 +449,43 @@ export const useGetApiTimers = <TError = ErrorResponse>(
 }
 
 /**
- * Start a new timer for a task
- * @summary Create a new timer
+ * @summary Create a post
  */
-export const postApiTimers = (createTimer: CreateTimer) => {
-  return customInstance<TimerResponse>({
-    url: `/api/timers`,
+export const postApiV1Posts = (createPost: CreatePost) => {
+  return customInstance<PostResponse>({
+    url: `/api/v1/posts`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    data: createTimer
+    data: createPost
   })
 }
 
-export const getPostApiTimersMutationFetcher = () => {
-  return (_: Key, { arg }: { arg: CreateTimer }) => {
-    return postApiTimers(arg)
+export const getPostApiV1PostsMutationFetcher = () => {
+  return (_: Key, { arg }: { arg: CreatePost }) => {
+    return postApiV1Posts(arg)
   }
 }
-export const getPostApiTimersMutationKey = () => [`/api/timers`] as const
+export const getPostApiV1PostsMutationKey = () => [`/api/v1/posts`] as const
 
-export type PostApiTimersMutationResult = NonNullable<Awaited<ReturnType<typeof postApiTimers>>>
-export type PostApiTimersMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+export type PostApiV1PostsMutationResult = NonNullable<Awaited<ReturnType<typeof postApiV1Posts>>>
+export type PostApiV1PostsMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Create a new timer
+ * @summary Create a post
  */
-export const usePostApiTimers = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(options?: {
+export const usePostApiV1Posts = <TError = ErrorResponse | ErrorResponse>(options?: {
   swr?: SWRMutationConfiguration<
-    Awaited<ReturnType<typeof postApiTimers>>,
+    Awaited<ReturnType<typeof postApiV1Posts>>,
     TError,
     Key,
-    CreateTimer,
-    Awaited<ReturnType<typeof postApiTimers>>
+    CreatePost,
+    Awaited<ReturnType<typeof postApiV1Posts>>
   > & { swrKey?: string }
 }) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPostApiTimersMutationKey()
-  const swrFn = getPostApiTimersMutationFetcher()
+  const swrKey = swrOptions?.swrKey ?? getPostApiV1PostsMutationKey()
+  const swrFn = getPostApiV1PostsMutationFetcher()
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -869,129 +496,48 @@ export const usePostApiTimers = <TError = ErrorResponse | ErrorResponse | ErrorR
 }
 
 /**
- * Retrieve all timers for a specific task
- * @summary Get timers for a task
+ * @summary Update a post
  */
-export const getApiTasksTaskIdTimers = (taskId: number) => {
-  return customInstance<TimerListResponse>({ url: `/api/tasks/${taskId}/timers`, method: 'GET' })
-}
-
-export const getGetApiTasksTaskIdTimersKey = (taskId: number) =>
-  [`/api/tasks/${taskId}/timers`] as const
-
-export type GetApiTasksTaskIdTimersQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getApiTasksTaskIdTimers>>
->
-export type GetApiTasksTaskIdTimersQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Get timers for a task
- */
-export const useGetApiTasksTaskIdTimers = <TError = ErrorResponse | ErrorResponse>(
-  taskId: number,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTasksTaskIdTimers>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!taskId
-  const swrKey =
-    swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTasksTaskIdTimersKey(taskId) : null))
-  const swrFn = () => getApiTasksTaskIdTimers(taskId)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Retrieve a specific timer by its ID
- * @summary Get a timer by ID
- */
-export const getApiTimersId = (id: number) => {
-  return customInstance<TimerResponse>({ url: `/api/timers/${id}`, method: 'GET' })
-}
-
-export const getGetApiTimersIdKey = (id: number) => [`/api/timers/${id}`] as const
-
-export type GetApiTimersIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTimersId>>>
-export type GetApiTimersIdQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Get a timer by ID
- */
-export const useGetApiTimersId = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTimersId>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!id
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTimersIdKey(id) : null))
-  const swrFn = () => getApiTimersId(id)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Update an existing timer (typically to set end time)
- * @summary Update a timer
- */
-export const putApiTimersId = (id: number, updateTimer: UpdateTimer) => {
-  return customInstance<TimerResponse>({
-    url: `/api/timers/${id}`,
-    method: 'PUT',
+export const patchApiV1PostsId = (id: number, updatePost: UpdatePost) => {
+  return customInstance<PostResponse>({
+    url: `/api/v1/posts/${id}`,
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    data: updateTimer
+    data: updatePost
   })
 }
 
-export const getPutApiTimersIdMutationFetcher = (id: number) => {
-  return (_: Key, { arg }: { arg: UpdateTimer }) => {
-    return putApiTimersId(id, arg)
+export const getPatchApiV1PostsIdMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: UpdatePost }) => {
+    return patchApiV1PostsId(id, arg)
   }
 }
-export const getPutApiTimersIdMutationKey = (id: number) => [`/api/timers/${id}`] as const
+export const getPatchApiV1PostsIdMutationKey = (id: number) => [`/api/v1/posts/${id}`] as const
 
-export type PutApiTimersIdMutationResult = NonNullable<Awaited<ReturnType<typeof putApiTimersId>>>
-export type PutApiTimersIdMutationError = ErrorResponse | ErrorResponse
+export type PatchApiV1PostsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApiV1PostsId>>
+>
+export type PatchApiV1PostsIdMutationError = ErrorResponse | ErrorResponse | ErrorResponse
 
 /**
- * @summary Update a timer
+ * @summary Update a post
  */
-export const usePutApiTimersId = <TError = ErrorResponse | ErrorResponse>(
+export const usePatchApiV1PostsId = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
   id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof putApiTimersId>>,
+      Awaited<ReturnType<typeof patchApiV1PostsId>>,
       TError,
       Key,
-      UpdateTimer,
-      Awaited<ReturnType<typeof putApiTimersId>>
+      UpdatePost,
+      Awaited<ReturnType<typeof patchApiV1PostsId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPutApiTimersIdMutationKey(id)
-  const swrFn = getPutApiTimersIdMutationFetcher(id)
+  const swrKey = swrOptions?.swrKey ?? getPatchApiV1PostsIdMutationKey(id)
+  const swrFn = getPatchApiV1PostsIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -1002,44 +548,43 @@ export const usePutApiTimersId = <TError = ErrorResponse | ErrorResponse>(
 }
 
 /**
- * Delete a timer
- * @summary Delete a timer
+ * @summary Delete a post
  */
-export const deleteApiTimersId = (id: number) => {
-  return customInstance<TimerResponse>({ url: `/api/timers/${id}`, method: 'DELETE' })
+export const deleteApiV1PostsId = (id: number) => {
+  return customInstance<PostResponse>({ url: `/api/v1/posts/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiTimersIdMutationFetcher = (id: number) => {
+export const getDeleteApiV1PostsIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return deleteApiTimersId(id)
+    return deleteApiV1PostsId(id)
   }
 }
-export const getDeleteApiTimersIdMutationKey = (id: number) => [`/api/timers/${id}`] as const
+export const getDeleteApiV1PostsIdMutationKey = (id: number) => [`/api/v1/posts/${id}`] as const
 
-export type DeleteApiTimersIdMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteApiTimersId>>
+export type DeleteApiV1PostsIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiV1PostsId>>
 >
-export type DeleteApiTimersIdMutationError = ErrorResponse | ErrorResponse
+export type DeleteApiV1PostsIdMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Delete a timer
+ * @summary Delete a post
  */
-export const useDeleteApiTimersId = <TError = ErrorResponse | ErrorResponse>(
+export const useDeleteApiV1PostsId = <TError = ErrorResponse | ErrorResponse>(
   id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof deleteApiTimersId>>,
+      Awaited<ReturnType<typeof deleteApiV1PostsId>>,
       TError,
       Key,
       Arguments,
-      Awaited<ReturnType<typeof deleteApiTimersId>>
+      Awaited<ReturnType<typeof deleteApiV1PostsId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getDeleteApiTimersIdMutationKey(id)
-  const swrFn = getDeleteApiTimersIdMutationFetcher(id)
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiV1PostsIdMutationKey(id)
+  const swrFn = getDeleteApiV1PostsIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -1050,32 +595,36 @@ export const useDeleteApiTimersId = <TError = ErrorResponse | ErrorResponse>(
 }
 
 /**
- * Retrieve all tags for the current user
- * @summary Get all tags
+ * Notes list, pinned first, sorted by updated_at desc. Use limit/offset for paging.
+ * @summary List notes
  */
-export const getApiTags = () => {
-  return customInstance<TagListResponse>({ url: `/api/tags`, method: 'GET' })
+export const getApiV1Notes = (params?: GetApiV1NotesParams) => {
+  return customInstance<NoteListResponse>({ url: `/api/v1/notes`, method: 'GET', params })
 }
 
-export const getGetApiTagsKey = () => [`/api/tags`] as const
+export const getGetApiV1NotesKey = (params?: GetApiV1NotesParams) =>
+  [`/api/v1/notes`, ...(params ? [params] : [])] as const
 
-export type GetApiTagsQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTags>>>
-export type GetApiTagsQueryError = ErrorResponse
+export type GetApiV1NotesQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1Notes>>>
+export type GetApiV1NotesQueryError = ErrorResponse
 
 /**
- * @summary Get all tags
+ * @summary List notes
  */
-export const useGetApiTags = <TError = ErrorResponse>(options?: {
-  swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTags>>, TError> & {
-    swrKey?: Key
-    enabled?: boolean
+export const useGetApiV1Notes = <TError = ErrorResponse>(
+  params?: GetApiV1NotesParams,
+  options?: {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1Notes>>, TError> & {
+      swrKey?: Key
+      enabled?: boolean
+    }
   }
-}) => {
+) => {
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTagsKey() : null))
-  const swrFn = () => getApiTags()
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1NotesKey(params) : null))
+  const swrFn = () => getApiV1Notes(params)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 
@@ -1086,44 +635,43 @@ export const useGetApiTags = <TError = ErrorResponse>(options?: {
 }
 
 /**
- * Create a new tag
- * @summary Create a tag
+ * @summary Create a note
  */
-export const postApiTags = (createTag: CreateTag) => {
-  return customInstance<TagResponse>({
-    url: `/api/tags`,
+export const postApiV1Notes = (createNote: CreateNote) => {
+  return customInstance<NoteResponse>({
+    url: `/api/v1/notes`,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    data: createTag
+    data: createNote
   })
 }
 
-export const getPostApiTagsMutationFetcher = () => {
-  return (_: Key, { arg }: { arg: CreateTag }) => {
-    return postApiTags(arg)
+export const getPostApiV1NotesMutationFetcher = () => {
+  return (_: Key, { arg }: { arg: CreateNote }) => {
+    return postApiV1Notes(arg)
   }
 }
-export const getPostApiTagsMutationKey = () => [`/api/tags`] as const
+export const getPostApiV1NotesMutationKey = () => [`/api/v1/notes`] as const
 
-export type PostApiTagsMutationResult = NonNullable<Awaited<ReturnType<typeof postApiTags>>>
-export type PostApiTagsMutationError = ErrorResponse | ErrorResponse
+export type PostApiV1NotesMutationResult = NonNullable<Awaited<ReturnType<typeof postApiV1Notes>>>
+export type PostApiV1NotesMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Create a tag
+ * @summary Create a note
  */
-export const usePostApiTags = <TError = ErrorResponse | ErrorResponse>(options?: {
+export const usePostApiV1Notes = <TError = ErrorResponse | ErrorResponse>(options?: {
   swr?: SWRMutationConfiguration<
-    Awaited<ReturnType<typeof postApiTags>>,
+    Awaited<ReturnType<typeof postApiV1Notes>>,
     TError,
     Key,
-    CreateTag,
-    Awaited<ReturnType<typeof postApiTags>>
+    CreateNote,
+    Awaited<ReturnType<typeof postApiV1Notes>>
   > & { swrKey?: string }
 }) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPostApiTagsMutationKey()
-  const swrFn = getPostApiTagsMutationFetcher()
+  const swrKey = swrOptions?.swrKey ?? getPostApiV1NotesMutationKey()
+  const swrFn = getPostApiV1NotesMutationFetcher()
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -1134,25 +682,24 @@ export const usePostApiTags = <TError = ErrorResponse | ErrorResponse>(options?:
 }
 
 /**
- * Retrieve a specific tag by ID
- * @summary Get a tag
+ * @summary Get a note
  */
-export const getApiTagsId = (id: number) => {
-  return customInstance<TagResponse>({ url: `/api/tags/${id}`, method: 'GET' })
+export const getApiV1NotesId = (id: number) => {
+  return customInstance<NoteResponse>({ url: `/api/v1/notes/${id}`, method: 'GET' })
 }
 
-export const getGetApiTagsIdKey = (id: number) => [`/api/tags/${id}`] as const
+export const getGetApiV1NotesIdKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
-export type GetApiTagsIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiTagsId>>>
-export type GetApiTagsIdQueryError = ErrorResponse | ErrorResponse
+export type GetApiV1NotesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiV1NotesId>>>
+export type GetApiV1NotesIdQueryError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Get a tag
+ * @summary Get a note
  */
-export const useGetApiTagsId = <TError = ErrorResponse | ErrorResponse>(
+export const useGetApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
   id: number,
   options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiTagsId>>, TError> & {
+    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiV1NotesId>>, TError> & {
       swrKey?: Key
       enabled?: boolean
     }
@@ -1161,8 +708,8 @@ export const useGetApiTagsId = <TError = ErrorResponse | ErrorResponse>(
   const { swr: swrOptions } = options ?? {}
 
   const isEnabled = swrOptions?.enabled !== false && !!id
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiTagsIdKey(id) : null))
-  const swrFn = () => getApiTagsId(id)
+  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiV1NotesIdKey(id) : null))
+  const swrFn = () => getApiV1NotesId(id)
 
   const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
 
@@ -1173,47 +720,49 @@ export const useGetApiTagsId = <TError = ErrorResponse | ErrorResponse>(
 }
 
 /**
- * Update an existing tag by ID
- * @summary Update a tag
+ * Update title, body, or pinned status. Used by auto-save (debounced).
+ * @summary Update a note
  */
-export const putApiTagsId = (id: number, updateTag: UpdateTag) => {
-  return customInstance<TagResponse>({
-    url: `/api/tags/${id}`,
-    method: 'PUT',
+export const patchApiV1NotesId = (id: number, updateNote: UpdateNote) => {
+  return customInstance<NoteResponse>({
+    url: `/api/v1/notes/${id}`,
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    data: updateTag
+    data: updateNote
   })
 }
 
-export const getPutApiTagsIdMutationFetcher = (id: number) => {
-  return (_: Key, { arg }: { arg: UpdateTag }) => {
-    return putApiTagsId(id, arg)
+export const getPatchApiV1NotesIdMutationFetcher = (id: number) => {
+  return (_: Key, { arg }: { arg: UpdateNote }) => {
+    return patchApiV1NotesId(id, arg)
   }
 }
-export const getPutApiTagsIdMutationKey = (id: number) => [`/api/tags/${id}`] as const
+export const getPatchApiV1NotesIdMutationKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
-export type PutApiTagsIdMutationResult = NonNullable<Awaited<ReturnType<typeof putApiTagsId>>>
-export type PutApiTagsIdMutationError = ErrorResponse | ErrorResponse | ErrorResponse
+export type PatchApiV1NotesIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof patchApiV1NotesId>>
+>
+export type PatchApiV1NotesIdMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Update a tag
+ * @summary Update a note
  */
-export const usePutApiTagsId = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
+export const usePatchApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
   id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof putApiTagsId>>,
+      Awaited<ReturnType<typeof patchApiV1NotesId>>,
       TError,
       Key,
-      UpdateTag,
-      Awaited<ReturnType<typeof putApiTagsId>>
+      UpdateNote,
+      Awaited<ReturnType<typeof patchApiV1NotesId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPutApiTagsIdMutationKey(id)
-  const swrFn = getPutApiTagsIdMutationFetcher(id)
+  const swrKey = swrOptions?.swrKey ?? getPatchApiV1NotesIdMutationKey(id)
+  const swrFn = getPatchApiV1NotesIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -1224,42 +773,43 @@ export const usePutApiTagsId = <TError = ErrorResponse | ErrorResponse | ErrorRe
 }
 
 /**
- * Delete a tag by ID. This will also remove the tag from all associated tasks.
- * @summary Delete a tag
+ * @summary Delete a note
  */
-export const deleteApiTagsId = (id: number) => {
-  return customInstance<TagResponse>({ url: `/api/tags/${id}`, method: 'DELETE' })
+export const deleteApiV1NotesId = (id: number) => {
+  return customInstance<NoteResponse>({ url: `/api/v1/notes/${id}`, method: 'DELETE' })
 }
 
-export const getDeleteApiTagsIdMutationFetcher = (id: number) => {
+export const getDeleteApiV1NotesIdMutationFetcher = (id: number) => {
   return (_: Key, __: { arg: Arguments }) => {
-    return deleteApiTagsId(id)
+    return deleteApiV1NotesId(id)
   }
 }
-export const getDeleteApiTagsIdMutationKey = (id: number) => [`/api/tags/${id}`] as const
+export const getDeleteApiV1NotesIdMutationKey = (id: number) => [`/api/v1/notes/${id}`] as const
 
-export type DeleteApiTagsIdMutationResult = NonNullable<Awaited<ReturnType<typeof deleteApiTagsId>>>
-export type DeleteApiTagsIdMutationError = ErrorResponse | ErrorResponse
+export type DeleteApiV1NotesIdMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiV1NotesId>>
+>
+export type DeleteApiV1NotesIdMutationError = ErrorResponse | ErrorResponse
 
 /**
- * @summary Delete a tag
+ * @summary Delete a note
  */
-export const useDeleteApiTagsId = <TError = ErrorResponse | ErrorResponse>(
+export const useDeleteApiV1NotesId = <TError = ErrorResponse | ErrorResponse>(
   id: number,
   options?: {
     swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof deleteApiTagsId>>,
+      Awaited<ReturnType<typeof deleteApiV1NotesId>>,
       TError,
       Key,
       Arguments,
-      Awaited<ReturnType<typeof deleteApiTagsId>>
+      Awaited<ReturnType<typeof deleteApiV1NotesId>>
     > & { swrKey?: string }
   }
 ) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getDeleteApiTagsIdMutationKey(id)
-  const swrFn = getDeleteApiTagsIdMutationFetcher(id)
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiV1NotesIdMutationKey(id)
+  const swrFn = getDeleteApiV1NotesIdMutationFetcher(id)
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 
@@ -2000,279 +1550,41 @@ export const useGetApiCalendarsIdWatch = <TError = ErrorResponse | ErrorResponse
 }
 
 /**
- * Retrieve all notes for the current user. By default, archived notes are excluded.
- * @summary Get all notes
+ * Delete the authenticated user and all their data including tenant database.
+ * @summary Delete account
  */
-export const getApiNotes = (params?: GetApiNotesParams) => {
-  return customInstance<NoteListResponse>({ url: `/api/notes`, method: 'GET', params })
+export const deleteApiAccount = () => {
+  return customInstance<DeleteAccountResponse>({ url: `/api/account`, method: 'DELETE' })
 }
 
-export const getGetApiNotesKey = (params?: GetApiNotesParams) =>
-  [`/api/notes`, ...(params ? [params] : [])] as const
-
-export type GetApiNotesQueryResult = NonNullable<Awaited<ReturnType<typeof getApiNotes>>>
-export type GetApiNotesQueryError = ErrorResponse
-
-/**
- * @summary Get all notes
- */
-export const useGetApiNotes = <TError = ErrorResponse>(
-  params?: GetApiNotesParams,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiNotes>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiNotesKey(params) : null))
-  const swrFn = () => getApiNotes(params)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
+export const getDeleteApiAccountMutationFetcher = () => {
+  return (_: Key, __: { arg: Arguments }) => {
+    return deleteApiAccount()
   }
 }
+export const getDeleteApiAccountMutationKey = () => [`/api/account`] as const
+
+export type DeleteApiAccountMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteApiAccount>>
+>
+export type DeleteApiAccountMutationError = ErrorResponse
 
 /**
- * Create a new note
- * @summary Create a note
+ * @summary Delete account
  */
-export const postApiNotes = (createNote: CreateNote) => {
-  return customInstance<NoteResponse>({
-    url: `/api/notes`,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    data: createNote
-  })
-}
-
-export const getPostApiNotesMutationFetcher = () => {
-  return (_: Key, { arg }: { arg: CreateNote }) => {
-    return postApiNotes(arg)
-  }
-}
-export const getPostApiNotesMutationKey = () => [`/api/notes`] as const
-
-export type PostApiNotesMutationResult = NonNullable<Awaited<ReturnType<typeof postApiNotes>>>
-export type PostApiNotesMutationError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Create a note
- */
-export const usePostApiNotes = <TError = ErrorResponse | ErrorResponse>(options?: {
+export const useDeleteApiAccount = <TError = ErrorResponse>(options?: {
   swr?: SWRMutationConfiguration<
-    Awaited<ReturnType<typeof postApiNotes>>,
+    Awaited<ReturnType<typeof deleteApiAccount>>,
     TError,
     Key,
-    CreateNote,
-    Awaited<ReturnType<typeof postApiNotes>>
+    Arguments,
+    Awaited<ReturnType<typeof deleteApiAccount>>
   > & { swrKey?: string }
 }) => {
   const { swr: swrOptions } = options ?? {}
 
-  const swrKey = swrOptions?.swrKey ?? getPostApiNotesMutationKey()
-  const swrFn = getPostApiNotesMutationFetcher()
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Retrieve a specific note by ID
- * @summary Get a note
- */
-export const getApiNotesId = (id: number) => {
-  return customInstance<NoteResponse>({ url: `/api/notes/${id}`, method: 'GET' })
-}
-
-export const getGetApiNotesIdKey = (id: number) => [`/api/notes/${id}`] as const
-
-export type GetApiNotesIdQueryResult = NonNullable<Awaited<ReturnType<typeof getApiNotesId>>>
-export type GetApiNotesIdQueryError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Get a note
- */
-export const useGetApiNotesId = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRConfiguration<Awaited<ReturnType<typeof getApiNotesId>>, TError> & {
-      swrKey?: Key
-      enabled?: boolean
-    }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const isEnabled = swrOptions?.enabled !== false && !!id
-  const swrKey = swrOptions?.swrKey ?? (() => (isEnabled ? getGetApiNotesIdKey(id) : null))
-  const swrFn = () => getApiNotesId(id)
-
-  const query = useSwr<Awaited<ReturnType<typeof swrFn>>, TError>(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Update an existing note by ID
- * @summary Update a note
- */
-export const putApiNotesId = (id: number, updateNote: UpdateNote) => {
-  return customInstance<NoteResponse>({
-    url: `/api/notes/${id}`,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    data: updateNote
-  })
-}
-
-export const getPutApiNotesIdMutationFetcher = (id: number) => {
-  return (_: Key, { arg }: { arg: UpdateNote }) => {
-    return putApiNotesId(id, arg)
-  }
-}
-export const getPutApiNotesIdMutationKey = (id: number) => [`/api/notes/${id}`] as const
-
-export type PutApiNotesIdMutationResult = NonNullable<Awaited<ReturnType<typeof putApiNotesId>>>
-export type PutApiNotesIdMutationError = ErrorResponse | ErrorResponse | ErrorResponse
-
-/**
- * @summary Update a note
- */
-export const usePutApiNotesId = <TError = ErrorResponse | ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof putApiNotesId>>,
-      TError,
-      Key,
-      UpdateNote,
-      Awaited<ReturnType<typeof putApiNotesId>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getPutApiNotesIdMutationKey(id)
-  const swrFn = getPutApiNotesIdMutationFetcher(id)
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Delete a note by ID
- * @summary Delete a note
- */
-export const deleteApiNotesId = (id: number) => {
-  return customInstance<NoteResponse>({ url: `/api/notes/${id}`, method: 'DELETE' })
-}
-
-export const getDeleteApiNotesIdMutationFetcher = (id: number) => {
-  return (_: Key, __: { arg: Arguments }) => {
-    return deleteApiNotesId(id)
-  }
-}
-export const getDeleteApiNotesIdMutationKey = (id: number) => [`/api/notes/${id}`] as const
-
-export type DeleteApiNotesIdMutationResult = NonNullable<
-  Awaited<ReturnType<typeof deleteApiNotesId>>
->
-export type DeleteApiNotesIdMutationError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Delete a note
- */
-export const useDeleteApiNotesId = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof deleteApiNotesId>>,
-      TError,
-      Key,
-      Arguments,
-      Awaited<ReturnType<typeof deleteApiNotesId>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getDeleteApiNotesIdMutationKey(id)
-  const swrFn = getDeleteApiNotesIdMutationFetcher(id)
-
-  const query = useSWRMutation(swrKey, swrFn, swrOptions)
-
-  return {
-    swrKey,
-    ...query
-  }
-}
-
-/**
- * Atomically creates a task from the note, records the conversion, and archives the note.
- * @summary Convert a note to a task
- */
-export const postApiNotesIdTaskConversions = (
-  id: number,
-  convertNoteToTaskRequest: ConvertNoteToTaskRequest
-) => {
-  return customInstance<ConvertNoteToTaskResponse>({
-    url: `/api/notes/${id}/task_conversions`,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    data: convertNoteToTaskRequest
-  })
-}
-
-export const getPostApiNotesIdTaskConversionsMutationFetcher = (id: number) => {
-  return (_: Key, { arg }: { arg: ConvertNoteToTaskRequest }) => {
-    return postApiNotesIdTaskConversions(id, arg)
-  }
-}
-export const getPostApiNotesIdTaskConversionsMutationKey = (id: number) =>
-  [`/api/notes/${id}/task_conversions`] as const
-
-export type PostApiNotesIdTaskConversionsMutationResult = NonNullable<
-  Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>
->
-export type PostApiNotesIdTaskConversionsMutationError = ErrorResponse | ErrorResponse
-
-/**
- * @summary Convert a note to a task
- */
-export const usePostApiNotesIdTaskConversions = <TError = ErrorResponse | ErrorResponse>(
-  id: number,
-  options?: {
-    swr?: SWRMutationConfiguration<
-      Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>,
-      TError,
-      Key,
-      ConvertNoteToTaskRequest,
-      Awaited<ReturnType<typeof postApiNotesIdTaskConversions>>
-    > & { swrKey?: string }
-  }
-) => {
-  const { swr: swrOptions } = options ?? {}
-
-  const swrKey = swrOptions?.swrKey ?? getPostApiNotesIdTaskConversionsMutationKey(id)
-  const swrFn = getPostApiNotesIdTaskConversionsMutationFetcher(id)
+  const swrKey = swrOptions?.swrKey ?? getDeleteApiAccountMutationKey()
+  const swrFn = getDeleteApiAccountMutationFetcher()
 
   const query = useSWRMutation(swrKey, swrFn, swrOptions)
 

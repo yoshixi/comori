@@ -1,35 +1,29 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 import { createAuth } from '../../core/auth'
-import { validateEnv } from '../../core/env'
+import { getEnv, validateEnv } from '../../core/env'
 import { rootLogger } from '../../lib/logger'
 import type { AppBindings, Auth } from './types'
 
 // Import route definitions from local routes directory
 import {
   healthRoute,
-  listTasksRoute,
-  getTaskRoute,
-  createTaskRoute,
-  updateTaskRoute,
-  deleteTaskRoute,
-  listTaskCommentsRoute,
-  createTaskCommentRoute,
-  getTaskCommentRoute,
-  updateTaskCommentRoute,
-  deleteTaskCommentRoute,
-  getTaskActivitiesRoute,
-  listTimersRoute,
-  getTaskTimersRoute,
-  getTimerRoute,
-  createTimerRoute,
-  updateTimerRoute,
-  deleteTimerRoute,
-  listTagsRoute,
-  getTagRoute,
-  createTagRoute,
-  updateTagRoute,
-  deleteTagRoute,
+  // Todo routes
+  listTodosRoute,
+  createTodoRoute,
+  updateTodoRoute,
+  deleteTodoRoute,
+  // Post routes
+  listPostsRoute,
+  createPostRoute,
+  updatePostRoute,
+  deletePostRoute,
+  // Note routes
+  listNotesRoute,
+  getNoteRoute,
+  createNoteRoute,
+  updateNoteRoute,
+  deleteNoteRoute,
   // Google OAuth routes (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusRoute,
   deleteGoogleAuthRoute,
@@ -52,13 +46,6 @@ import {
   getEventRoute,
   // Webhook routes
   googleCalendarWebhookRoute,
-  // Note routes
-  listNotesRoute,
-  getNoteRoute,
-  createNoteRoute,
-  updateNoteRoute,
-  deleteNoteRoute,
-  convertNoteToTaskRoute,
   // Auth routes
   tokenRoute,
   sessionRoute,
@@ -70,28 +57,22 @@ import {
 // Import handlers from local handlers directory
 import {
   healthHandler,
-  listTasksHandler,
-  getTaskHandler,
-  createTaskHandler,
-  updateTaskHandler,
-  deleteTaskHandler,
-  listTaskCommentsHandler,
-  createTaskCommentHandler,
-  getTaskCommentHandler,
-  updateTaskCommentHandler,
-  deleteTaskCommentHandler,
-  getTaskActivitiesHandler,
-  listTimersHandler,
-  getTaskTimersHandler,
-  getTimerHandler,
-  createTimerHandler,
-  updateTimerHandler,
-  deleteTimerHandler,
-  listTagsHandler,
-  getTagHandler,
-  createTagHandler,
-  updateTagHandler,
-  deleteTagHandler,
+  // Todo handlers
+  listTodosHandler,
+  createTodoHandler,
+  updateTodoHandler,
+  deleteTodoHandler,
+  // Post handlers
+  listPostsHandler,
+  createPostHandler,
+  updatePostHandler,
+  deletePostHandler,
+  // Note handlers
+  listNotesHandler,
+  getNoteHandler,
+  createNoteHandler,
+  updateNoteHandler,
+  deleteNoteHandler,
   // Google OAuth handlers (status/disconnect only - auth handled by better-auth)
   getGoogleAuthStatusHandler,
   deleteGoogleAuthHandler,
@@ -114,13 +95,6 @@ import {
   getEventHandler,
   // Webhook handlers
   googleCalendarWebhookHandler,
-  // Note handlers
-  listNotesHandler,
-  getNoteHandler,
-  createNoteHandler,
-  updateNoteHandler,
-  deleteNoteHandler,
-  convertNoteToTaskHandler,
   // Auth handlers
   createTokenHandler,
   createSessionHandler,
@@ -144,6 +118,27 @@ export interface AppDeps {
   skipEnvValidation?: boolean
 }
 
+function getAllowedCorsOrigins(): Set<string> {
+  const env = getEnv()
+  const allowed = new Set<string>()
+
+  const addOrigin = (value: string | undefined) => {
+    if (!value) return
+    try {
+      allowed.add(new URL(value).origin)
+    } catch {
+      rootLogger.warn({ value }, 'ignoring invalid CORS origin')
+    }
+  }
+
+  addOrigin(env.BETTER_AUTH_URL)
+  for (const origin of (env.TRUSTED_ORIGINS || '').split(',')) {
+    addOrigin(origin.trim())
+  }
+
+  return allowed
+}
+
 export function createApp(deps?: AppDeps) {
   if (!deps?.skipEnvValidation) {
     validateEnv()
@@ -158,9 +153,25 @@ export function createApp(deps?: AppDeps) {
   // Hono's CORS middleware sets headers on c.res after await next(),
   // so it correctly applies to all responses including raw Response
   // objects returned by auth.handler().
+  const allowedCorsOrigins = getAllowedCorsOrigins()
   app.use('/*', cors({
-    origin: (origin) => origin,
-    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: (origin) => {
+      if (!origin) return ''
+
+      try {
+        const requestOrigin = new URL(origin).origin
+        if (allowedCorsOrigins.has(requestOrigin)) {
+          return requestOrigin
+        }
+
+        rootLogger.warn({ origin: requestOrigin }, 'blocked CORS origin')
+        return ''
+      } catch {
+        rootLogger.warn({ origin }, 'blocked malformed CORS origin')
+        return ''
+      }
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     exposeHeaders: ['set-auth-token'],
     credentials: true,
@@ -183,44 +194,35 @@ export function createApp(deps?: AppDeps) {
   // Register health check route
   app.openapi(healthRoute, healthHandler)
 
-  // Register task routes
-  app.openapi(listTasksRoute, listTasksHandler)
-  app.openapi(getTaskRoute, getTaskHandler)
-  app.openapi(createTaskRoute, createTaskHandler)
-  app.openapi(updateTaskRoute, updateTaskHandler)
-  app.openapi(deleteTaskRoute, deleteTaskHandler)
+  // --- v1 domain routes ---
 
-  // Register task comment routes
-  app.openapi(listTaskCommentsRoute, listTaskCommentsHandler)
-  app.openapi(createTaskCommentRoute, createTaskCommentHandler)
-  app.openapi(getTaskCommentRoute, getTaskCommentHandler)
-  app.openapi(updateTaskCommentRoute, updateTaskCommentHandler)
-  app.openapi(deleteTaskCommentRoute, deleteTaskCommentHandler)
+  // Todo routes
+  app.openapi(listTodosRoute, listTodosHandler)
+  app.openapi(createTodoRoute, createTodoHandler)
+  app.openapi(updateTodoRoute, updateTodoHandler)
+  app.openapi(deleteTodoRoute, deleteTodoHandler)
 
-  // Register task activity route
-  app.openapi(getTaskActivitiesRoute, getTaskActivitiesHandler)
+  // Post routes
+  app.openapi(listPostsRoute, listPostsHandler)
+  app.openapi(createPostRoute, createPostHandler)
+  app.openapi(updatePostRoute, updatePostHandler)
+  app.openapi(deletePostRoute, deletePostHandler)
 
-  // Register timer routes
-  app.openapi(listTimersRoute, listTimersHandler)
-  app.openapi(getTaskTimersRoute, getTaskTimersHandler)
-  app.openapi(getTimerRoute, getTimerHandler)
-  app.openapi(createTimerRoute, createTimerHandler)
-  app.openapi(updateTimerRoute, updateTimerHandler)
-  app.openapi(deleteTimerRoute, deleteTimerHandler)
+  // Note routes
+  app.openapi(listNotesRoute, listNotesHandler)
+  app.openapi(getNoteRoute, getNoteHandler)
+  app.openapi(createNoteRoute, createNoteHandler)
+  app.openapi(updateNoteRoute, updateNoteHandler)
+  app.openapi(deleteNoteRoute, deleteNoteHandler)
 
-  // Register tag routes
-  app.openapi(listTagsRoute, listTagsHandler)
-  app.openapi(getTagRoute, getTagHandler)
-  app.openapi(createTagRoute, createTagHandler)
-  app.openapi(updateTagRoute, updateTagHandler)
-  app.openapi(deleteTagRoute, deleteTagHandler)
+  // --- Existing infrastructure routes ---
 
-  // Register Google OAuth routes (status/disconnect only - auth handled by better-auth)
+  // Google OAuth routes (status/disconnect only - auth handled by better-auth)
   app.openapi(getGoogleAuthStatusRoute, getGoogleAuthStatusHandler)
   app.openapi(deleteGoogleAuthRoute, deleteGoogleAuthHandler)
   app.openapi(listGoogleAccountsRoute, listGoogleAccountsHandler)
 
-  // Register calendar routes
+  // Calendar routes
   app.openapi(listAvailableCalendarsRoute, listAvailableCalendarsHandler)
   app.openapi(listCalendarsRoute, listCalendarsHandler)
   app.openapi(createCalendarRoute, createCalendarHandler)
@@ -230,27 +232,19 @@ export function createApp(deps?: AppDeps) {
   app.openapi(syncCalendarRoute, syncCalendarHandler)
   app.openapi(syncAllCalendarsRoute, syncAllCalendarsHandler)
 
-  // Register event routes
+  // Event routes
   app.openapi(listEventsRoute, listEventsHandler)
   app.openapi(getEventRoute, getEventHandler)
 
-  // Register calendar watch routes
+  // Calendar watch routes
   app.openapi(watchCalendarRoute, watchCalendarHandler)
   app.openapi(stopWatchingCalendarRoute, stopWatchingCalendarHandler)
   app.openapi(getWatchStatusRoute, getWatchStatusHandler)
 
-  // Register note routes
-  app.openapi(listNotesRoute, listNotesHandler)
-  app.openapi(getNoteRoute, getNoteHandler)
-  app.openapi(createNoteRoute, createNoteHandler)
-  app.openapi(updateNoteRoute, updateNoteHandler)
-  app.openapi(deleteNoteRoute, deleteNoteHandler)
-  app.openapi(convertNoteToTaskRoute, convertNoteToTaskHandler)
-
-  // Register account routes
+  // Account routes
   app.openapi(deleteAccountRoute, deleteAccountHandler)
 
-  // Register webhook routes
+  // Webhook routes
   app.openapi(googleCalendarWebhookRoute, googleCalendarWebhookHandler)
 
   // The OpenAPI documentation will be available at /doc
@@ -258,8 +252,8 @@ export function createApp(deps?: AppDeps) {
     openapi: '3.0.0',
     info: {
       version: '1.0.0',
-      title: 'Techoo API',
-      description: 'API for the Techoo task management application with OpenAPI documentation'
+      title: 'Techo API',
+      description: 'API for the Techo digital planner application'
     }
   })
 

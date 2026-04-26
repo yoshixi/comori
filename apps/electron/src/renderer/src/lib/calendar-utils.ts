@@ -1,7 +1,16 @@
 /**
  * Shared calendar utilities for CalendarView and TaskTimeRangePicker
  */
-import type { Task, CalendarEvent, Calendar } from '../gen/api'
+import type { CalendarEvent, Calendar } from '../gen/api'
+
+/** Minimal task-like shape used by calendar layout utilities */
+export interface Task {
+  id: number | string
+  title: string
+  startAt: string | null
+  endAt: string | null
+  completedAt?: string | null
+}
 
 // ============================================================================
 // Constants
@@ -59,10 +68,10 @@ export const DEFAULT_ZOOM = 1.0
  * @returns Minutes per time slot (30, 15, 10, or 5)
  */
 export const getSlotMinutesForZoom = (zoom: number): number => {
-  if (zoom <= 0.75) return 30  // 30 min slots when zoomed out (overview)
-  if (zoom <= 1.5) return 15   // 15 min slots at default zoom
-  if (zoom <= 2.25) return 10  // 10 min slots when zoomed in
-  return 5                      // 5 min slots when fully zoomed in (precise)
+  if (zoom <= 0.75) return 30 // 30 min slots when zoomed out (overview)
+  if (zoom <= 1.5) return 15 // 15 min slots at default zoom
+  if (zoom <= 2.25) return 10 // 10 min slots when zoomed in
+  return 5 // 5 min slots when fully zoomed in (precise)
 }
 
 /**
@@ -71,7 +80,9 @@ export const getSlotMinutesForZoom = (zoom: number): number => {
  * @param zoom - Current zoom level
  * @returns Object containing slotMinutes, slotsPerHour, and total slotCount
  */
-export const getSlotConfig = (zoom: number): {
+export const getSlotConfig = (
+  zoom: number
+): {
   slotMinutes: number
   slotsPerHour: number
   slotCount: number

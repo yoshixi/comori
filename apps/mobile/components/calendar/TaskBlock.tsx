@@ -5,11 +5,11 @@ import Animated, {
   runOnJS,
   withSpring,
 } from 'react-native-reanimated';
-import type { Task } from '@/gen/api/schemas';
+import type { CalendarTimedItem } from '@/lib/todoCalendar';
 import { Text } from '@/components/ui/text';
 
 export interface TaskBlockProps {
-  task: Task;
+  task: CalendarTimedItem;
   top: number;
   height: number;
   width: number;
@@ -21,7 +21,7 @@ export interface TaskBlockProps {
   isCompleted: boolean;
   onPress: () => void;
   /** Called when task is dragged to a new time */
-  onMove?: (task: Task, deltaMinutes: number) => void;
+  onMove?: (task: CalendarTimedItem, deltaMinutes: number) => void;
 }
 
 export function TaskBlock({
@@ -48,7 +48,6 @@ export function TaskBlock({
 
   const handleMove = (deltaY: number) => {
     if (!onMove) return;
-    // Convert pixel offset to minutes (snap to 15-minute increments)
     const minutesPerPixel = 60 / hourHeight;
     const deltaMinutes = Math.round((deltaY * minutesPerPixel) / 15) * 15;
     if (deltaMinutes !== 0) {
@@ -125,11 +124,6 @@ export function TaskBlock({
         >
           {task.title}
         </Text>
-        {height > 50 && task.tags.length > 0 && (
-          <Text className="text-white/70 text-xs" numberOfLines={1}>
-            {task.tags.map((t) => t.name).join(', ')}
-          </Text>
-        )}
       </Animated.View>
     </GestureDetector>
   );

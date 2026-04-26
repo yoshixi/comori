@@ -271,11 +271,11 @@ describe('Auth with multi-tenant provisioning', () => {
 
       const jwt = await getJwt(getSessionToken(signInRes)!)
 
-      const tasksRes = await request(
-        new Request('http://localhost/api/tasks', { headers: authHeaders(jwt) })
+      const todosRes = await request(
+        new Request('http://localhost/api/v1/todos', { headers: authHeaders(jwt) })
       )
-      expect(tasksRes.status).toBe(200)
-      expect((await tasksRes.json()).tasks).toEqual([])
+      expect(todosRes.status).toBe(200)
+      expect((await todosRes.json()).data).toEqual([])
     })
   })
 
@@ -347,14 +347,14 @@ describe('Auth with multi-tenant provisioning', () => {
       expect(fs.existsSync(tenantDbPath)).toBe(true)
 
       // Verify user can create tasks in their tenant
-      const taskRes = await request(
-        new Request('http://localhost/api/tasks', {
+      const todoRes = await request(
+        new Request('http://localhost/api/v1/todos', {
           method: 'POST',
           headers: authHeaders(jwt),
-          body: JSON.stringify({ title: 'OAuth user task' }),
+          body: JSON.stringify({ title: 'OAuth user todo' }),
         })
       )
-      expect(taskRes.status).toBe(201)
+      expect(todoRes.status).toBe(201)
     })
 
     it('should not re-provision on subsequent sign-in', async () => {
@@ -370,10 +370,10 @@ describe('Auth with multi-tenant provisioning', () => {
       const signInRes = await signIn('repeat@example.com', 'password123456')
       const jwt2 = await getJwt(getSessionToken(signInRes)!)
 
-      const tasksRes = await request(
-        new Request('http://localhost/api/tasks', { headers: authHeaders(jwt2) })
+      const todosRes = await request(
+        new Request('http://localhost/api/v1/todos', { headers: authHeaders(jwt2) })
       )
-      expect(tasksRes.status).toBe(200)
+      expect(todosRes.status).toBe(200)
     })
   })
 
@@ -392,35 +392,36 @@ describe('Auth with multi-tenant provisioning', () => {
       jwtB = await getJwt(getSessionToken(resB)!)
     })
 
-    it('should isolate tasks between users', async () => {
-      await request(new Request('http://localhost/api/tasks', {
-        method: 'POST', headers: authHeaders(jwtA), body: JSON.stringify({ title: 'A-only task' }),
+    it('should isolate todos between users', async () => {
+      await request(new Request('http://localhost/api/v1/todos', {
+        method: 'POST', headers: authHeaders(jwtA), body: JSON.stringify({ title: 'A-only todo' }),
       }))
-      await request(new Request('http://localhost/api/tasks', {
-        method: 'POST', headers: authHeaders(jwtB), body: JSON.stringify({ title: 'B-only task' }),
+      await request(new Request('http://localhost/api/v1/todos', {
+        method: 'POST', headers: authHeaders(jwtB), body: JSON.stringify({ title: 'B-only todo' }),
       }))
 
-      const listA = await request(new Request('http://localhost/api/tasks', { headers: authHeaders(jwtA) }))
+      const listA = await request(new Request('http://localhost/api/v1/todos', { headers: authHeaders(jwtA) }))
       const dataA = await listA.json()
-      expect(dataA.tasks).toHaveLength(1)
-      expect(dataA.tasks[0].title).toBe('A-only task')
+      expect(dataA.data).toHaveLength(1)
+      expect(dataA.data[0].title).toBe('A-only todo')
 
-      const listB = await request(new Request('http://localhost/api/tasks', { headers: authHeaders(jwtB) }))
+      const listB = await request(new Request('http://localhost/api/v1/todos', { headers: authHeaders(jwtB) }))
       const dataB = await listB.json()
-      expect(dataB.tasks).toHaveLength(1)
-      expect(dataB.tasks[0].title).toBe('B-only task')
+      expect(dataB.data).toHaveLength(1)
+      expect(dataB.data[0].title).toBe('B-only todo')
     })
 
-    it('should not allow user A to access user B task by ID', async () => {
-      const createB = await request(new Request('http://localhost/api/tasks', {
-        method: 'POST', headers: authHeaders(jwtB), body: JSON.stringify({ title: 'Secret B task' }),
+    it('should not allow user A to see user B todos', async () => {
+      // User B creates a todo
+      await request(new Request('http://localhost/api/v1/todos', {
+        method: 'POST', headers: authHeaders(jwtB), body: JSON.stringify({ title: 'Secret B todo' }),
       }))
-      const { task: taskB } = await createB.json()
 
-      const readA = await request(
-        new Request(`http://localhost/api/tasks/${taskB.id}`, { headers: authHeaders(jwtA) })
-      )
-      expect(readA.status).toBe(404)
+      // User A lists todos — should not see B's todo
+      const listA = await request(new Request('http://localhost/api/v1/todos', { headers: authHeaders(jwtA) }))
+      const dataA = await listA.json()
+      const titles = dataA.data.map((t: { title: string }) => t.title)
+      expect(titles).not.toContain('Secret B todo')
     })
   })
 })

@@ -4,7 +4,7 @@ import { SettingsContent } from '@/components/settings/SettingsContent';
 
 export default function SettingsScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['left', 'right']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>
       <ScrollView className="flex-1">
         <View className="p-4">
           <SettingsContent />

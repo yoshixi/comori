@@ -1,82 +1,39 @@
-# Minimal Template
+# Techo — mobile companion
 
-This is a [React Native](https://reactnative.dev/) project built with [Expo](https://expo.dev/) and [React Native Reusables](https://reactnativereusables.com).
+Expo app aligned with [`docs/CONCEPT.md`](../../docs/CONCEPT.md): **today’s to-dos**, **posts** (day log), **calendar** (to-dos + Google events), **notes** (off-timeline), and **settings** (OAuth / calendars).
 
-It was initialized using the following command:
+## API client
 
-```bash
-npx @react-native-reusables/cli@latest init -t mobile
-```
-
-## Getting Started
-
-To run the development server:
+Regenerate from the Electron OpenAPI export (keeps types in sync with the backend):
 
 ```bash
-    npm run dev
-    # or
-    yarn dev
-    # or
-    pnpm dev
-    # or
-    bun dev
+pnpm --filter mobile run api:generate
 ```
 
-This will start the Expo Dev Server. Open the app in:
+## Run
 
-- **iOS**: press `i` to launch in the iOS simulator _(Mac only)_
-- **Android**: press `a` to launch in the Android emulator
-- **Web**: press `w` to run in a browser
-
-You can also scan the QR code using the [Expo Go](https://expo.dev/go) app on your device. This project fully supports running in Expo Go for quick testing on physical devices.
-
-## Adding components
-
-You can add more reusable components using the CLI:
+From repo root (with dev env):
 
 ```bash
-npx react-native-reusables/cli@latest add [...components]
+pnpm --filter mobile run dev
 ```
 
-> e.g. `npx react-native-reusables/cli@latest add input textarea`
+Configure API base URL for the mutator via your Expo env (see `.env_example`).
 
-If you don't specify any component names, you'll be prompted to select which components to add interactively. Use the `--all` flag to install all available components at once.
+### Google sign-in (mobile)
 
-## Project Features
+The API validates `redirect_uri` from `expo-linking` before starting OAuth. **Expo Go** uses URLs like `exp://192.168.x.x:8081/--/auth-callback`; the backend allows those automatically (LAN, `127.0.0.1`, `.exp.direct`, `.expo.dev`, etc.). **Release builds** use `techoo://auth-callback` per `app.json` `scheme`. If you still see `Untrusted redirect_uri`, copy the exact URL from a debug log and add it to `MOBILE_REDIRECT_URIS` on the server, or deploy the backend with the latest `mobile-redirect` rules.
 
-- ⚛️ Built with [Expo Router](https://expo.dev/router)
-- 🎨 Styled with [Tailwind CSS](https://tailwindcss.com/) via [Nativewind](https://www.nativewind.dev/)
-- 📦 UI powered by [React Native Reusables](https://github.com/founded-labs/react-native-reusables)
-- 🚀 New Architecture enabled
-- 🔥 Edge to Edge enabled
-- 📱 Runs on iOS, Android, and Web
+## Navigation (two tabs)
 
-## Learn More
+| Tab      | Role |
+|----------|------|
+| **Today** | **Plan** — to-dos for the selected day, week strip, “Next up” when viewing today. **Log** — that day’s posts + sticky composer. Mode is persisted (`AsyncStorage`). |
+| **Library** | Calendar, all open to-dos, **Logbook** (last 14 days of posts), Notes, Settings — same screens as before, opened from one list (hidden from the tab bar). |
 
-To dive deeper into the technologies used:
+## Stack notes
 
-- [React Native Docs](https://reactnative.dev/docs/getting-started)
-- [Expo Docs](https://docs.expo.dev/)
-- [Nativewind Docs](https://www.nativewind.dev/)
-- [React Native Reusables](https://reactnativereusables.com)
+- Expo Router, Nativewind, SWR + Orval-generated hooks (`gen/api/`)
+- Modal routes: `todo/[id]`, `note/[id]`
 
-## Deploy with EAS
-
-The easiest way to deploy your app is with [Expo Application Services (EAS)](https://expo.dev/eas).
-
-- [EAS Build](https://docs.expo.dev/build/introduction/)
-- [EAS Updates](https://docs.expo.dev/eas-update/introduction/)
-- [EAS Submit](https://docs.expo.dev/submit/introduction/)
-
----
-
-If you enjoy using React Native Reusables, please consider giving it a ⭐ on [GitHub](https://github.com/founded-labs/react-native-reusables). Your support means a lot!
-
-## Set up for prod
-
-```
-  pnpm exec eas secret:create --name EXPO_PUBLIC_API_BASE_URL --value https://api.techoo.app
-```
-
-
-
+Legacy **tasks / timers / tags** UI has been removed in favor of **todos** and **posts**.

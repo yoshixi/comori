@@ -8,5 +8,5 @@
 import type { Note } from './note';
 
 export interface NoteResponse {
-  note: Note;
+  data: Note;
 }

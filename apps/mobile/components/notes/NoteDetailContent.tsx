@@ -1,15 +1,14 @@
 import { useCallback, useState, useEffect } from 'react';
 import { View, Pressable, Alert, TextInput, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { X, Trash2, Archive, ArrowRightLeft } from 'lucide-react-native';
-import { useGetApiNotesId } from '@/gen/api/endpoints/techooAPI.gen';
+import { X, Trash2 } from 'lucide-react-native';
+import { useGetApiV1NotesId } from '@/gen/api/endpoints/techooAPI.gen';
 import { Text } from '@/components/ui/text';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useNotesData, mergeNoteText } from '@/hooks/useNotesData';
 import { formatDateTime } from '@/lib/time';
-import { ConvertToTaskSheet } from './ConvertToTaskSheet';
 
 export interface NoteDetailContentProps {
   noteId: number;
@@ -18,18 +17,15 @@ export interface NoteDetailContentProps {
 export function NoteDetailContent({ noteId }: NoteDetailContentProps) {
   const router = useRouter();
   const { height: windowHeight } = useWindowDimensions();
-  const { data: noteData, isLoading, error } = useGetApiNotesId(noteId);
-  const { handleUpdateNote, handleDeleteNote, handleArchiveNote, handleConvertToTask } = useNotesData();
+  const { data: noteData, isLoading, error } = useGetApiV1NotesId(noteId);
+  const { handleUpdateNote, handleDeleteNote } = useNotesData();
 
-  const note = noteData?.note;
+  const note = noteData?.data;
 
   const [text, setText] = useState('');
-  const [showConvertSheet, setShowConvertSheet] = useState(false);
 
   useEffect(() => {
-    if (note) {
-      setText(mergeNoteText(note));
-    }
+    if (note) setText(mergeNoteText(note));
   }, [note]);
 
   const handleSave = useCallback(
@@ -52,7 +48,7 @@ export function NoteDetailContent({ noteId }: NoteDetailContentProps) {
   }, [router]);
 
   const handleDelete = useCallback(() => {
-    Alert.alert('Delete Note', 'Are you sure you want to delete this note?', [
+    Alert.alert('Delete note', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -65,17 +61,11 @@ export function NoteDetailContent({ noteId }: NoteDetailContentProps) {
     ]);
   }, [handleDeleteNote, noteId, router]);
 
-  const handleArchive = useCallback(async () => {
-    await handleArchiveNote(noteId);
-    router.back();
-  }, [handleArchiveNote, noteId, router]);
-
   if (isLoading) {
     return (
       <View className="flex-1 p-4">
-        <Skeleton className="h-8 w-3/4 mb-4" />
-        <Skeleton className="h-4 w-full mb-2" />
-        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="mb-4 h-8 w-3/4" />
+        <Skeleton className="mb-2 h-4 w-full" />
       </View>
     );
   }
@@ -85,7 +75,7 @@ export function NoteDetailContent({ noteId }: NoteDetailContentProps) {
       <View className="flex-1 items-center justify-center p-4">
         <Text className="text-destructive">Failed to load note</Text>
         <Button onPress={handleClose} className="mt-4">
-          <Text>Go Back</Text>
+          <Text>Go back</Text>
         </Button>
       </View>
     );
@@ -93,57 +83,36 @@ export function NoteDetailContent({ noteId }: NoteDetailContentProps) {
 
   return (
     <View className="flex-1">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-6 py-4 border-b border-border">
+      <View className="flex-row items-center justify-between border-b border-border px-4 py-3">
         <Pressable onPress={handleClose} hitSlop={10}>
           <X size={24} className="text-muted-foreground" />
         </Pressable>
-        <View className="flex-row items-center gap-4">
-          {isPending && (
-            <Text className="text-xs text-muted-foreground">Saving...</Text>
-          )}
-          <Pressable onPress={() => setShowConvertSheet(true)} hitSlop={10}>
-            <ArrowRightLeft size={18} className="text-muted-foreground" />
-          </Pressable>
-          <Pressable onPress={handleArchive} hitSlop={10}>
-            <Archive size={18} className="text-muted-foreground" />
-          </Pressable>
+        <View className="flex-row items-center gap-3">
+          {isPending ? <Text className="text-xs text-muted-foreground">Saving…</Text> : null}
           <Pressable onPress={handleDelete} hitSlop={10}>
-            <Trash2 size={18} className="text-destructive" />
+            <Trash2 size={20} className="text-destructive" />
           </Pressable>
         </View>
       </View>
 
-      {/* Full-screen text editor */}
       <TextInput
         value={text}
         onChangeText={setText}
-        placeholder="Start writing..."
+        placeholder="Start writing…"
         placeholderTextColor="#9ca3af"
         multiline
         textAlignVertical="top"
         autoFocus
         scrollEnabled
-        className="flex-1 px-4 pt-4 pb-8 text-foreground text-base leading-6"
+        className="flex-1 px-4 pb-8 pt-4 text-base leading-6 text-foreground"
         style={{ minHeight: windowHeight * 0.5 }}
       />
 
-      {/* Timestamp footer */}
-      <View className="px-4 py-2 border-t border-border">
-        <Text className="text-xs text-muted-foreground text-center">
-          {formatDateTime(note.updatedAt)}
+      <View className="border-t border-border px-4 py-2">
+        <Text className="text-center text-xs text-muted-foreground">
+          {formatDateTime(new Date(note.updated_at * 1000))}
         </Text>
       </View>
-
-      <ConvertToTaskSheet
-        visible={showConvertSheet}
-        note={note}
-        onClose={() => setShowConvertSheet(false)}
-        onConvert={async (noteId, schedule) => {
-          await handleConvertToTask(noteId, schedule);
-          router.back();
-        }}
-      />
     </View>
   );
 }

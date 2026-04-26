@@ -4,7 +4,7 @@ import { CalendarView } from '@/components/calendar/CalendarView';
 
 export default function CalendarScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['left', 'right']}>
+    <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>
       <View className="flex-1">
         <CalendarView />
       </View>

@@ -32,5 +32,5 @@ export const MICROCOPY = {
 
   // Celebration
   taskCompleted: 'Nice work!',
-  timerStopped: 'Take a break!',
+  timerStopped: 'Take a break!'
 } as const

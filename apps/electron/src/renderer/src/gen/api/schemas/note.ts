@@ -8,29 +8,25 @@
 
 export interface Note {
   /**
-   * Unique identifier for the note
+   * Numeric ID
    * @minimum 0
    * @exclusiveMinimum
    */
   id: number
-  /**
-   * Title of the note
-   * @minLength 1
-   * @maxLength 200
-   */
   title: string
   /**
-   * Content of the note
+   * Full Markdown content
    * @nullable
    */
-  content: string | null
+  body: string | null
   /**
-   * Timestamp when the note was archived (converted to task)
-   * @nullable
+   * 1 = pinned to top
+   * @minimum 0
+   * @maximum 1
    */
-  archivedAt: string | null
-  /** Timestamp when the note was created */
-  createdAt: string
-  /** Timestamp when the note was last updated */
-  updatedAt: string
+  pinned: number
+  /** RFC3339 timestamp */
+  created_at: string
+  /** RFC3339 timestamp */
+  updated_at: string
 }

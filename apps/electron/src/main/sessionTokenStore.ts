@@ -4,7 +4,7 @@ import path from 'path'
 
 const SESSION_TOKEN_FILENAME = 'session_token.bin'
 
-const getSessionTokenPath = () => path.join(app.getPath('userData'), SESSION_TOKEN_FILENAME)
+const getSessionTokenPath = (): string => path.join(app.getPath('userData'), SESSION_TOKEN_FILENAME)
 
 const encryptToken = (token: string): Buffer => {
   if (safeStorage.isEncryptionAvailable()) {

@@ -1,105 +1,105 @@
 ---
-title: "Techoo - Product Concept"
-brief_description: "Techoo - Product Concept"
+title: "Techo - Product Concept"
+brief_description: "Techo - Product Concept"
 created_at: "2026-02-12"
-update_at: "2026-02-12"
+update_at: "2026-04-11"
 ---
 
-# Techoo - Product Concept
+# Techo - Product Concept
 
 ## One-liner
 
-Techoo makes it incredibly easy to track your planned vs. actual progress for short-term personal tasks.
+Techo is a daily planner: you lay out the day with calendar to-dos, narrate it with posts as you go, and keep private capture in notes—one place for both your planned day and your day-to-day life.
+
+## Name and metaphor
+
+**Techo** (手帳) evokes the everyday planner—paper or digital—that holds *the day*. The product name grows out of **Techoo**, playing on the Japanese word for that kind of daily book. The app is not meant to be only a task list; it is meant to feel like **planning and writing the day on your techo**.
 
 ## The Problem
 
-Knowledge workers plan their day in their head or on paper, then dive in. Hours later they surface with no clear picture of where the time actually went. Existing tools either force heavyweight project management or offer time tracking that feels disconnected from the plan. The gap between "what I intended to do" and "what I actually did" stays invisible.
+People juggle intent (“what I meant to do today”), what actually happened, and everything else (thoughts, snippets, non-scheduled life). Those pieces often live in separate apps or nowhere durable. The day becomes hard to see as a whole: the plan, the log, and private notes drift apart.
 
 ## Core Insight
 
-If you can see your plan and your actual time side by side -- with almost no friction to record either -- you naturally get better at estimating, prioritizing, and staying focused. The feedback loop should be tight: plan in seconds, track in one click, review at a glance.
+If **the schedule**, **a lightweight log**, and **free-form notes** share one daily surface, you get a coherent picture of *your* day without heavyweight project management. Planning stays visual and time-based; remembering stays easy; capture that does not belong on the calendar still has a home.
 
 ## Who It's For
 
-Individual contributors who work on short-term, self-directed tasks: developers on personal projects, freelancers managing client work, students studying for exams, or anyone doing focused knowledge work. Not teams. Not multi-year roadmaps. Just you and your day.
+Individuals planning and reflecting on their own days: knowledge workers, students, freelancers, anyone who wants a **personal** daily planner with calendar, log, and notes—not teams, not enterprise roadmaps. Just you and your day.
+
+## Core resources
+
+Techo is built around three kinds of content. Each has a clear role so the app can cover **private day-to-day plan and logs** without forcing everything into one shape.
+
+### 1. To-dos on the calendar — “what I’m doing with my day”
+
+To-dos belong **on the calendar** because planning here means **time and intent**: blocks and moments when you mean to do something. That mirrors opening a techo and **writing the day’s plan in the grid**, not dumping an undated backlog.
+
+### 2. Posts — “what happened”
+
+As the day runs, **posts** are the **log**: short, chronological entries—often tied to the moment or linked to a calendar event or to-do you were in. Posts are not the same as the plan; they are how the day **reads back** after you live it.
+
+### 3. Notes — “not on the day’s timeline”
+
+**Notes** hold capture that does not need to sit on the schedule or in the log stream: ideas, reference, longer writing, journal-style pages. They let Techo cover **the rest of private day-to-day life** without pretending every thought is a to-do or a post.
+
+**External calendar events** (for example from Google Calendar) appear as read-only context on the same day so your plan and the world’s schedule stay in one view.
 
 ## Design Principles
 
-### 1. Plan-vs-actual is the core axis
+### 1. The day is the unit of attention
 
-Every screen should reinforce the relationship between intended time and actual time. The calendar shows where you planned to work. The timer records where you actually worked. The review shows the delta. This comparison is the product's reason to exist.
+Screens and flows should reinforce **today and the near horizon** (this week), not multi-month roadmaps. The product is optimized for seeing and editing *this* day’s plan and story.
 
-### 2. One-click to start working
+### 2. Plan on the calendar, story in posts
 
-The distance from "I want to work on this" to "a timer is running" must be exactly one action. Quick Capture creates a task and starts the timer simultaneously. Starting a timer from the calendar or task list is a single click. Anything more and people stop tracking.
+The calendar answers **“what did I plan?”** Posts answer **“what was it like?”** Keeping that distinction clear avoids collapsing planning and journaling into one undifferentiated list.
 
-### 3. Short-term focus
+### 3. Notes stay optional and free
 
-Techoo is optimized for today and this week. It is not a backlog, a roadmap, or a project management tool. Tasks have start times and durations, not sprints or milestones. The planning horizon is hours to days, not weeks to months.
+Notes should feel **unstructured** relative to to-dos and posts: no requirement to schedule or timestamp every private thought. If it belongs in a notebook page, it belongs in notes.
 
-### 4. Lightweight structure, rich signal
+### 4. Lightweight structure
 
-Tasks have a title, optional time range, and optional tags. That's it. No priority fields, no status columns, no custom fields. The richness comes from timer data: how long you actually worked, when you started and stopped, how many sessions it took. Structure is derived from behavior, not from manual entry.
+Prefer small, clear fields over heavy metadata. Richness comes from **how** items relate (time, links between posts and events/to-dos) and from consistent daily habits, not from filling many custom columns.
 
-### 5. Glanceable review
+### 5. Glanceable day
 
-You should be able to answer "how did my day/week go?" in under 5 seconds. Charts and summaries exist to give you that answer, not to generate reports for someone else.
+You should be able to answer **“what’s my day?”** and **“what did I note today?”** quickly. Summaries exist for you, not for reporting up a chain of command.
 
-## The Three Modes
+## Primary surfaces (conceptual)
 
-Techoo organizes work into three distinct modes, each optimized for a different mindset:
+- **Today / timeline-oriented views** — Compose calendar context, today’s to-dos, and posts so the day is readable at a glance.
+- **Calendar** — Week (and related) views: external events plus **your** to-dos as the planned layer of the day.
+- **Posts** — Chronological log, composer with context from the current schedule when helpful.
+- **To-dos** — Today-first lists that align with how items sit on the calendar; incomplete work across days when needed.
+- **Notes** — List and editor: pinned items, search, content that sits outside the strict plan/log timeline.
 
-### Calendar - Visual Planning
+Exact layouts may evolve; the **roles** of calendar, posts, and notes stay stable.
 
-The calendar is where you lay out your intentions. Drag to create time blocks, move them around, see your day at a glance. It answers: **"What do I plan to do?"**
+## What Techo Is Not
 
-- Day and week views
-- Drag-to-create and drag-to-move time blocks
-- Visual density shows how packed your schedule is
-- Active timers are visually distinct (red) so you see plan vs. reality in real time
-
-### Tasks - Execution
-
-The tasks view is where you do the work. It's split into three tabs reflecting the execution lifecycle:
-
-**Now** -- the daily cockpit. Quick Capture to start working immediately. Running tasks with live timers. Today's schedule to see what's next. This is the screen you live in during the workday. It answers: **"What am I doing right now?"**
-
-**Upcoming** -- the planning queue. All scheduled tasks grouped by date (Today, Tomorrow, This Week, Later). Light controls to start timers or mark tasks complete. It answers: **"What's coming up?"**
-
-**Review** -- the feedback loop. Time charts showing daily hours over the past two weeks. Breakdown by tag. Task-level summaries with total time and session count. It answers: **"Where did my time actually go?"**
-
-### Sidebar - Ambient Awareness
-
-The sidebar provides persistent context regardless of which view you're in. Active timers with live elapsed time and comment input are always visible. The system tray mirrors this so you can see what's running even when the app is in the background.
-
-## How Plan-vs-Actual Works
-
-1. **Plan**: Create a task with a time range on the calendar (e.g., "Write proposal, 10:00-11:30").
-2. **Execute**: When you start working, click Play or use Quick Capture. A timer begins recording actual time.
-3. **Log**: While the timer runs, add comments capturing what you're doing or any blockers. These attach to the task's timeline.
-4. **Stop**: When you finish or switch tasks, stop the timer. The actual duration is recorded.
-5. **Review**: At the end of the day or week, the Review tab shows your actual hours against your planned blocks. The calendar shows planned blocks alongside timer-derived actual time. The gap between plan and reality becomes visible.
-
-## What Techoo Is Not
-
-- **Not a team tool.** No shared projects, no assignments, no permissions. Single-user by design.
-- **Not a project manager.** No Gantt charts, no dependencies, no status workflows. Tasks are flat.
-- **Not a Pomodoro timer.** No forced intervals, no break reminders. You control your own rhythm.
-- **Not a habit tracker.** No streaks, no goals, no gamification. Just honest data about how you spend your time.
+- **Not a team tool.** Single-user by design: your techo, not a shared workspace.
+- **Not full project management.** No Gantt charts, dependencies, or enterprise workflows.
+- **Not a replacement for every specialist app.** It integrates calendar context and daily capture; deep specialist needs may still use other tools.
 
 ## Technical Context
 
 - **Desktop app** (Electron) with a Hono API backend (Cloudflare Workers)
-- **Offline-capable** with local SQLite by default; can point to Turso via env vars
+- **Mobile companion** (Expo, `apps/mobile`) uses the same API for today’s to-dos, posts, calendar context, and notes
+- **Multi-tenant data** with per-user databases; authentication and OAuth for services such as Google Calendar
 - **Auto-generated API client** from OpenAPI spec keeps frontend and backend in sync
-- **SWR** for data fetching with optimistic updates so the UI never feels slow
+- **SWR** for data fetching with optimistic updates so the UI stays responsive
+
+## Lineage
+
+Techo evolves ideas from the earlier **Techoo** concept, which emphasized **planned vs. actual time** with timers and tasks. Techo keeps the spirit of **honest, personal daily planning** while shifting the model to **calendar to-dos, posts as logs, and notes for everything else**.
 
 ## Future Directions (Not Committed)
 
-These are areas where the plan-vs-actual concept could naturally extend. They are not planned work -- they exist here to show the product's natural growth direction and to help evaluate whether proposed features align with the core concept.
+Possible extensions—not committed roadmap—used to test whether ideas still fit the techo metaphor.
 
-- **Daily summary**: An end-of-day view that explicitly compares planned blocks with actual timer sessions, showing over/under time per task.
-- **Estimation calibration**: Over time, show the user how accurate their time estimates are (e.g., "You typically spend 1.4x your planned time on tasks tagged 'writing'").
-- **Focus score**: A simple metric derived from timer data -- how much of your planned time was actually tracked? High scores mean your plan matched reality.
-- **Weekly reflection**: A prompted review at the end of the week encouraging the user to note what went well and what to adjust.
-- **Mobile companion**: A lightweight mobile app for quick timer start/stop and comment logging when away from the desktop.
+- **Deeper “day review”** — A single end-of-day read that contrasts planned blocks, completed to-dos, and posts.
+- **Lightweight AI assistance** — Suggestions or summaries that respect the user’s private data and the day-as-one-page idea.
+- **Mobile companion** — Extend capture and day views on the go (see `apps/mobile` README).
+- **Richer linking** — Stronger connections between posts, events, and to-dos without turning the product into a graph database for casual users.

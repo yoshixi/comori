@@ -1,177 +1,92 @@
-import { eq, and, desc, isNull } from 'drizzle-orm'
-import { notesTable, noteTaskConversionsTable, type InsertNote, type SelectNote, type InsertNoteTaskConversion } from '../db/schema/schema'
+import { eq, and, desc } from 'drizzle-orm'
+import { notesTable, type SelectNote } from '../db/schema/schema'
 import { type DB } from './common.db'
-import { formatTimestamp, getCurrentTimestamp, validateRequiredString } from './common.core'
+import { unixToIso } from './common.core'
+import type { Note, CreateNote, UpdateNote } from './notes.core'
 
-// Define API types without zod dependencies
-export interface Note {
-  id: number
-  title: string
-  content: string | null
-  archivedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface CreateNote {
-  title: string
-  content?: string
-}
-
-export interface UpdateNote {
-  title?: string
-  content?: string | null
-  archivedAt?: string | null
-}
-
-// Convert database note to API note
-export function convertDbNoteToApi(dbNote: SelectNote): Note {
+function convertDbNoteToApi(row: SelectNote): Note {
   return {
-    id: dbNote.id,
-    title: dbNote.title,
-    content: dbNote.content ?? null,
-    archivedAt: dbNote.archivedAt ? formatTimestamp(dbNote.archivedAt) : null,
-    createdAt: formatTimestamp(dbNote.createdAt),
-    updatedAt: formatTimestamp(dbNote.updatedAt)
+    id: row.id,
+    title: row.title,
+    body: row.body ?? null,
+    pinned: row.pinned,
+    created_at: unixToIso(row.createdAt),
+    updated_at: unixToIso(row.updatedAt),
   }
 }
 
-// Note database functions
-export async function getAllNotes(db: DB, userId: number, includeArchived = false): Promise<Note[]> {
-  const conditions = [eq(notesTable.userId, userId)]
-  if (!includeArchived) {
-    conditions.push(isNull(notesTable.archivedAt))
-  }
-
-  const dbNotes = await db
+export async function getNotesPage(
+  db: DB,
+  userId: number,
+  limit: number,
+  offset: number
+): Promise<{ notes: Note[]; has_more: boolean }> {
+  const take = limit + 1
+  const rows = await db
     .select()
     .from(notesTable)
-    .where(and(...conditions))
-    .orderBy(desc(notesTable.updatedAt))
+    .where(eq(notesTable.userId, userId))
+    .orderBy(desc(notesTable.pinned), desc(notesTable.updatedAt))
+    .limit(take)
+    .offset(offset)
 
-  return dbNotes.map(convertDbNoteToApi)
+  const hasMore = rows.length > limit
+  const slice = hasMore ? rows.slice(0, limit) : rows
+  return { notes: slice.map(convertDbNoteToApi), has_more: hasMore }
 }
 
 export async function getNoteById(db: DB, userId: number, noteId: number): Promise<Note | null> {
-  const [dbNote] = await db
+  const [row] = await db
     .select()
     .from(notesTable)
     .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
 
-  if (!dbNote) {
-    return null
-  }
-
-  return convertDbNoteToApi(dbNote)
+  return row ? convertDbNoteToApi(row) : null
 }
 
 export async function createNote(db: DB, userId: number, data: CreateNote): Promise<Note> {
-  const now = getCurrentTimestamp()
-  const noteData: InsertNote = {
-    userId: userId,
-    title: validateRequiredString(data.title, 'Note title'),
-    content: data.content?.trim() || null,
-    createdAt: now,
-    updatedAt: now
-  }
+  const now = Math.floor(Date.now() / 1000)
 
-  const result = await db.insert(notesTable).values(noteData).returning()
-  const dbNote = result[0]
-  if (!dbNote) {
-    throw new Error('Failed to create note')
-  }
-  return convertDbNoteToApi(dbNote)
+  const [row] = await db.insert(notesTable).values({
+    userId,
+    title: data.title.trim(),
+    body: data.body?.trim() || null,
+    pinned: 0,
+    createdAt: now,
+    updatedAt: now,
+  }).returning()
+
+  if (!row) throw new Error('Failed to create note')
+  return convertDbNoteToApi(row)
 }
 
 export async function updateNote(db: DB, userId: number, noteId: number, data: UpdateNote): Promise<Note | null> {
-  // Check if note exists and belongs to user
-  const [existingNote] = await db
-    .select()
-    .from(notesTable)
-    .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
+  const existing = await getNoteById(db, userId, noteId)
+  if (!existing) return null
 
-  if (!existingNote) {
-    return null
-  }
+  const now = Math.floor(Date.now() / 1000)
+  const updateData: Record<string, unknown> = { updatedAt: now }
 
-  const now = getCurrentTimestamp()
-  const updateData: Partial<InsertNote> = {
-    updatedAt: now
-  }
+  if (data.title !== undefined) updateData.title = data.title.trim()
+  if (data.body !== undefined) updateData.body = data.body === null ? null : data.body.trim()
+  if (data.pinned !== undefined) updateData.pinned = data.pinned
 
-  if (data.title !== undefined) {
-    updateData.title = validateRequiredString(data.title, 'Note title')
-  }
-
-  if (data.content !== undefined) {
-    updateData.content = data.content === null ? null : (data.content.trim() || null)
-  }
-
-  if (data.archivedAt !== undefined) {
-    updateData.archivedAt = data.archivedAt === null ? null : new Date(data.archivedAt)
-  }
-
-  const result = await db
+  const [row] = await db
     .update(notesTable)
     .set(updateData)
     .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
     .returning()
 
-  const updatedDbNote = result[0]
-  if (!updatedDbNote) {
-    return null
-  }
-
-  return convertDbNoteToApi(updatedDbNote)
+  return row ? convertDbNoteToApi(row) : null
 }
 
 export async function deleteNote(db: DB, userId: number, noteId: number): Promise<Note | null> {
-  const [existingNote] = await db
-    .select()
-    .from(notesTable)
-    .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
+  const existing = await getNoteById(db, userId, noteId)
+  if (!existing) return null
 
-  if (!existingNote) {
-    return null
-  }
-
-  const result = await db
+  await db
     .delete(notesTable)
     .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
-    .returning()
 
-  const deletedNote = result[0]
-  if (!deletedNote) {
-    return null
-  }
-
-  return convertDbNoteToApi(deletedNote)
-}
-
-export async function archiveNote(db: DB, userId: number, noteId: number): Promise<Note | null> {
-  const now = getCurrentTimestamp()
-
-  const result = await db
-    .update(notesTable)
-    .set({ archivedAt: now, updatedAt: now })
-    .where(and(eq(notesTable.id, noteId), eq(notesTable.userId, userId)))
-    .returning()
-
-  const archivedDbNote = result[0]
-  if (!archivedDbNote) {
-    return null
-  }
-
-  return convertDbNoteToApi(archivedDbNote)
-}
-
-export async function recordConversion(db: DB, noteId: number, taskId: number): Promise<void> {
-  const now = getCurrentTimestamp()
-  const conversionData: InsertNoteTaskConversion = {
-    noteId,
-    taskId,
-    createdAt: now
-  }
-
-  await db.insert(noteTaskConversionsTable).values(conversionData)
+  return existing
 }

@@ -31,8 +31,12 @@ function getLogger(): Logger {
           const obj = o as Record<string, unknown>
           // Pino browser mode emits numeric levels; convert to labels.
           const LEVEL_LABELS: Record<number, string> = {
-            10: 'trace', 20: 'debug', 30: 'info',
-            40: 'warn', 50: 'error', 60: 'fatal',
+            10: 'trace',
+            20: 'debug',
+            30: 'info',
+            40: 'warn',
+            50: 'error',
+            60: 'fatal',
           }
           if (typeof obj.level === 'number') {
             obj.level = LEVEL_LABELS[obj.level] ?? String(obj.level)

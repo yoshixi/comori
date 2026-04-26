@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import useSwr from 'swr'
 import { Button } from './ui/button'
-import { Keyboard, Bell, CheckCircle, XCircle, AlertCircle, LogOut, User, ChevronDown, ChevronRight, Link } from 'lucide-react'
+import {
+  Keyboard,
+  Bell,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  LogOut,
+  User,
+  ChevronDown,
+  ChevronRight,
+  Link
+} from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { customInstance } from '../lib/api/mutator'
 import { getSessionToken } from '../lib/auth'
@@ -30,7 +41,11 @@ const keyboardShortcuts = [
   { keys: ['Shift', 'Tab'], description: 'Navigate to previous task' }
 ]
 
-function NotificationStatusBadge({ status }: { status: NotificationPermissionStatus }): React.JSX.Element {
+function NotificationStatusBadge({
+  status
+}: {
+  status: NotificationPermissionStatus
+}): React.JSX.Element {
   switch (status) {
     case 'granted':
       return (
@@ -79,7 +94,11 @@ function CollapsibleSection({
           {icon}
           {title}
         </span>
-        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+        {open ? (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        )}
       </button>
       {open && <div className="px-6 pb-5 pt-0">{children}</div>}
     </div>
@@ -88,7 +107,8 @@ function CollapsibleSection({
 
 export function AccountView(): React.JSX.Element {
   const { user, signOut } = useAuth()
-  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>('not-determined')
+  const [notificationStatus, setNotificationStatus] =
+    useState<NotificationPermissionStatus>('not-determined')
   const [isRequesting, setIsRequesting] = useState(false)
   const [isLinkingGoogle, setIsLinkingGoogle] = useState(false)
   const [linkStatus, setLinkStatus] = useState<'success' | 'error' | null>(null)
@@ -156,9 +176,7 @@ export function AccountView(): React.JSX.Element {
   return (
     <div className="p-8 overflow-auto flex-1 min-h-0">
       <h2 className="text-2xl font-semibold tracking-tight">Your Space</h2>
-      <p className="mt-2 text-muted-foreground">
-        Manage your account and preferences.
-      </p>
+      <p className="mt-2 text-muted-foreground">Manage your account and preferences.</p>
 
       <div className="mt-8 space-y-6">
         {/* Profile */}
@@ -201,7 +219,9 @@ export function AccountView(): React.JSX.Element {
             )}
             {notificationStatus !== 'not-determined' && (
               <Button size="sm" variant="outline" onClick={handleOpenSettings}>
-                {notificationStatus === 'denied' ? 'Open System Settings' : 'Manage in System Settings'}
+                {notificationStatus === 'denied'
+                  ? 'Open System Settings'
+                  : 'Manage in System Settings'}
               </Button>
             )}
           </div>
@@ -273,7 +293,7 @@ export function AccountView(): React.JSX.Element {
 
         {/* About — minimal footer */}
         <div className="pt-2 text-center text-sm text-muted-foreground">
-          Techoo — Your cozy focus companion
+          Techo — Your digital planner
         </div>
       </div>
     </div>

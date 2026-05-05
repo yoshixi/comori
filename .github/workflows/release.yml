@@ -25,6 +25,7 @@ jobs:
             platform: linux
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -38,20 +39,6 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-
-      - name: Get pnpm store path
-        id: pnpm-store
-        shell: bash
-        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache pnpm store
-        uses: actions/cache@v4
-        if: steps.pnpm-store.outputs.path != ''
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-${{ runner.os }}-
 
       - name: Cache Electron downloads
         uses: actions/cache@v4
